@@ -1,0 +1,41 @@
+{
+  "climateInformationSystem": "Sisitemu y'Amakuru y'Ibihe",
+  "dashboard": "Ikibaho",
+  "forecasts": "Iteganyagihe",
+  "historical": "Amakuru y'amateka",
+  "alerts": "Amakuru y'umutekano",
+  "farmers": "Gucunga abahinzi",
+  "messages": "Ubutumwa",
+  "settings": "Igenamiterere",
+
+  "todayForecast": "Iteganyagihe ry'uyu munsi",
+  "weeklyOverview": "Incamake y'icyumweru",
+  "recentActivity": "Ibikorwa bya vuba",
+  "farmerGroups": "Amatsinda y'abahinzi",
+
+  "temperature": "Ubushyuhe",
+  "rainfall": "Imvura",
+  "humidity": "Ubuhehere",
+  "wind": "Umuvuduko w'umuyaga",
+
+  "viewDetails": "Reba Ibisobanuro",
+  "sendMessage": "Ohereza Ubutumwa",
+  "exportData": "Kuramo Amakuru",
+
+  "search": "Shakisha...",
+  "filterBy": "Shungura ku...",
+  "sortBy": "Tondeka ku...",
+  "darkMode": "Ibara Ryijimye",
+  "lightMode": "Ibara Ryerurutse",
+  "language": "Ururimi",
+
+  "compose": "Andika Ubutumwa",
+  "selectRecipients": "Hitamo Abakiriya",
+  "messageTemplate": "Imbata y'ubutumwa",
+  "schedule": "Gahunda",
+  "send": "Ohereza",
+
+  "farmersReached": "Abahinzi Bagezweho",
+  "messagesDelivered": "Ubutumwa Bwatanzwe",
+  "alertsTriggered": "Imiburo Yatanzwe"
+}

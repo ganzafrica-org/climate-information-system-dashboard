@@ -1,0 +1,41 @@
+{
+  "climateInformationSystem": "Climate Information System",
+  "dashboard": "Dashboard",
+  "forecasts": "Weather Forecasts",
+  "historical": "Historical Data",
+  "alerts": "Weather Alerts",
+  "farmers": "Farmer Management",
+  "messages": "Messaging",
+  "settings": "Settings",
+
+  "todayForecast": "Today's Forecast",
+  "weeklyOverview": "Weekly Overview",
+  "recentActivity": "Recent Activity",
+  "farmerGroups": "Farmer Groups",
+
+  "temperature": "Temperature",
+  "rainfall": "Rainfall",
+  "humidity": "Humidity",
+  "wind": "Wind Speed",
+
+  "viewDetails": "View Details",
+  "sendMessage": "Send Message",
+  "exportData": "Export Data",
+
+  "search": "Search...",
+  "filterBy": "Filter by",
+  "sortBy": "Sort by",
+  "darkMode": "Dark Mode",
+  "lightMode": "Light Mode",
+  "language": "Language",
+
+  "compose": "Compose Message",
+  "selectRecipients": "Select Recipients",
+  "messageTemplate": "Message Template",
+  "schedule": "Schedule",
+  "send": "Send",
+
+  "farmersReached": "Farmers Reached",
+  "messagesDelivered": "Messages Delivered",
+  "alertsTriggered": "Alerts Triggered"
+}
