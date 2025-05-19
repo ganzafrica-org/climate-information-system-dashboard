@@ -5,13 +5,13 @@ import Head from 'next/head';
 export default function Home() {
   const router = useRouter();
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      router.replace('/dashboard');
-    }, 5000);
+useEffect(() => {
+      const timeout = setTimeout(() => {
+        router.replace('/dashboard');
+      }, 5000);
 
-    return () => clearTimeout(timeout);
-  }, [router]);
+      return () => clearTimeout(timeout);
+    }, [router]);
 
   return (
       <>
@@ -23,49 +23,26 @@ export default function Home() {
             <div className="relative h-24 w-24">
               <div className="absolute h-24 w-24 rounded-full bg-ganz-primary/10 animate-pulse"></div>
 
-              {/* Leaf 1 - Top Left */}
-              <div className="absolute top-1/4 left-1/4 h-10 w-6 text-ganz-primary animate-sway">
-                <svg viewBox="0 0 30 50" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 h-16 w-16 text-ganz-primary animate-grow">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
-                      d="M15 5 C8 15, 8 35, 15 45 C22 35, 22 15, 15 5 Z"
+                      d="M7 17.9999C11.5714 17.9999 19 15.9999 19 6.99994C19 6.99994 14.5 12.9999 7 12.9999V17.9999Z"
                       stroke="currentColor"
                       strokeWidth="2"
-                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="animate-wave"
                   />
-                  <circle cx="15" cy="5" r="3" fill="currentColor" />
-                  <circle cx="15" cy="45" r="3" fill="currentColor" />
-                </svg>
-              </div>
-
-              {/* Leaf 2 - Top Right */}
-              <div className="absolute top-1/4 right-1/4 h-10 w-6 text-ganz-primary animate-sway animation-delay-300">
-                <svg viewBox="0 0 30 50" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path
-                      d="M15 5 C8 15, 8 35, 15 45 C22 35, 22 15, 15 5 Z"
+                      d="M7 13C7 13 3 10 3 7C3 7 8.5 5 12 3C12 3 12.5 8.5 7 13Z"
                       stroke="currentColor"
                       strokeWidth="2"
-                      fill="none"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      className="animate-wave animation-delay-300"
                   />
-                  <circle cx="15" cy="5" r="3" fill="currentColor" />
-                  <circle cx="15" cy="45" r="3" fill="currentColor" />
                 </svg>
               </div>
-
-              {/* Leaf 3 - Bottom Left */}
-              <div className="absolute bottom-1/4 left-1/4 h-10 w-6 text-ganz-primary animate-sway animation-delay-600">
-                <svg viewBox="0 0 30 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                      d="M15 5 C8 15, 8 35, 15 45 C22 35, 22 15, 15 5 Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      fill="none"
-                  />
-                  <circle cx="15" cy="5" r="3" fill="currentColor" />
-                  <circle cx="15" cy="45" r="3" fill="currentColor" />
-                </svg>
-              </div>
-
-              {/* Raindrops - optional, kept from your original design */}
               <div className="absolute top-0 left-1/2 transform -translate-x-1/2 h-3 w-3 text-blue-500 animate-raindrop">
                 <svg viewBox="0 0 24 24" fill="currentColor">
                   <path d="M12 21.5C14.2091 21.5 16 19.7091 16 17.5C16 15.2909 12 9.5 12 9.5C12 9.5 8 15.2909 8 17.5C8 19.7091 9.79086 21.5 12 21.5Z" />
@@ -76,8 +53,13 @@ export default function Home() {
                   <path d="M12 21.5C14.2091 21.5 16 19.7091 16 17.5C16 15.2909 12 9.5 12 9.5C12 9.5 8 15.2909 8 17.5C8 19.7091 9.79086 21.5 12 21.5Z" />
                 </svg>
               </div>
+              <div className="absolute top-0 left-2/3 transform -translate-x-2/3 h-2.5 w-2.5 text-blue-500 animate-raindrop animation-delay-700">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M12 21.5C14.2091 21.5 16 19.7091 16 17.5C16 15.2909 12 9.5 12 9.5C12 9.5 8 15.2909 8 17.5C8 19.7091 9.79086 21.5 12 21.5Z" />
+                </svg>
+              </div>
 
-              {/* Sun - optional, kept from your original design */}
+              {/* Animated Sun */}
               <div className="absolute bottom-1 right-1 h-8 w-8 text-yellow-500 animate-spin-slow">
                 <svg viewBox="0 0 24 24" fill="currentColor">
                   <circle cx="12" cy="12" r="5" />
