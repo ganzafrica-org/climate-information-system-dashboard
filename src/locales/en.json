@@ -570,5 +570,7 @@
   "cropSpecific": "Crop Specific",
 
   "recentMessagesSent": "Recently sent messages",
-  "upcomingMessages": "Upcoming scheduled messages"
+  "upcomingMessages": "Upcoming scheduled messages",
+
+  "training": "Training"
 }
