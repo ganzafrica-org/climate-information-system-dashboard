@@ -3,7 +3,6 @@ import { NextPage } from 'next';
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useLanguage } from '@/i18n';
-import { useTheme } from 'next-themes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,19 +18,16 @@ import {
     Lock,
     LogOut,
     Mail,
-    Moon,
     RefreshCw,
     Save,
     Settings as SettingsIcon,
     Shield,
-    Sun,
     User,
     Send, Trash
 } from 'lucide-react';
 
 const Settings: NextPage = () => {
     const { t, locale, changeLanguage } = useLanguage();
-    const { theme, setTheme } = useTheme();
     const [activeTab, setActiveTab] = useState('general');
 
     return (
@@ -157,55 +153,6 @@ const Settings: NextPage = () => {
                                                     <span>Kinyarwanda</span>
                                                 </div>
                                                 {locale === 'rw' && <Check className="h-4 w-4 text-primary" />}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('appearance')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('themeSettingDesc')}
-                                        </p>
-                                        <div className="flex items-center gap-4">
-                                            <div
-                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 ${
-                                                    theme === 'light' ? 'bg-muted/50 border-primary' : ''
-                                                }`}
-                                                role="button"
-                                                onClick={() => setTheme('light')}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Sun className="h-4 w-4" />
-                                                    <span>{t('lightMode')}</span>
-                                                </div>
-                                                {theme === 'light' && <Check className="h-4 w-4 text-primary" />}
-                                            </div>
-                                            <div
-                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 ${
-                                                    theme === 'dark' ? 'bg-muted/50 border-primary' : ''
-                                                }`}
-                                                role="button"
-                                                onClick={() => setTheme('dark')}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Moon className="h-4 w-4" />
-                                                    <span>{t('darkMode')}</span>
-                                                </div>
-                                                {theme === 'dark' && <Check className="h-4 w-4 text-primary" />}
-                                            </div>
-                                            <div
-                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 ${
-                                                    theme === 'system' ? 'bg-muted/50 border-primary' : ''
-                                                }`}
-                                                role="button"
-                                                onClick={() => setTheme('system')}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <DesktopIcon className="h-4 w-4" />
-                                                    <span>{t('systemDefault')}</span>
-                                                </div>
-                                                {theme === 'system' && <Check className="h-4 w-4 text-primary" />}
                                             </div>
                                         </div>
                                     </div>

@@ -1,40 +1,176 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# GanzAfrica Climate Information System
+
+A localized weather and farming advisory system for farmers in Musanze region, Rwanda. This application provides real-time weather forecasts, agricultural alerts, historical data analysis, and farmer management tools.
+
+## Features
+
+- **Dashboard**: Overview of current weather conditions and farming advisories
+- **Weather Forecasts**: 7-day weather predictions with farming recommendations
+- **Historical Data**: Analysis of weather trends and patterns
+- **Weather Alerts**: Timely notifications for weather events
+- **Farmer Management**: Registration and organization of farmer information
+- **Messaging System**: Send targeted alerts and information to farmers
+- **Multilingual Support**: Available in English and Kinyarwanda
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+
+- Node.js 18.x or higher
+- npm or yarn
+- Git
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/ganzafrica-climate-information-system.git
+   cd ganzafrica-climate-information-system
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. Set up environment variables:
+   Create a `.env.local` file in the root directory with the following variables:
+   ```
+   NEXT_PUBLIC_API_URL=your_api_url_here
+   ```
+
+4. Run the development server:
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+5. Open [http://localhost:3000](http://localhost:3000) in your browser to see the application.
+
+## Building for Production
 
 ```bash
-npm run dev
+npm run build
 # or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+yarn build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then start the production server:
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+```bash
+npm start
+# or
+yarn start
+```
 
-[API routes](https://nextjs.org/docs/api-routes/introduction) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+## Project Structure
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/api-routes/introduction) instead of React pages.
+- `/src/pages`: Next.js pages using the Pages Router
+- `/src/components`: Reusable React components
+- `/src/hooks`: Custom React hooks
+- `/src/lib`: Utility functions and configurations
+- `/src/styles`: Global CSS and styling utilities
+- `/src/i18n`: Internationalization setup
+- `/src/locales`: Translation files
 
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
+## API Client
 
-## Learn More
+The project uses a custom API client for handing data.
 
-To learn more about Next.js, take a look at the following resources:
+### Setup
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The API client is already configured in the project. The main setup happens in:
+- `src/lib/apiClient.ts`: The main API client with request methods
+- `src/lib/queryProvider.tsx`: The React Query provider component
+- `src/pages/_app.tsx`: Where the QueryProvider wraps the application
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+### Using the API Client
 
-## Deploy on Vercel
+The API client provides a simple interface with `{ data, isLoading, error }` for all API requests.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+#### GET Request
+```tsx
+import { apiClient } from '@/lib/apiClient';
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
+function MyComponent() {
+  // Simple GET
+  const { data, isLoading, error } = apiClient.get('/forecasts', {
+    params: { region: 'Musanze' }
+  });
+
+  // GET with pagination
+  const { data: paginatedData, isLoading: loadingPaginated, error: paginationError } = 
+    apiClient.get('/farmers', {
+      pagination: { page: 1, pageSize: 10 }
+    });
+
+  // Rest of your component...
+}
+```
+
+#### POST Request
+```tsx
+import { apiClient } from '@/lib/apiClient';
+import { useState } from 'react';
+
+function CreateComponent() {
+  const [submittedData, setSubmittedData] = useState(null);
+  
+  const handleSubmit = (formData) => {
+    // Set state to trigger the POST request
+    setSubmittedData(formData);
+  };
+
+  // POST request happens when submittedData is set
+  const { data, isLoading, error } = apiClient.post('/alerts', {
+    data: submittedData
+  });
+
+  // Rest of your component...
+}
+```
+
+#### PUT Request
+```tsx
+import { apiClient } from '@/lib/apiClient';
+import { useState } from 'react';
+
+function UpdateComponent({ itemId }) {
+  const [updateData, setUpdateData] = useState(null);
+  
+  const handleUpdate = (formData) => {
+    setUpdateData(formData);
+  };
+
+  // PUT request happens when updateData is set
+  const { data, isLoading, error } = apiClient.put(`/items/${itemId}`, {
+    data: updateData
+  });
+}
+```
+
+#### DELETE Request
+```tsx
+import { apiClient } from '@/lib/apiClient';
+import { useState } from 'react';
+
+function DeleteComponent({ itemId }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  
+  const handleDelete = () => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      setConfirmDelete(true);
+    }
+  };
+
+  // DELETE request happens when confirmDelete is set to true
+  const { data, isLoading, error } = apiClient.delete(`/items/${itemId}`, {
+    data: confirmDelete
+  });
+
+  // Rest of your component...
+}
+```
