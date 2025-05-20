@@ -172,7 +172,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <div className="flex h-16 items-center justify-between px-4 border-b border-border">
                         <div className="flex items-center space-x-2">
                             <div className="h-8 w-8 rounded-full bg-ganz-primary flex items-center justify-center">
-                                <div className="h-6 w-6 text-white">
+                                <div className="h-6 w-6 text-black dark:text-white">
                                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M7 17.9999C11.5714 17.9999 19 15.9999 19 6.99994C19 6.99994 14.5 12.9999 7 12.9999V17.9999Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                         <path d="M7 13C7 13 3 10 3 7C3 7 8.5 5 12 3C12 3 12.5 8.5 7 13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
