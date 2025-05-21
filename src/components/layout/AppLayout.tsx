@@ -14,14 +14,15 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
-    BookOpen
+    BookOpen,
+    HelpCircle
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'; // Import Sheet components
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -201,16 +202,6 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 );
                             })}
                         </nav>
-                        <div className="mt-auto px-2 py-4">
-                            <Separator className="my-2" />
-                            <Button
-                                variant="ghost"
-                                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
-                            >
-                                <LogOut size={20} />
-                                <span className="ml-3">{t('logout')}</span>
-                            </Button>
-                        </div>
                     </div>
                 </div>
             </SheetContent>
@@ -230,6 +221,13 @@ export function AppLayout({ children }: AppLayoutProps) {
                         </h1>
                     </div>
                     <div className="flex items-center space-x-2">
+                        <Link href="/help">
+                            <Button variant="ghost" size="sm" className="flex items-center">
+                                <HelpCircle className="h-4 w-4 mr-1" />
+                                <span className="hidden md:inline">{t('help')}</span>
+                            </Button>
+                        </Link>
+
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="flex items-center">
@@ -246,7 +244,6 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
-
                     </div>
                 </header>
 

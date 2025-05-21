@@ -16,14 +16,13 @@ import {
     HelpCircle,
     InfoIcon,
     Lock,
-    LogOut,
     Mail,
     RefreshCw,
     Save,
     Settings as SettingsIcon,
     Shield,
     User,
-    Send, Trash
+    Send, Trash, LogOut
 } from 'lucide-react';
 
 const Settings: NextPage = () => {
@@ -93,22 +92,6 @@ const Settings: NextPage = () => {
                                 >
                                     <InfoIcon className="h-4 w-4 mr-2" />
                                     {t('about')}
-                                </Button>
-                                <Button
-                                    variant={activeTab === 'help' ? 'secondary' : 'ghost'}
-                                    className="w-full justify-start"
-                                    onClick={() => setActiveTab('help')}
-                                >
-                                    <HelpCircle className="h-4 w-4 mr-2" />
-                                    {t('help')}
-                                </Button>
-                                <Separator className="my-2" />
-                                <Button
-                                    variant="ghost"
-                                    className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
-                                >
-                                    <LogOut className="h-4 w-4 mr-2" />
-                                    {t('logout')}
                                 </Button>
                             </nav>
                         </CardContent>
@@ -625,105 +608,6 @@ const Settings: NextPage = () => {
                                                 <Globe className="h-4 w-4 text-muted-foreground" />
                                                 <span>www.ganzafrica.org</span>
                                             </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </>
-                        )}
-                        {activeTab === 'help' && (
-                            <>
-                                <CardHeader>
-                                    <CardTitle>{t('help')}</CardTitle>
-                                    <CardDescription>{t('helpAndSupportDesc')}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="space-y-4">
-                                        <h3 className="text-base font-medium">{t('frequentlyAskedQuestions')}</h3>
-
-                                        <div className="space-y-3">
-                                            {[
-                                                {
-                                                    question: 'faqQuestion1',
-                                                    answer: 'faqAnswer1'
-                                                },
-                                                {
-                                                    question: 'faqQuestion2',
-                                                    answer: 'faqAnswer2'
-                                                },
-                                                {
-                                                    question: 'faqQuestion3',
-                                                    answer: 'faqAnswer3'
-                                                },
-                                                {
-                                                    question: 'faqQuestion4',
-                                                    answer: 'faqAnswer4'
-                                                }
-                                            ].map((faq, index) => (
-                                                <div key={index} className="border rounded-md p-4">
-                                                    <button className="flex w-full items-start justify-between text-left">
-                                                        <span className="font-medium">{t(faq.question)}</span>
-                                                        <ChevronDown className="h-4 w-4" />
-                                                    </button>
-                                                    <div className="mt-2 text-sm text-muted-foreground">
-                                                        {t(faq.answer)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('userManual')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('userManualDesc')}
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                            <Button variant="outline">
-                                                <FileIcon className="h-4 w-4 mr-2" />
-                                                {t('downloadUserManual')}
-                                            </Button>
-                                            <Button variant="outline">
-                                                <BookOpen className="h-4 w-4 mr-2" />
-                                                {t('viewOnlineDocumentation')}
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('contactSupport')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('contactSupportDesc')}
-                                        </p>
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium">{t('name')}</label>
-                                                    <Input placeholder={t('yourName')} />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-sm font-medium">{t('email')}</label>
-                                                    <Input placeholder={t('yourEmail')} />
-                                                </div>
-                                                <div className="col-span-1 md:col-span-2 space-y-2">
-                                                    <label className="text-sm font-medium">{t('subject')}</label>
-                                                    <Input placeholder={t('subject')} />
-                                                </div>
-                                                <div className="col-span-1 md:col-span-2 space-y-2">
-                                                    <label className="text-sm font-medium">{t('message')}</label>
-                                                    <textarea
-                                                        className="min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                                        placeholder={t('describeYourIssue')}
-                                                    ></textarea>
-                                                </div>
-                                            </div>
-                                            <Button>
-                                                <Send className="h-4 w-4 mr-2" />
-                                                {t('sendMessage')}
-                                            </Button>
                                         </div>
                                     </div>
                                 </CardContent>
