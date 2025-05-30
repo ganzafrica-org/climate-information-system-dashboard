@@ -124,7 +124,7 @@ const Dashboard: NextPage = () => {
     const [selectedSector, setSelectedSector] = useState('all');
     const [selectedCrop, setSelectedCrop] = useState('all');
     const alerts = generateAgriAlerts();
-
+    
     const getCurrentSeason = () => {
         const month = new Date().getMonth() + 1; // 1-12
         if (month >= 9 || month <= 2) return 'seasons.seasonA';
@@ -137,16 +137,16 @@ const Dashboard: NextPage = () => {
             <Head>
                 <title>{t('dashboard')} | {t('climateInformationSystem')}</title>
             </Head>
-
+            
             <div className="space-y-4 md:space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
                     <div className="flex items-center gap-2">
                         <MapPin className="h-5 w-5 text-ganz-primary" />
                         <h2 className="text-lg font-medium">{t('musanzeRegion')}</h2>
-
+                        
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="ml-2">
+                                <Button variant="outline" size="sm" className="ml-2 h-9">
                                     <span>{selectedSector === 'all' ? t('selectRegion') : selectedSector}</span>
                                     <ChevronDown className="ml-2 h-4 w-4" />
                                 </Button>
@@ -174,8 +174,8 @@ const Dashboard: NextPage = () => {
                                 className="pl-8 w-full sm:w-[180px] h-9"
                             />
                         </div>
-                        <Button variant="outline" size="sm">
-                            <Filter className="mr-2 h-4 w-4" />
+                        <Button variant="primary" size="sm" className='h-9 px-3'>
+                            <Filter className=" h-4 w-4" />
                             {t('filterBy')}
                         </Button>
                     </div>
@@ -188,7 +188,7 @@ const Dashboard: NextPage = () => {
                                 <span className="font-medium">{t('currentSeason')}: </span>
                                 <span className="font-bold">{t(getCurrentSeason())}</span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            {/* <div className="flex flex-wrap gap-2 bg-pink-300">
                                 {cropData.map(crop => (
                                     <Button
                                         key={crop.id}
@@ -201,14 +201,14 @@ const Dashboard: NextPage = () => {
                                         <span>{t(crop.name)}</span>
                                     </Button>
                                 ))}
-                            </div>
+                            </div> */}
                         </div>
                     </CardContent>
                 </Card>
 
                 <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                     <Card className="col-span-1">
-                        <CardHeader className="pb-2">
+                        <CardHeader className="pb-4">
                             <CardTitle>{t('todayForecast')}</CardTitle>
                             <CardDescription>Musanze {selectedSector !== 'all' ? `- ${selectedSector}` : ''}</CardDescription>
                         </CardHeader>
@@ -252,7 +252,7 @@ const Dashboard: NextPage = () => {
                             </div>
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" variant="outline">
+                            <Button className="w-full" variant="primary">
                                 {t('viewDetails')}
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
@@ -292,14 +292,14 @@ const Dashboard: NextPage = () => {
                             ))}
                         </CardContent>
                         <CardFooter>
-                            <Button className="w-full" variant="outline">
+                            <Button className="w-full" variant="primary_outline">
                                 {t('viewAllAlerts')}
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
                         </CardFooter>
                     </Card>
                     <Card className="col-span-1">
-                        <CardHeader className="pb-2">
+                        <CardHeader className="pb-4">
                             <CardTitle>{t('farmingConditions')}</CardTitle>
                             <CardDescription>{t('forNextWeek')}</CardDescription>
                         </CardHeader>
@@ -390,8 +390,8 @@ const Dashboard: NextPage = () => {
                                 <CardTitle>{t('weeklyOverview')}: {t('temperature')}</CardTitle>
                                 <CardDescription>{t('januaryToDecember')} 2024</CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px]">
+                            <CardContent className=''>
+                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                     <LineChart data={weatherData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis
@@ -425,7 +425,7 @@ const Dashboard: NextPage = () => {
                                 <CardDescription>{t('januaryToDecember')} 2024</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px]">
+                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                     <BarChart data={weatherData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis
@@ -439,7 +439,7 @@ const Dashboard: NextPage = () => {
                                         <Legend />
                                         <Bar
                                             dataKey="rainfall"
-                                            fill="#3b82f6"
+                                            fill="#004b23"
                                             name={t('rainfall')}
                                             radius={4}
                                         />
@@ -456,7 +456,7 @@ const Dashboard: NextPage = () => {
                                 <CardDescription>{t('januaryToDecember')} 2024</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px]">
+                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                     <LineChart data={weatherData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis
