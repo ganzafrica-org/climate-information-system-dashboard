@@ -159,7 +159,7 @@ const Forecasts: NextPage = () => {
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="ml-2">
+                                <Button variant="outline" size="sm" className="ml-2 h-9">
                                     <span>{selectedSector === 'all' ? t('selectRegion') : selectedSector}</span>
                                     <ChevronDown className="ml-2 h-4 w-4" />
                                 </Button>
@@ -188,12 +188,12 @@ const Forecasts: NextPage = () => {
                     </div>
                 </div>
                 <div className="w-full overflow-x-auto pb-2">
-                    <div className="flex min-w-max space-x-2">
+                    <div className="flex min-w-max space-x-3">
                         {weeklyForecast.map((day, index) => (
                             <Card
                                 key={day.day}
-                                className={`w-[120px] flex-shrink-0 cursor-pointer transition-colors ${
-                                    activeDay === index ? 'border-ganz-primary bg-ganz-primary/5' : ''
+                                className={`w-[120px] lg:w-[140px] flex-shrink-0 cursor-pointer transition-colors ${
+                                    activeDay === index ? 'border-green-950' : ''
                                 }`}
                                 onClick={() => setActiveDay(index)}
                             >
@@ -202,8 +202,11 @@ const Forecasts: NextPage = () => {
                                     <div className="text-xs text-muted-foreground">{day.date}</div>
                                     <div className="my-2 flex justify-center text-blue-500">{day.icon}</div>
                                     <div className="flex justify-center gap-2 text-sm">
+                                        {/* <span className="font-medium text-muted-foreground">T:</span> */}
+                                        <span className="text-medium">{day.temperature.low}°</span>
+                                        <span className="font-medium">-</span>
                                         <span className="font-medium">{day.temperature.high}°</span>
-                                        <span className="text-muted-foreground">{day.temperature.low}°</span>
+                                        
                                     </div>
                                     {day.alerts.length > 0 && (
                                         <div className="mt-1 flex justify-center">
