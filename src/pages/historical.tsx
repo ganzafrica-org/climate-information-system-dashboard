@@ -194,7 +194,6 @@ const Historical: NextPage = () => {
                         <TabsTrigger value="monthly">{t('monthly')}</TabsTrigger>
                         <TabsTrigger value="seasonal">{t('seasonal')}</TabsTrigger>
                         <TabsTrigger value="annual">{t('annual')}</TabsTrigger>
-                        <TabsTrigger value="historical">{t('fiveYearTrend')}</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
@@ -259,7 +258,7 @@ const Historical: NextPage = () => {
                         </CardContent>
                     </Card>
                 </div>
-
+                
                 {/* Different time period views */}
                 {selectedTimePeriod === 'monthly' && (
                     <Card>
@@ -479,110 +478,6 @@ const Historical: NextPage = () => {
                         </Card>
                     </div>
                 )}
-
-                {selectedTimePeriod === 'historical' && (
-                    <Card>
-                        <div className="flex items-center justify-between py-4 pr-5">
-                            <CardHeader>
-                            <CardTitle>{t('fiveYearClimateAnalysis')}</CardTitle>
-                            <CardDescription>
-                                {t('longTermTrends')}
-                            </CardDescription>
-                        </CardHeader>
-                        <Button variant="primary">
-                                <Download className="h-4 w-4 mr-2" />
-                                {t('downloadFullReport')}
-                            </Button>
-                        </div>
-                        <CardContent className="space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div>
-                                    <h3 className="font-medium mb-4">{t('temperatureTrend')}</h3>
-                                    <div className="flex items-center text-2xl mb-4">
-                                        <TrendingUp className="h-6 w-6 mr-2 text-red-500" />
-                                        <span>+{temperatureTrend.toFixed(1)}°C</span>
-                                        <span className="text-muted-foreground text-sm ml-2">
-                      {t('overFiveYears')}
-                    </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {t('temperatureTrendAnalysis')}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h3 className="font-medium mb-4">{t('rainfallTrend')}</h3>
-                                    <div className="flex items-center text-2xl mb-4">
-                                        {rainfallTrend > 0 ? (
-                                            <TrendingUp className="h-6 w-6 mr-2 text-green-500" />
-                                        ) : (
-                                            <TrendingDown className="h-6 w-6 mr-2 text-red-500" />
-                                        )}
-                                        <span className={rainfallTrend > 0 ? 'text-green-500' : 'text-red-500'}>
-                      {rainfallTrend > 0 ? '+' : ''}{(rainfallTrend * 100).toFixed(1)}%
-                    </span>
-                                        <span className="text-muted-foreground text-sm ml-2">
-                      {t('averageAnnualChange')}
-                    </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {t('rainfallTrendAnalysis')}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <Separator />
-
-                            <div>
-                                <h3 className="font-medium mb-4">{t('agriculturalImplications')}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">{t('positiveEffects')}</h4>
-                                        <ul className="space-y-1 text-sm">
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('positiveEffect1')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('positiveEffect2')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('positiveEffect3')}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">{t('challengesToAddress')}</h4>
-                                        <ul className="space-y-1 text-sm">
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-red-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('challenge1')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-red-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('challenge2')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-red-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('challenge3')}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                        {/* <CardFooter>
-                            <Button variant="outline" className="ml-auto">
-                                <Download className="h-4 w-4 mr-2" />
-                                {t('downloadFullReport')}
-                            </Button>
-                        </CardFooter> */}
-                    </Card>
-                )}
-
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('compareSections')}</CardTitle>
