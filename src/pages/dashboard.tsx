@@ -40,7 +40,7 @@ import {
     Sun,
     Thermometer,
     Umbrella,
-    BarChart as BarChartIcon,
+    Filter,
 } from 'lucide-react';
 import dynamic from "next/dynamic";
 
@@ -122,17 +122,9 @@ const generateAgriAlerts = () => {
     ];
 };
 
-const cropData = [
-    { id: 'maize', name: 'maize', icon: '🌽' },
-    { id: 'beans', name: 'beans', icon: '🌱' },
-    { id: 'potatoes', name: 'potatoes', icon: '🥔' },
-    { id: 'vegetables', name: 'vegetables', icon: '🥬' }
-];
-
 const Dashboard: NextPage = () => {
     const { t } = useLanguage();
     const [selectedSector, setSelectedSector] = useState('all');
-    const [selectedCrop, setSelectedCrop] = useState('all');
     const [dashboardView, setDashboardView] = useState<'map' | 'charts'>('map');
     const alerts = generateAgriAlerts();
 
