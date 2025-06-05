@@ -3,10 +3,14 @@ import { NextPage } from 'next';
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useLanguage } from '@/i18n';
+import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { toast } from 'sonner';
 import {
     Bell,
     Check,
@@ -22,12 +26,95 @@ import {
     Settings as SettingsIcon,
     Shield,
     User,
-    Send, Trash, LogOut
+    Send,
+    Trash,
+    LogOut,
+    Eye,
+    EyeOff,
+    Loader2
 } from 'lucide-react';
 
 const Settings: NextPage = () => {
     const { t, locale, changeLanguage } = useLanguage();
+    const { user, updateProfile, changePassword } = useAuth();
     const [activeTab, setActiveTab] = useState('general');
+
+    const [profileData, setProfileData] = useState({
+        phone: user?.phone || '',
+    });
+    const [profileLoading, setProfileLoading] = useState(false);
+    const [profileError, setProfileError] = useState('');
+
+    const [passwordData, setPasswordData] = useState({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
+    });
+    const [passwordLoading, setPasswordLoading] = useState(false);
+    const [passwordError, setPasswordError] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+    const handleProfileUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setProfileError('');
+        setProfileLoading(true);
+
+        const phoneRegex = /^\+250\d{9}$/;
+        if (!phoneRegex.test(profileData.phone)) {
+            setProfileError(t('invalidPhoneFormat') || 'Phone number must be in format +250XXXXXXXXX');
+            setProfileLoading(false);
+            return;
+        }
+
+        try {
+            await updateProfile(profileData.phone);
+            toast.success(t('profileUpdated') || 'Profile updated successfully');
+        } catch (error: any) {
+            setProfileError(error.message || t('profileUpdateFailed') || 'Failed to update profile');
+        } finally {
+            setProfileLoading(false);
+        }
+    };
+
+    const handlePasswordChange = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setPasswordError('');
+        setPasswordLoading(true);
+
+        if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+            setPasswordError(t('pleaseEnterAllFields') || 'Please fill in all fields');
+            setPasswordLoading(false);
+            return;
+        }
+
+        if (passwordData.newPassword !== passwordData.confirmPassword) {
+            setPasswordError(t('passwordsDoNotMatch') || 'New passwords do not match');
+            setPasswordLoading(false);
+            return;
+        }
+
+        if (passwordData.newPassword.length < 6) {
+            setPasswordError(t('passwordTooShort') || 'New password must be at least 6 characters long');
+            setPasswordLoading(false);
+            return;
+        }
+
+        try {
+            await changePassword(passwordData.currentPassword, passwordData.newPassword);
+            toast.success(t('passwordChanged') || 'Password changed successfully');
+            setPasswordData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: '',
+            });
+        } catch (error: any) {
+            setPasswordError(error.message || t('passwordChangeFailed') || 'Failed to change password');
+        } finally {
+            setPasswordLoading(false);
+        }
+    };
 
     return (
         <AppLayout>
@@ -112,10 +199,9 @@ const Settings: NextPage = () => {
                                         </p>
                                         <div className="flex items-center gap-4">
                                             <div
-                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 ${
+                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 cursor-pointer ${
                                                     locale === 'en' ? 'bg-muted/50 border-primary' : ''
                                                 }`}
-                                                role="button"
                                                 onClick={() => changeLanguage('en')}
                                             >
                                                 <div className="flex items-center gap-2">
@@ -125,10 +211,9 @@ const Settings: NextPage = () => {
                                                 {locale === 'en' && <Check className="h-4 w-4 text-primary" />}
                                             </div>
                                             <div
-                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 ${
+                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 cursor-pointer ${
                                                     locale === 'rw' ? 'bg-muted/50 border-primary' : ''
                                                 }`}
-                                                role="button"
                                                 onClick={() => changeLanguage('rw')}
                                             >
                                                 <div className="flex items-center gap-2">
@@ -148,26 +233,28 @@ const Settings: NextPage = () => {
                                         </p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('defaultLocation')}</label>
-                                                <div className="flex items-center">
-                                                    <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                                                        <option value="all">{t('allSectors')}</option>
-                                                        {['Kinigi', 'Muhoza', 'Cyuve', 'Gataraga'].map(sector => (
-                                                            <option key={sector} value={sector}>{sector}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                                <Label htmlFor="defaultLocation">{t('defaultLocation')}</Label>
+                                                <select
+                                                    id="defaultLocation"
+                                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    <option value="all">{t('allSectors')}</option>
+                                                    {['Kinigi', 'Muhoza', 'Cyuve', 'Gataraga'].map(sector => (
+                                                        <option key={sector} value={sector}>{sector}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                             <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('defaultCrop')}</label>
-                                                <div className="flex items-center">
-                                                    <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                                                        <option value="all">{t('allCrops')}</option>
-                                                        {['Maize', 'Potatoes', 'Beans', 'Vegetables'].map(crop => (
-                                                            <option key={crop} value={crop}>{crop}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
+                                                <Label htmlFor="defaultCrop">{t('defaultCrop')}</Label>
+                                                <select
+                                                    id="defaultCrop"
+                                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                >
+                                                    <option value="all">{t('allCrops')}</option>
+                                                    {['Maize', 'Potatoes', 'Beans', 'Vegetables'].map(crop => (
+                                                        <option key={crop} value={crop}>{crop}</option>
+                                                    ))}
+                                                </select>
                                             </div>
                                         </div>
                                     </div>
@@ -180,6 +267,7 @@ const Settings: NextPage = () => {
                                 </CardFooter>
                             </>
                         )}
+
                         {activeTab === 'account' && (
                             <>
                                 <CardHeader>
@@ -187,70 +275,184 @@ const Settings: NextPage = () => {
                                     <CardDescription>{t('accountSettingsDesc')}</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
-                                    {/* Profile information */}
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4">
-                                            <div className="bg-muted rounded-full h-16 w-16 flex items-center justify-center">
-                                                <User className="h-8 w-8 text-muted-foreground" />
+                                            <div className="bg-ganz-primary rounded-full h-16 w-16 flex items-center justify-center">
+                                                <User className="h-8 w-8 text-white" />
                                             </div>
                                             <div>
-                                                <h3 className="text-lg font-medium">Admin User</h3>
-                                                <p className="text-sm text-muted-foreground">admin@ganzafrica.org</p>
+                                                <h3 className="text-lg font-medium">{user?.username}</h3>
+                                                <p className="text-sm text-muted-foreground">{user?.phone}</p>
+                                                <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
                                             </div>
-                                            <Button variant="outline" size="sm" className="ml-auto">
-                                                {t('editProfile')}
-                                            </Button>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('fullName')}</label>
-                                                <Input value="Admin User" />
+                                        <form onSubmit={handleProfileUpdate} className="space-y-4">
+                                            {profileError && (
+                                                <Alert variant="destructive">
+                                                    <AlertDescription>{profileError}</AlertDescription>
+                                                </Alert>
+                                            )}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="username">{t('username')}</Label>
+                                                    <Input
+                                                        id="username"
+                                                        value={user?.username || ''}
+                                                        disabled
+                                                        className="bg-muted"
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {t('usernameCannotBeChanged') || 'Username cannot be changed'}
+                                                    </p>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="role">{t('role')}</Label>
+                                                    <Input
+                                                        id="role"
+                                                        value={user?.role || ''}
+                                                        disabled
+                                                        className="bg-muted capitalize"
+                                                    />
+                                                </div>
+                                                <div className="space-y-2 md:col-span-2">
+                                                    <Label htmlFor="phone">{t('phone')}</Label>
+                                                    <Input
+                                                        id="phone"
+                                                        type="tel"
+                                                        placeholder="+250788123456"
+                                                        value={profileData.phone}
+                                                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                                                        disabled={profileLoading}
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {t('phoneFormat') || 'Format: +250XXXXXXXXX'}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('email')}</label>
-                                                <Input value="admin@ganzafrica.org" />
+
+                                            <div className="flex justify-end">
+                                                <Button type="submit" disabled={profileLoading}>
+                                                    {profileLoading ? (
+                                                        <>
+                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                            {t('updating') || 'Updating...'}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Save className="h-4 w-4 mr-2" />
+                                                            {t('updateProfile') || 'Update Profile'}
+                                                        </>
+                                                    )}
+                                                </Button>
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('phone')}</label>
-                                                <Input value="+250 78XXXXXXX" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('role')}</label>
-                                                <Input value="System Administrator" disabled />
-                                            </div>
-                                        </div>
+                                        </form>
                                     </div>
 
                                     <Separator />
-                                    <div className="space-y-2">
+
+                                    <div className="space-y-4">
                                         <h3 className="text-base font-medium">{t('changePassword')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
+                                        <p className="text-sm text-muted-foreground">
                                             {t('changePasswordDesc')}
                                         </p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('currentPassword')}</label>
-                                                <Input type="password" placeholder="••••••••" />
+
+                                        <form onSubmit={handlePasswordChange} className="space-y-4">
+                                            {passwordError && (
+                                                <Alert variant="destructive">
+                                                    <AlertDescription>{passwordError}</AlertDescription>
+                                                </Alert>
+                                            )}
+
+                                            <div className="space-y-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="currentPassword">{t('currentPassword')}</Label>
+                                                    <div className="relative">
+                                                        <Input
+                                                            id="currentPassword"
+                                                            type={showCurrentPassword ? 'text' : 'password'}
+                                                            placeholder="••••••••"
+                                                            value={passwordData.currentPassword}
+                                                            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                                                            disabled={passwordLoading}
+                                                            className="pr-10"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                            disabled={passwordLoading}
+                                                        >
+                                                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="newPassword">{t('newPassword')}</Label>
+                                                        <div className="relative">
+                                                            <Input
+                                                                id="newPassword"
+                                                                type={showNewPassword ? 'text' : 'password'}
+                                                                placeholder="••••••••"
+                                                                value={passwordData.newPassword}
+                                                                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                                                disabled={passwordLoading}
+                                                                className="pr-10"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                                disabled={passwordLoading}
+                                                            >
+                                                                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="confirmPassword">{t('confirmNewPassword')}</Label>
+                                                        <div className="relative">
+                                                            <Input
+                                                                id="confirmPassword"
+                                                                type={showConfirmPassword ? 'text' : 'password'}
+                                                                placeholder="••••••••"
+                                                                value={passwordData.confirmPassword}
+                                                                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                                                disabled={passwordLoading}
+                                                                className="pr-10"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                                disabled={passwordLoading}
+                                                            >
+                                                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="space-y-2 col-span-1 md:col-span-2">
-                                                <Separator />
+
+                                            <div className="flex justify-end">
+                                                <Button type="submit" disabled={passwordLoading}>
+                                                    {passwordLoading ? (
+                                                        <>
+                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                            {t('changingPassword') || 'Changing Password...'}
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Lock className="h-4 w-4 mr-2" />
+                                                            {t('changePassword')}
+                                                        </>
+                                                    )}
+                                                </Button>
                                             </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('newPassword')}</label>
-                                                <Input type="password" placeholder="••••••••" />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('confirmNewPassword')}</label>
-                                                <Input type="password" placeholder="••••••••" />
-                                            </div>
-                                        </div>
-                                        <div className="mt-4">
-                                            <Button>
-                                                <Lock className="h-4 w-4 mr-2" />
-                                                {t('updatePassword')}
-                                            </Button>
-                                        </div>
+                                        </form>
                                     </div>
                                 </CardContent>
                             </>
@@ -623,61 +825,6 @@ const Settings: NextPage = () => {
         </AppLayout>
     );
 };
-
-const DesktopIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg
-        {...props}
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-    >
-        <rect x="2" y="3" width="20" height="14" rx="2" />
-        <line x1="8" y1="21" x2="16" y2="21" />
-        <line x1="12" y1="17" x2="12" y2="21" />
-    </svg>
-);
-
-const FileIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg
-        {...props}
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-    >
-        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-        <polyline points="14 2 14 8 20 8" />
-    </svg>
-);
-
-const BookOpen = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg
-        {...props}
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-    >
-        <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
-        <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
-    </svg>
-);
 
 const Phone = (props: React.SVGProps<SVGSVGElement>) => (
     <svg
