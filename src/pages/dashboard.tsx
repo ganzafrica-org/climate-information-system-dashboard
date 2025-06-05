@@ -64,6 +64,12 @@ const weatherData = [
     { month: 'Dec', temperature: 22, rainfall: 70, humidity: 70, season: 'A' }
 ];
 
+const musanzeSectors = [
+    'Busogo', 'Cyuve', 'Gacaca', 'Gashaki', 'Gataraga',
+    'Kimonyi', 'Kinigi', 'Muhoza', 'Muko', 'Musanze',
+    'Nkotsi', 'Nyange', 'Remera', 'Rwaza', 'Shingiro'
+];
+
 const chartConfig = {
     temperature: {
         label: 'Temperature (°C)',
@@ -154,7 +160,6 @@ const Dashboard: NextPage = () => {
             </Head>
 
             <div className="space-y-4 md:space-y-6">
-                {/* Top bar with location selector and view toggle */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
                     <div className="flex items-center gap-2">
                         <MapPin className="h-5 w-5 text-ganz-primary" />
@@ -172,7 +177,11 @@ const Dashboard: NextPage = () => {
                                     {t('all')}
                                 </DropdownMenuItem>
                                 <Separator className="my-1" />
-
+                                {musanzeSectors.map((sector) => (
+                                    <DropdownMenuItem key={sector} onClick={() => setSelectedSector(sector)}>
+                                        {sector}
+                                    </DropdownMenuItem>
+                                ))}
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -186,25 +195,9 @@ const Dashboard: NextPage = () => {
                                 className="pl-8 w-full sm:w-[180px] h-9"
                             />
                         </div>
-
-                        <Button
-                            variant={dashboardView === 'map' ? "secondary" : "outline"}
-                            size="sm"
-                            onClick={() => setDashboardView('map')}
-                            className="px-3"
-                        >
-                            <MapPin className="mr-2 h-4 w-4" />
-                            {t('mapView')}
-                        </Button>
-
-                        <Button
-                            variant={dashboardView === 'charts' ? "secondary" : "outline"}
-                            size="sm"
-                            onClick={() => setDashboardView('charts')}
-                            className="px-3"
-                        >
-                            <BarChartIcon className="mr-2 h-4 w-4" />
-                            {t('chartView')}
+                        <Button variant="outline" size="sm">
+                            <Filter className="mr-2 h-4 w-4" />
+                            {t('filterBy')}
                         </Button>
                     </div>
                 </div>
@@ -216,7 +209,7 @@ const Dashboard: NextPage = () => {
                                 <span className="font-medium">{t('currentSeason')}: </span>
                                 <span className="font-bold">{t(getCurrentSeason())}</span>
                             </div>
-                            <div className="flex flex-wrap gap-2">
+                            {/* <div className="flex flex-wrap gap-2 bg-pink-300">
                                 {cropData.map(crop => (
                                     <Button
                                         key={crop.id}
@@ -229,7 +222,7 @@ const Dashboard: NextPage = () => {
                                         <span>{t(crop.name)}</span>
                                     </Button>
                                 ))}
-                            </div>
+                            </div> */}
                         </div>
                     </CardContent>
                 </Card>
@@ -464,36 +457,36 @@ const Dashboard: NextPage = () => {
                                 </Card>
                             </TabsContent>
 
-                            <TabsContent value="rainfall" className="space-y-4">
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle>{t('weeklyOverview')}: {t('rainfall')}</CardTitle>
-                                        <CardDescription>{t('januaryToDecember')} 2024</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ChartContainer config={chartConfig} className="h-[350px]">
-                                            <BarChart data={weatherData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <YAxis
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <Tooltip content={<ChartTooltipContent />} />
-                                                <Legend />
-                                                <Bar
-                                                    dataKey="rainfall"
-                                                    fill="#3b82f6"
-                                                    name={t('rainfall')}
-                                                    radius={4}
-                                                />
-                                            </BarChart>
-                                        </ChartContainer>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
+                    <TabsContent value="rainfall" className="space-y-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle>{t('weeklyOverview')}: {t('rainfall')}</CardTitle>
+                                <CardDescription>{t('januaryToDecember')} 2024</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <ChartContainer config={chartConfig} className="h-[350px]">
+                                    <BarChart data={weatherData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis
+                                            dataKey="month"
+                                            tick={{ fontSize: 12 }}
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 12 }}
+                                        />
+                                        <Tooltip content={<ChartTooltipContent />} />
+                                        <Legend />
+                                        <Bar
+                                            dataKey="rainfall"
+                                            fill="#004b23"
+                                            name={t('rainfall')}
+                                            radius={4}
+                                        />
+                                    </BarChart>
+                                </ChartContainer>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
                             <TabsContent value="humidity" className="space-y-4">
                                 <Card>

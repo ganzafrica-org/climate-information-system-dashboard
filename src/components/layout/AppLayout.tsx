@@ -130,8 +130,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                                     <TooltipTrigger asChild>
                                         <Link href={item.href}>
                                             <Button
-                                                variant={isActive ? "secondary" : "ghost"}
-                                                className={`w-full justify-start ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                                variant={isActive ? "primary" : "ghost"}
+                                                className={`w-full justify-start mb-1 ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
                                             >
                                                 {item.icon}
                                                 {(sidebarOpen || isMobile) && <span className="ml-3">{item.label}</span>}

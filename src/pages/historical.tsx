@@ -167,10 +167,10 @@ const Historical: NextPage = () => {
 
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                    <Calendar className="mr-2 h-4 w-4" />
+                                <Button variant="outline" className='h-9'>
+                                    <Calendar className="h-4 w-4" />
                                     <span>{selectedYear}</span>
-                                    <ChevronDown className="ml-2 h-4 w-4" />
+                                    <ChevronDown className=" h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent>
@@ -182,8 +182,8 @@ const Historical: NextPage = () => {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <Button variant="outline" size="sm">
-                            <Filter className="mr-2 h-4 w-4" />
+                        <Button variant="primary" className='h-9'>
+                            <Filter className="h-4 w-4" />
                             {t('filterBy')}
                         </Button>
                     </div>
@@ -194,7 +194,6 @@ const Historical: NextPage = () => {
                         <TabsTrigger value="monthly">{t('monthly')}</TabsTrigger>
                         <TabsTrigger value="seasonal">{t('seasonal')}</TabsTrigger>
                         <TabsTrigger value="annual">{t('annual')}</TabsTrigger>
-                        <TabsTrigger value="historical">{t('fiveYearTrend')}</TabsTrigger>
                     </TabsList>
                 </Tabs>
 
@@ -259,7 +258,7 @@ const Historical: NextPage = () => {
                         </CardContent>
                     </Card>
                 </div>
-
+                
                 {/* Different time period views */}
                 {selectedTimePeriod === 'monthly' && (
                     <Card>
@@ -270,7 +269,7 @@ const Historical: NextPage = () => {
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <ChartContainer config={chartConfig} className="h-[350px]">
+                            <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                 <LineChart data={monthlyTemperatureData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="month" />
@@ -321,7 +320,7 @@ const Historical: NextPage = () => {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px]">
+                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                     <BarChart data={seasonData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="name" />
@@ -330,12 +329,12 @@ const Historical: NextPage = () => {
                                         <Legend />
                                         <Bar
                                             dataKey="rainfall"
-                                            fill="#3b82f6"
+                                            fill="#004b23"
                                             name={t('rainfall')}
                                         />
                                         <Bar
                                             dataKey="normalRainfall"
-                                            fill="#9ca3af"
+                                            fill="#ecf39e"
                                             name={t('normalRainfall')}
                                         />
                                     </BarChart>
@@ -351,7 +350,7 @@ const Historical: NextPage = () => {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="flex flex-col justify-center h-[350px]">
-                                <div className="space-y-4">
+                                <div className="space-y-4 ">
                                     {seasonData.map(season => (
                                         <div key={season.name} className="space-y-2">
                                             <div className="flex justify-between">
@@ -363,8 +362,8 @@ const Historical: NextPage = () => {
                                                 </div>
                                                 <div className={
                                                     season.variance.startsWith('+')
-                                                        ? 'text-green-500 font-medium'
-                                                        : 'text-red-500 font-medium'
+                                                        ? 'text-[#088d41] font-medium'
+                                                        : 'text-[#bc6c25] font-medium'
                                                 }>
                                                     {season.variance}
                                                 </div>
@@ -372,7 +371,7 @@ const Historical: NextPage = () => {
                                             <div className="w-full bg-muted rounded-full h-2.5">
                                                 <div
                                                     className={`h-2.5 rounded-full ${
-                                                        season.variance.startsWith('+') ? 'bg-green-500' : 'bg-red-500'
+                                                        season.variance.startsWith('+') ? 'bg-[#088d41]' : 'bg-[#bc6c25]'
                                                     }`}
                                                     style={{
                                                         width: `${Math.min(100, Math.abs(parseInt(season.variance) * 4))}%`
@@ -387,15 +386,15 @@ const Historical: NextPage = () => {
                                     <h3 className="font-medium mb-2">{t('seasonalImpact')}</h3>
                                     <ul className="space-y-1 text-sm">
                                         <li className="flex items-start gap-2">
-                                            <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
+                                            <div className="rounded-full bg-[#004b23] h-2 w-2 mt-1.5" />
                                             <span>{t('seasonAImpact')}</span>
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
+                                            <div className="rounded-full bg-[#004b23] h-2 w-2 mt-1.5" />
                                             <span>{t('seasonBImpact')}</span>
                                         </li>
                                         <li className="flex items-start gap-2">
-                                            <div className="rounded-full bg-amber-500 h-2 w-2 mt-1.5" />
+                                            <div className="rounded-full bg-[#bc6c25] h-2 w-2 mt-1.5" />
                                             <span>{t('seasonCImpact')}</span>
                                         </li>
                                     </ul>
@@ -404,7 +403,7 @@ const Historical: NextPage = () => {
                         </Card>
                     </div>
                 )}
-
+                
                 {selectedTimePeriod === 'annual' && (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         <Card>
@@ -415,7 +414,7 @@ const Historical: NextPage = () => {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px]">
+                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                     <LineChart data={temperatureData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="year" />
@@ -456,7 +455,7 @@ const Historical: NextPage = () => {
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px]">
+                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                     <BarChart data={rainfallData}>
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="month" />
@@ -465,7 +464,7 @@ const Historical: NextPage = () => {
                                         <Legend />
                                         <Bar
                                             dataKey="current"
-                                            fill="#3b82f6"
+                                            fill="#3e8914"
                                             name={t('currentYear')}
                                         />
                                         <Bar
@@ -479,104 +478,6 @@ const Historical: NextPage = () => {
                         </Card>
                     </div>
                 )}
-
-                {selectedTimePeriod === 'historical' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('fiveYearClimateAnalysis')}</CardTitle>
-                            <CardDescription>
-                                {t('longTermTrends')}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div>
-                                    <h3 className="font-medium mb-4">{t('temperatureTrend')}</h3>
-                                    <div className="flex items-center text-2xl mb-4">
-                                        <TrendingUp className="h-6 w-6 mr-2 text-red-500" />
-                                        <span>+{temperatureTrend.toFixed(1)}°C</span>
-                                        <span className="text-muted-foreground text-sm ml-2">
-                      {t('overFiveYears')}
-                    </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {t('temperatureTrendAnalysis')}
-                                    </p>
-                                </div>
-
-                                <div>
-                                    <h3 className="font-medium mb-4">{t('rainfallTrend')}</h3>
-                                    <div className="flex items-center text-2xl mb-4">
-                                        {rainfallTrend > 0 ? (
-                                            <TrendingUp className="h-6 w-6 mr-2 text-green-500" />
-                                        ) : (
-                                            <TrendingDown className="h-6 w-6 mr-2 text-red-500" />
-                                        )}
-                                        <span className={rainfallTrend > 0 ? 'text-green-500' : 'text-red-500'}>
-                      {rainfallTrend > 0 ? '+' : ''}{(rainfallTrend * 100).toFixed(1)}%
-                    </span>
-                                        <span className="text-muted-foreground text-sm ml-2">
-                      {t('averageAnnualChange')}
-                    </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground">
-                                        {t('rainfallTrendAnalysis')}
-                                    </p>
-                                </div>
-                            </div>
-
-                            <Separator />
-
-                            <div>
-                                <h3 className="font-medium mb-4">{t('agriculturalImplications')}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">{t('positiveEffects')}</h4>
-                                        <ul className="space-y-1 text-sm">
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('positiveEffect1')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('positiveEffect2')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('positiveEffect3')}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <h4 className="text-sm font-medium">{t('challengesToAddress')}</h4>
-                                        <ul className="space-y-1 text-sm">
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-red-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('challenge1')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-red-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('challenge2')}</span>
-                                            </li>
-                                            <li className="flex items-start gap-2">
-                                                <div className="rounded-full bg-red-500 h-2 w-2 mt-1.5" />
-                                                <span>{t('challenge3')}</span>
-                                            </li>
-                                        </ul>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                        <CardFooter>
-                            <Button variant="outline" className="ml-auto">
-                                <Download className="h-4 w-4 mr-2" />
-                                {t('downloadFullReport')}
-                            </Button>
-                        </CardFooter>
-                    </Card>
-                )}
-
                 <Card>
                     <CardHeader>
                         <CardTitle>{t('compareSections')}</CardTitle>
@@ -646,7 +547,7 @@ const Historical: NextPage = () => {
                             </div>
 
                             <div className="flex items-end">
-                                <Button>
+                                <Button variant="primary" className="h-9">
                                     <RefreshCw className="mr-2 h-4 w-4" />
                                     {t('compare')}
                                 </Button>
@@ -654,7 +555,7 @@ const Historical: NextPage = () => {
                         </div>
 
                         <div className="mt-6">
-                            <ChartContainer config={chartConfig} className="h-[350px]">
+                            <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                 <LineChart data={monthlyTemperatureData}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="month" />
