@@ -1,11 +1,10 @@
-import { useState } from 'react';
-import { NextPage } from 'next';
+import { JSX, SVGProps, useState} from 'react';
 import Head from 'next/head';
-import { AppLayout } from '@/components/layout/AppLayout';
-import { useLanguage } from '@/i18n';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import {AppLayout} from '@/components/layout/AppLayout';
+import {useLanguage} from '@/i18n';
+import {Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter} from '@/components/ui/card';
+import {Button} from '@/components/ui/button';
+import {Input} from '@/components/ui/input';
 import {
     Dialog,
     DialogContent,
@@ -21,8 +20,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
+import {Tabs, TabsList, TabsTrigger, TabsContent} from '@/components/ui/tabs';
+import {Badge} from '@/components/ui/badge';
 import {
     BookOpen,
     Download,
@@ -44,7 +43,7 @@ import {
 import {Label} from "@/components/ui/label";
 import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion";
 
-const CloudIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const CloudIcon = (props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) => (
     <svg
         {...props}
         xmlns="http://www.w3.org/2000/svg"
@@ -59,7 +58,7 @@ const CloudIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const LeafIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const LeafIcon = (props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) => (
     <svg
         {...props}
         xmlns="http://www.w3.org/2000/svg"
@@ -75,7 +74,7 @@ const LeafIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const CalendarIcon = (props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) => (
     <svg
         {...props}
         xmlns="http://www.w3.org/2000/svg"
@@ -99,7 +98,7 @@ const CalendarIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const BugIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const BugIcon = (props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) => (
     <svg
         {...props}
         xmlns="http://www.w3.org/2000/svg"
@@ -124,7 +123,7 @@ const BugIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const DropletIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const DropletIcon = (props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) => (
     <svg
         {...props}
         xmlns="http://www.w3.org/2000/svg"
@@ -139,7 +138,7 @@ const DropletIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-const LayersIcon = (props: React.SVGProps<SVGSVGElement>) => (
+const LayersIcon = (props: JSX.IntrinsicAttributes & SVGProps<SVGSVGElement>) => (
     <svg
         {...props}
         xmlns="http://www.w3.org/2000/svg"
@@ -166,7 +165,6 @@ const trainingModules = [
         level: 'beginner',
         duration: 30,
         format: 'video',
-        completionRate: 85,
         popular: true
     },
     {
@@ -177,7 +175,6 @@ const trainingModules = [
         level: 'intermediate',
         duration: 45,
         format: 'interactive',
-        completionRate: 72,
         new: true
     },
     {
@@ -187,8 +184,7 @@ const trainingModules = [
         icon: <CalendarIcon className="h-6 w-6" />,
         level: 'beginner',
         duration: 25,
-        format: 'document',
-        completionRate: 92
+        format: 'document'
     },
     {
         id: 'pest-management',
@@ -198,7 +194,6 @@ const trainingModules = [
         level: 'advanced',
         duration: 60,
         format: 'interactive',
-        completionRate: 68,
         popular: true
     },
     {
@@ -208,8 +203,7 @@ const trainingModules = [
         icon: <DropletIcon className="h-6 w-6" />,
         level: 'intermediate',
         duration: 40,
-        format: 'audio',
-        completionRate: 76
+        format: 'audio'
     },
     {
         id: 'soil-health',
@@ -219,7 +213,6 @@ const trainingModules = [
         level: 'beginner',
         duration: 35,
         format: 'document',
-        completionRate: 88,
         new: true
     },
 ];
@@ -251,7 +244,19 @@ const faqs = [
     }
 ];
 
-const ModuleDetail = ({ module, onBack, t }: { module: any, onBack: () => void, t: (key: string) => string }) => {
+interface Module {
+    id: string;
+    title: string;
+    description: string;
+    icon: JSX.Element;
+    level: string;
+    duration: number;
+    format: string;
+    popular?: boolean;
+    new?: boolean;
+}
+
+const ModuleDetail = ({ module, onBack, t }: { module: Module; onBack: () => void; t: (key: string) => string }) => {
     return (
         <Card>
             <CardHeader>
@@ -278,24 +283,24 @@ const ModuleDetail = ({ module, onBack, t }: { module: any, onBack: () => void, 
             </CardHeader>
             <CardContent className="space-y-6">
                 <div className="flex flex-wrap gap-2 mb-2">
-          <span className={`text-xs px-2 py-0.5 rounded-full ${
-              module.level === 'beginner' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-                  module.level === 'intermediate' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                      'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
-          }`}>
-            {t(module.level)}
-          </span>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        module.level === 'beginner' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
+                            module.level === 'intermediate' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                                'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                    }`}>
+                        {t(module.level)}
+                    </span>
                     <span className="text-xs flex items-center gap-1 px-2 py-0.5 bg-muted rounded-full">
-            {module.format === 'video' ? <Video className="h-4 w-4" /> :
-                module.format === 'document' ? <FileText className="h-4 w-4" /> :
-                    module.format === 'audio' ? <Headphones className="h-4 w-4" /> :
-                        <Smartphone className="h-4 w-4" />}
+                        {module.format === 'video' ? <Video className="h-4 w-4" /> :
+                            module.format === 'document' ? <FileText className="h-4 w-4" /> :
+                                module.format === 'audio' ? <Headphones className="h-4 w-4" /> :
+                                    <Smartphone className="h-4 w-4" />}
                         {t(module.format)}
-          </span>
+                    </span>
                     <span className="text-xs flex items-center gap-1 px-2 py-0.5 bg-muted rounded-full">
-            <Clock className="h-3 w-3" />
+                        <Clock className="h-3 w-3" />
                         {module.duration} {t('minutes')}
-          </span>
+                    </span>
                 </div>
 
                 <p className="text-muted-foreground">{t(module.description)}</p>
@@ -362,40 +367,6 @@ const ModuleDetail = ({ module, onBack, t }: { module: any, onBack: () => void, 
                 </div>
 
                 <div>
-                    <h3 className="text-lg font-medium mb-3">{t('moduleOutline')}</h3>
-                    <div className="space-y-3">
-                        <div className="p-3 border rounded-md bg-muted/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-6 w-6 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-500 flex items-center justify-center text-xs font-medium">1</div>
-                                <span>{t('introduction')}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">5 {t('minutes')}</div>
-                        </div>
-                        <div className="p-3 border rounded-md bg-muted/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-6 w-6 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-500 flex items-center justify-center text-xs font-medium">2</div>
-                                <span>{t('keyPrinciples')}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">10 {t('minutes')}</div>
-                        </div>
-                        <div className="p-3 border rounded-md bg-muted/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-6 w-6 rounded-full bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-500 flex items-center justify-center text-xs font-medium">3</div>
-                                <span>{t('practicalExamples')}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">10 {t('minutes')}</div>
-                        </div>
-                        <div className="p-3 border rounded-md bg-muted/30 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <div className="h-6 w-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-xs font-medium">4</div>
-                                <span>{t('implementation')}</span>
-                            </div>
-                            <div className="text-xs text-muted-foreground">15 {t('minutes')}</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div>
                     <h3 className="text-lg font-medium mb-3">{t('relatedModules')}</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {trainingModules
@@ -425,21 +396,20 @@ const ModuleDetail = ({ module, onBack, t }: { module: any, onBack: () => void, 
                     </Button>
                 </div>
                 <Button>
-                    {module.completionRate < 100 ? t('continueModule') : t('restartModule')}
+                    {t('viewModule')}
                 </Button>
             </CardFooter>
         </Card>
     );
 };
 
-const Training: NextPage = () => {
+const Training = () => {
     const { t } = useLanguage();
-    const [view, setView] = useState<'grid' | 'list'>('grid');
+    const [view, setView] = useState('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [levelFilter, setLevelFilter] = useState('all');
     const [formatFilter, setFormatFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('modules');
-    const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
     const [selectedModule, setSelectedModule] = useState<string | null>(null);
 
     const filteredModules = trainingModules.filter((module) => {
@@ -464,17 +434,13 @@ const Training: NextPage = () => {
     };
 
     const getLevelBadge = (level: string) => {
-        const colors = {
+        const colors: Record<string, string> = {
             beginner: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
             intermediate: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
             advanced: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
         };
 
-        return (
-            <span className={`text-xs px-2 py-0.5 rounded-full ${colors[level as keyof typeof colors]}`}>
-        {t(level)}
-      </span>
-        );
+        return <span className={`text-xs px-2 py-0.5 rounded-full ${colors[level]}`}>{t(level)}</span>;
     };
 
     return (
@@ -583,11 +549,17 @@ const Training: NextPage = () => {
                         </div>
 
                         {selectedModule ? (
-                            <ModuleDetail
-                                module={trainingModules.find(m => m.id === selectedModule)!}
-                                onBack={() => setSelectedModule(null)}
-                                t={t}
-                            />
+                            (() => {
+                                const selectedModuleData = trainingModules.find(m => m.id === selectedModule);
+
+                                return selectedModuleData ? (
+                                    <ModuleDetail
+                                        module={selectedModuleData}
+                                        onBack={() => setSelectedModule(null)}
+                                        t={t}
+                                    />
+                                ) : null;
+                            })()
                         ) : (
                             <>
                                 {filteredModules.length === 0 ? (
@@ -629,25 +601,13 @@ const Training: NextPage = () => {
                                                     <div className="flex flex-wrap gap-2 mb-2">
                                                         {getLevelBadge(module.level)}
                                                         <span className="text-xs flex items-center gap-1 px-2 py-0.5 bg-muted rounded-full">
-                              {getFormatIcon(module.format)}
+                                                            {getFormatIcon(module.format)}
                                                             {t(module.format)}
-                            </span>
+                                                        </span>
                                                         <span className="text-xs flex items-center gap-1 px-2 py-0.5 bg-muted rounded-full">
-                              <Clock className="h-3 w-3" />
+                                                            <Clock className="h-3 w-3" />
                                                             {module.duration} {t('minutes')}
-                            </span>
-                                                    </div>
-
-                                                    <div className="mt-3">
-                                                        <div className="text-xs text-muted-foreground mb-1">
-                                                            {t('completionRate')}: {module.completionRate}%
-                                                        </div>
-                                                        <div className="w-full h-1.5 bg-muted rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-primary"
-                                                                style={{ width: `${module.completionRate}%` }}
-                                                            ></div>
-                                                        </div>
+                                                        </span>
                                                     </div>
                                                 </CardContent>
                                             </Card>
@@ -660,7 +620,7 @@ const Training: NextPage = () => {
                                                 <div
                                                     key={module.id}
                                                     className="p-4 flex items-start gap-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                                                    onClick={() => setSelectedModule(module.id)}
+                                                    onClick={() => setSelectedModule(module.id!)}
                                                 >
                                                     <div className="p-2 rounded-md bg-primary/10 text-primary">
                                                         {module.icon}
@@ -686,25 +646,13 @@ const Training: NextPage = () => {
                                                         <div className="flex flex-wrap gap-2">
                                                             {getLevelBadge(module.level)}
                                                             <span className="text-xs flex items-center gap-1 px-2 py-0.5 bg-muted rounded-full">
-                                {getFormatIcon(module.format)}
+                                                                {getFormatIcon(module.format)}
                                                                 {t(module.format)}
-                              </span>
+                                                            </span>
                                                             <span className="text-xs flex items-center gap-1 px-2 py-0.5 bg-muted rounded-full">
-                                <Clock className="h-3 w-3" />
+                                                                <Clock className="h-3 w-3" />
                                                                 {module.duration} {t('minutes')}
-                              </span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="hidden sm:block text-right">
-                                                        <div className="text-xs text-muted-foreground mb-1">
-                                                            {t('completionRate')}: {module.completionRate}%
-                                                        </div>
-                                                        <div className="w-24 h-1.5 bg-muted rounded-full overflow-hidden">
-                                                            <div
-                                                                className="h-full bg-primary"
-                                                                style={{ width: `${module.completionRate}%` }}
-                                                            ></div>
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 </div>
