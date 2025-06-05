@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
@@ -14,14 +14,17 @@ import {
     ChevronLeft,
     ChevronRight,
     LogOut,
-    BookOpen
+    BookOpen,
+    HelpCircle,
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'; // Import Sheet components
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -29,9 +32,10 @@ interface AppLayoutProps {
 
 export function AppLayout({ children }: AppLayoutProps) {
     const { t, locale, changeLanguage } = useLanguage();
+    const { user, logout, isLoading } = useAuth();
     const router = useRouter();
     const [isMounted, setIsMounted] = useState(false);
-    const [sidebarOpen, setSidebarOpen] = useState(false); // Set to false by default
+    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
@@ -50,9 +54,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         };
 
         checkIsMobile();
-
         window.addEventListener('resize', checkIsMobile);
-
         return () => window.removeEventListener('resize', checkIsMobile);
     }, []);
 
@@ -67,8 +69,24 @@ export function AppLayout({ children }: AppLayoutProps) {
         { href: '/settings', icon: <Settings size={20} />, label: t('settings') }
     ];
 
-    if (!isMounted) {
-        return null;
+    const getUserInitials = (username: string) => {
+        return username
+            .split(' ')
+            .map(name => name.charAt(0).toUpperCase())
+            .join('')
+            .slice(0, 2);
+    };
+
+    const handleLogout = () => {
+        logout();
+    };
+
+    if (!isMounted || isLoading) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-ganz-primary"></div>
+            </div>
+        );
     }
 
     const DesktopSidebar = () => (
@@ -138,6 +156,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 <Button
                                     variant="ghost"
                                     className={`w-full justify-start ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                    onClick={handleLogout}
                                 >
                                     <LogOut size={20} />
                                     {(sidebarOpen || isMobile) && <span className="ml-3">{t('logout')}</span>}
@@ -172,7 +191,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <div className="flex h-16 items-center justify-between px-4 border-b border-border">
                         <div className="flex items-center space-x-2">
                             <div className="h-8 w-8 rounded-full bg-ganz-primary flex items-center justify-center">
-                                <div className="h-6 w-6 text-black dark:text-white">
+                                <div className="h-6 w-6 text-white">
                                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                         <path d="M7 17.9999C11.5714 17.9999 19 15.9999 19 6.99994C19 6.99994 14.5 12.9999 7 12.9999V17.9999Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                         <path d="M7 13C7 13 3 10 3 7C3 7 8.5 5 12 3C12 3 12.5 8.5 7 13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -205,7 +224,8 @@ export function AppLayout({ children }: AppLayoutProps) {
                             <Separator className="my-2" />
                             <Button
                                 variant="ghost"
-                                className="w-full justify-start text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20"
+                                className="w-full justify-start"
+                                onClick={handleLogout}
                             >
                                 <LogOut size={20} />
                                 <span className="ml-3">{t('logout')}</span>
@@ -230,6 +250,13 @@ export function AppLayout({ children }: AppLayoutProps) {
                         </h1>
                     </div>
                     <div className="flex items-center space-x-2">
+                        <Link href="/help">
+                            <Button variant="ghost" size="sm" className="flex items-center">
+                                <HelpCircle className="h-4 w-4 mr-1" />
+                                <span className="hidden md:inline">{t('help')}</span>
+                            </Button>
+                        </Link>
+
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" size="sm" className="flex items-center">
@@ -247,6 +274,49 @@ export function AppLayout({ children }: AppLayoutProps) {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
+                        {user && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" className="flex items-center space-x-2 px-2">
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarFallback className="bg-ganz-primary text-white text-sm">
+                                                {getUserInitials(user.username)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="hidden md:flex flex-col items-start">
+                                            <span className="text-sm font-medium">{user.username}</span>
+                                            <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
+                                        </div>
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-56">
+                                    <div className="flex items-center space-x-2 p-2">
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarFallback className="bg-ganz-primary text-white text-sm">
+                                                {getUserInitials(user.username)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-medium">{user.username}</span>
+                                            <span className="text-xs text-muted-foreground">{user.phone}</span>
+                                            <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
+                                        </div>
+                                    </div>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem asChild>
+                                        <Link href="/settings" className="flex items-center">
+                                            <Settings className="mr-2 h-4 w-4" />
+                                            {t('settings')}
+                                        </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600">
+                                        <LogOut className="mr-2 h-4 w-4" />
+                                        {t('logout')}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
                 </header>
 
