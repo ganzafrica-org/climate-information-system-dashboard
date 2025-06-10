@@ -24,7 +24,7 @@ A localized weather and farming advisory system for farmers in Musanze region, R
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/ganzafrica-climate-information-system.git
+   git clone https://github.com/ganzafrica-org/ganzafrica-climate-information-system.git
    cd ganzafrica-climate-information-system
    ```
 
