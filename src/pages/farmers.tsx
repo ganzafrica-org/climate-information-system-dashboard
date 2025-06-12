@@ -1,278 +1,309 @@
-// src/pages/farmers.tsx
-import { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { NextPage } from "next";
 import Head from "next/head";
+import { useRouter } from "next/router";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useLanguage } from "@/i18n";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Archive, ArrowUpDown, ChevronDown, Download, Edit, Filter, MapPin, MessageSquare, MoreHorizontal, Phone, Plus, Search, Send, SlidersHorizontal, Trash, Upload, User, Users } from "lucide-react";
-
-const musanzeSectors = ["Busogo", "Cyuve", "Gacaca", "Gashaki", "Gataraga", "Kimonyi", "Kinigi", "Muhoza", "Muko", "Musanze", "Nkotsi", "Nyange", "Remera", "Rwaza", "Shingiro"];
-
-const farmersData = [
-  {
-    id: 1,
-    name: "Jean Mugabo",
-    location: ["Kinigi", "Busogo"],
-    phone: "078XXXXXXX",
-    crops: ["Maize", "Potatoes"],
-    subscribedAlerts: ["Weather", "Planting"],
-    lastActive: "2025-05-15T10:30:00",
-  },
-  {
-    id: 2,
-    name: "Marie Uwimana",
-    location: ["Muhoza", "Gacaca"],
-    phone: "075XXXXXXX",
-    crops: ["Beans", "Vegetables"],
-    subscribedAlerts: ["Weather", "Pest"],
-    lastActive: "2025-05-16T14:20:00",
-  },
-  {
-    id: 3,
-    name: "Emmanuel Habimana",
-    location: ["Gataraga"],
-    phone: "072XXXXXXX",
-    crops: ["Maize", "Beans"],
-    subscribedAlerts: ["Weather", "Planting", "Harvest"],
-    lastActive: "2025-05-18T09:15:00",
-  },
-  {
-    id: 4,
-    name: "Claire Mukeshimana",
-    location: ["Cyuve"],
-    phone: "079XXXXXXX",
-    crops: ["Potatoes", "Vegetables"],
-    subscribedAlerts: ["Weather"],
-    lastActive: "2025-05-17T16:45:00",
-  },
-  {
-    id: 5,
-    name: "Patrick Ndayisenga",
-    location: ["Busogo"],
-    phone: "073XXXXXXX",
-    crops: ["Maize", "Potatoes", "Beans"],
-    subscribedAlerts: ["Weather", "Planting", "Pest", "Harvest"],
-    lastActive: "2025-05-18T11:30:00",
-  },
-  {
-    id: 6,
-    name: "Jeanette Murekatete",
-    location: ["Rwaza"],
-    phone: "078XXXXXXX",
-    crops: ["Vegetables"],
-    subscribedAlerts: ["Weather", "Pest"],
-    lastActive: "2025-05-15T15:10:00",
-  },
-  {
-    id: 7,
-    name: "Bernard Niyonzima",
-    location: ["Muko"],
-    phone: "075XXXXXXX",
-    crops: ["Maize", "Beans"],
-    subscribedAlerts: ["Weather", "Planting"],
-    lastActive: "2025-05-16T10:20:00",
-  },
-  {
-    id: 8,
-    name: "Francine Ingabire",
-    location: ["Nyange"],
-    phone: "072XXXXXXX",
-    crops: ["Potatoes"],
-    subscribedAlerts: ["Weather", "Harvest"],
-    lastActive: "2025-05-17T14:05:00",
-  },
-];
+import { Badge } from "@/components/ui/badge";
+import {
+  ArrowUpDown, ChevronDown, Download, Edit, Loader2, MapPin, MessageSquare,
+  MoreHorizontal, Phone, Plus, Search, Trash, Upload, User
+} from "lucide-react";
+import { toast } from "sonner";
+import api from "@/lib/api";
+import { CreateFarmerDialog, ViewFarmerDialog, EditFarmerDialog, ImportFarmersDialog } from "@/components/farmers/dialogs";
+import {
+  Farmer, Location, FarmersResponse, LocationsResponse, ApiResponse, FarmerFilters
+} from "@/types/farmer";
 
 const Farmers: NextPage = () => {
   const { t } = useLanguage();
-  const [selectedSector, setSelectedSector] = useState("all");
-  const [selectedCrop, setSelectedCrop] = useState("all");
+  const { user, isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  const [farmers, setFarmers] = useState<Farmer[]>([]);
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFarmer, setSelectedFarmer] = useState<number | null>(null);
-  const [addingFarmer, setAddingFarmer] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const filteredFarmers = farmersData.filter((farmer) => {
-    // Search term matching - now checks if any location in the array matches
-    const matchesSearch = searchTerm === "" || farmer.name.toLowerCase().includes(searchTerm.toLowerCase()) || farmer.location.some((loc) => loc.toLowerCase().includes(searchTerm.toLowerCase()));
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit] = useState(20);
 
-    // Sector matching - now checks if any location in the array matches the selected sector
-    const matchesSector = selectedSector === "all" || farmer.location.some((loc) => loc === selectedSector);
-    
-    // Crop matching remains the same since crops was already an array
-    const matchesCrop = selectedCrop === "all" || farmer.crops.some((crop) => crop.toLowerCase() === selectedCrop.toLowerCase());
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [farmerToEdit, setFarmerToEdit] = useState<Farmer | null>(null);
 
-    return matchesSearch && matchesSector && matchesCrop;
-  });
+  const [isExporting, setIsExporting] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role !== 'admin') {
+      toast.error(t('adminAccessRequired'));
+      router.push('/dashboard');
+      return;
+    }
+  }, [isAuthenticated, user, router, t]);
+
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated && user?.role === 'admin') {
+      fetchFarmers();
+    }
+  }, [selectedLocation, searchTerm, currentPage, isAuthenticated, user]);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
+        params: { limit: 100 }
+      });
+      setLocations(response.data.locations);
+    } catch (error: any) {
+      console.error('Failed to fetch locations:', error);
+      toast.error(t('failedToLoadLocations'));
+    }
+  };
+
+  const fetchFarmers = async () => {
+    setIsLoading(true);
+    try {
+      const filters: FarmerFilters = {
+        limit,
+        offset: (currentPage - 1) * limit,
+      };
+
+      if (selectedLocation !== "all") {
+        const location = locations.find(l => l.name === selectedLocation);
+        if (location) {
+          filters.locationId = location.id;
+        }
+      }
+
+      if (searchTerm.trim()) {
+        filters.search = searchTerm.trim();
+      }
+
+      const response = await api.get<ApiResponse<FarmersResponse>>('/api/admin/farmers', {
+        params: filters
+      });
+
+      setFarmers(response.data.farmers);
+      setTotalCount(response.data.count);
+    } catch (error: any) {
+      console.error('Failed to fetch farmers:', error);
+      toast.error(t('failedToLoadFarmers'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteFarmer = async (farmerId: number) => {
+    if (!confirm(t('confirmDeleteFarmer'))) return;
+
+    try {
+      await api.delete(`/api/admin/farmers/${farmerId}`);
+      toast.success(t('farmerDeletedSuccessfully'));
+      await fetchFarmers();
+      if (selectedFarmer === farmerId) {
+        setSelectedFarmer(null);
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || t('failedToDeleteFarmer');
+      toast.error(message);
+    }
+  };
+
+  const handleImportFarmers = () => {
+    setImportDialogOpen(true);
+  };
+
+  const fetchAllFarmersForExport = async (): Promise<Farmer[]> => {
+    try {
+      const filters: FarmerFilters = {
+        limit: 100,
+        offset: 0,
+      };
+
+      if (selectedLocation !== "all") {
+        const location = locations.find(l => l.name === selectedLocation);
+        if (location) {
+          filters.locationId = location.id;
+        }
+      }
+
+      if (searchTerm.trim()) {
+        filters.search = searchTerm.trim();
+      }
+
+      const response = await api.get<ApiResponse<FarmersResponse>>('/api/admin/farmers', {
+        params: filters
+      });
+
+      return response.data.farmers;
+    } catch (error) {
+      console.error('Failed to fetch all farmers for export:', error);
+      throw error;
+    }
+  };
+
+  const handleExportFarmers = async () => {
+    setIsExporting(true);
+    try {
+      const allFarmers = await fetchAllFarmersForExport();
+
+      if (allFarmers.length === 0) {
+        toast.error(t('noDataToExport'));
+        return;
+      }
+
+      const exportData = allFarmers.map(farmer => ({
+        [t('farmerId')]: farmer.id,
+        [t('name')]: farmer.name,
+        [t('phoneNumber')]: farmer.phone,
+        [t('locations')]: farmer.locations.map(loc => loc.name).join('; '),
+        [t('status')]: farmer.isActive ? t('active') : t('inactive'),
+        [t('createdAt')]: new Date(farmer.createdAt).toLocaleDateString(),
+        [t('updatedAt')]: new Date(farmer.updatedAt).toLocaleDateString(),
+      }));
+
+      let filename = `farmers_${new Date().toISOString().split('T')[0]}`;
+      if (selectedLocation !== 'all') {
+        filename += `_${selectedLocation}`;
+      }
+      if (searchTerm.trim()) {
+        filename += `_search_${searchTerm.trim().replace(/[^a-zA-Z0-9]/g, '_')}`;
+      }
+      filename += '.csv';
+
+      api.exportAsCSV(exportData, filename);
+
+      toast.success(t('farmersExportedSuccessfully') + ` (${allFarmers.length} ${t('farmers')})`);
+    } catch (error: any) {
+      console.error('Export error:', error);
+      toast.error(t('failedToExportFarmers'));
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleViewFarmer = (farmerId: number) => {
+    setSelectedFarmer(farmerId);
+    setViewDialogOpen(true);
+  };
+
+  const handleEditFarmer = (farmer: Farmer) => {
+    setFarmerToEdit(farmer);
+    setViewDialogOpen(false);
+    setEditDialogOpen(true);
+  };
+
+  const handleDialogSuccess = () => {
+    fetchFarmers();
+    setSelectedFarmer(null);
+  };
+
+  const totalPages = Math.ceil(totalCount / limit);
+
+
   return (
-    <AppLayout>
-      <Head>
-        <title>
-          {t("farmers")} | {t("climateInformationSystem")}
-        </title>
-      </Head>
+      <AppLayout>
+        <Head>
+          <title>
+            {t("farmers")} | {t("climateInformationSystem")}
+          </title>
+        </Head>
 
-      <div className="space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-          <div className="flex items-center gap-2">
-            <MapPin className="h-5 w-5 text-ganz-primary" />
-            <h2 className="text-lg font-medium">{t("musanzeRegion")}</h2>
+        <div className="space-y-4 md:space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-ganz-primary" />
+              <h2 className="text-lg font-medium">{t("farmersManagement")}</h2>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="ml-2 h-9">
-                  <span>{selectedSector === "all" ? t("selectRegion") : selectedSector}</span>
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setSelectedSector("all")}>{t("all")}</DropdownMenuItem>
-                <Separator className="my-1" />
-                {musanzeSectors.map((sector) => (
-                  <DropdownMenuItem key={sector} onClick={() => setSelectedSector(sector)}>
-                    {sector}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
-            <div className="relative w-full sm:w-auto">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input type="search" placeholder={t("searchFarmers")} className="pl-8 w-full sm:w-[180px] h-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="ml-2 h-9">
+                    <span>{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onClick={() => setSelectedLocation("all")}>{t("allLocations")}</DropdownMenuItem>
+                  <Separator className="my-1" />
+                  {locations.map((location) => (
+                      <DropdownMenuItem key={location.id} onClick={() => setSelectedLocation(location.name)}>
+                        {location.name}
+                      </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-9">
-                  <Filter className="mr-2 h-4 w-4" />
-                  <span>{t("crop")}</span>
-                  <ChevronDown className="ml-2 h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => setSelectedCrop("all")}>{t("all")}</DropdownMenuItem>
-                <Separator className="my-1" />
-                {["Maize", "Potatoes", "Beans", "Vegetables"].map((crop) => (
-                  <DropdownMenuItem key={crop} onClick={() => setSelectedCrop(crop)}>
-                    {crop}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
+              <div className="relative w-full sm:w-auto">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                    type="search"
+                    placeholder={t("searchFarmers")}
+                    className="pl-8 w-full sm:w-[200px] h-9"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
 
-            <Button variant="primary" size="sm">
-              <SlidersHorizontal className="mr-2 h-4 w-4" />
-              {t("moreFilters")}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="primary" onClick={() => setCreateDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t("addFarmer")}
+            </Button>
+
+            <Button
+                variant="outline"
+                onClick={handleImportFarmers}
+            >
+              <Upload className="h-4 w-4 mr-2" />
+              {t("importData")}
+            </Button>
+
+            <Button
+                variant="outline"
+                onClick={handleExportFarmers}
+                disabled={isExporting}
+            >
+              <Download className="h-4 w-4 mr-2" />
+              {isExporting ? t("exporting") : t("exportData")}
             </Button>
           </div>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="primary" onClick={() => setAddingFarmer(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            {t("addFarmer")}
-          </Button>
-          <Button variant="outline">
-            <Upload className="h-4 w-4 mr-2" />
-            {t("importData")}
-          </Button>
-          <Button variant="outline">
-            <Download className="h-4 w-4 mr-2" />
-            {t("exportData")}
-          </Button>
-          <Button variant="outline">
-            <MessageSquare className="h-4 w-4 mr-2" />
-            {t("sendMessage")}
-          </Button>
-        </div>
 
-        {addingFarmer ? (
           <Card>
-            <div className="flex justify-between items-center pr-6">
-              <CardHeader>
-                <CardTitle>{"addNewFarmer"}</CardTitle>
-                <CardDescription>{t("fillFarmerDetails")}</CardDescription>
-              </CardHeader>
-              <Button variant="outline" className="text-destructive" onClick={() => setAddingFarmer(false)}>
-                {t("cancel")}
-              </Button>
-            </div>
-            <CardContent>
-              {/* Form for adding new farmer */}
-              <form className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">{t("farmerName")}</label>
-                    <Input placeholder={t("enterfarmerName")} />
+            <CardHeader className="p-4">
+              <CardTitle>{t("registeredFarmers")}</CardTitle>
+              <CardDescription>
+                {totalCount} {t("farmersFound")}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="animate-spin h-8 w-8" />
                   </div>
-                  <div>
-                    <label className="text-sm font-medium">
-                      {t("phoneNumber")} <span className="text-destructive">*</span>
-                    </label>
-                    <Input placeholder="7XXXXXXXX" required />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium">
-                      {t("location")} <span className="text-red-500">*</span>
-                    </label>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="h-9 w-full justify-between">
-                          <span>{selectedSector === "all" ? t("selectRegion") : selectedSector}</span>
-                          <ChevronDown className="ml-2 h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={() => setSelectedSector("all")}>{t("all")}</DropdownMenuItem>
-                        <Separator className="my-1" />
-                        {musanzeSectors.map((sector) => (
-                          <DropdownMenuItem key={sector} onClick={() => setSelectedSector(sector)}>
-                            {sector}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium">{t("farmSize")} (ha)</label>
-                    <Input type="number" step="1" min="0" placeholder="1.0" />
-                  </div>
-                </div>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-end">
-              <div className="flex gap-2">
-                <Button variant="primary_outline">
-                  <Archive className="h-4 w-4 mr-2" />
-                  {t("saveAsDraft")}
-                </Button>
-                <Button variant="primary">
-                  <Plus className="h-4 w-4" />
-                  {t("saveFarmerDetails")}
-                </Button>
-              </div>
-            </CardFooter>
-          </Card>
-        ) : (
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="p-4">
-                <CardTitle>{t("registeredFarmers")}</CardTitle>
-                <CardDescription>
-                  {filteredFarmers.length} {t("farmersFound")}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
+              ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
                       <tr className="border-b bg-muted">
                         <th className="py-3 px-4 text-left font-medium text-muted-foreground">
                           <div className="flex items-center gap-1">
@@ -282,216 +313,181 @@ const Farmers: NextPage = () => {
                         </th>
                         <th className="py-3 px-4 text-left font-medium text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <span>{t("farmlocation")}</span>
+                            <span>{t("locations")}</span>
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </th>
                         <th className="py-3 px-4 text-left font-medium text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <span>{t("crops")}</span>
+                            <span>{t("status")}</span>
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </th>
                         <th className="py-3 px-4 text-left font-medium text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <span>{t("alerts")}</span>
+                            <span>{t("joinedDate")}</span>
                             <ArrowUpDown className="h-3 w-3" />
                           </div>
                         </th>
                         <th className="py-3 px-4 text-right font-medium text-muted-foreground">{t("actions")}</th>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {filteredFarmers.map((farmer) => (
-                        <tr key={farmer.id} className={`border-b hover:bg-muted/50 cursor-pointer transition-colors ${selectedFarmer === farmer.id ? "bg-muted/50" : ""}`} onClick={() => setSelectedFarmer(farmer.id)}>
-                          <td className="py-3 px-4">
-                            <div className="font-medium">{farmer.name}</div>
-                            <div className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Phone className="h-3 w-3" />
-                              {farmer.phone}
-                            </div>
-                          </td>
-                          {/* <td className="py-3 px-4">{farmer.location}</td> */}
-                          <td className="py-3 px-4">
-                            <div className="flex flex-wrap gap-1">
-                              {farmer.location.map((location, index) => (
-                                <div key={index} className="text-sm bg-muted rounded-full px-2 py-0.5">
-                                  {location}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex flex-wrap gap-1">
-                              {farmer.crops.map((crop, index) => (
-                                <div key={index} className="text-xs bg-muted rounded-full px-2 py-0.5">
-                                  {crop}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4">
-                            <div className="flex flex-wrap gap-1">
-                              {farmer.subscribedAlerts.map((alert, index) => (
-                                <div key={index} className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full px-2 py-0.5">
-                                  {alert}
-                                </div>
-                              ))}
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem>
-                                  <User className="h-4 w-4 mr-2" />
-                                  {t("viewProfile")}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <Edit className="h-4 w-4 mr-2" />
-                                  {t("editFarmer")}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem>
-                                  <MessageSquare className="h-4 w-4 mr-2" />
-                                  {t("sendMessage")}
-                                </DropdownMenuItem>
-                                <Separator className="my-1" />
-                                <DropdownMenuItem className="text-red-600">
-                                  <Trash className="h-4 w-4 mr-2" />
-                                  {t("delete")}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-              <CardFooter className="p-4 flex justify-between">
-                <div className="text-sm text-muted-foreground">
-                  {t("showing")} {filteredFarmers.length} {t("of")} {farmersData.length} {t("farmers")}
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button variant="outline" size="sm" disabled>
-                    {t("previous")}
-                  </Button>
-                  <Button variant="outline" size="sm" disabled>
-                    {t("next")}
-                  </Button>
-                </div>
-              </CardFooter>
-            </Card>
-            {selectedFarmer && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>{t("farmerProfile")}</CardTitle>
-                  <CardDescription>{t("farmerDetails")}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {(() => {
-                    const farmer = farmersData.find((f) => f.id === selectedFarmer);
-                    if (!farmer) return null;
+                      </thead>
+                      <tbody>
+                      {farmers.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                              {t("noFarmersFound")}
+                            </td>
+                          </tr>
+                      ) : (
+                          farmers.map((farmer) => (
+                              <tr
+                                  key={farmer.id}
+                                  className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
+                                  onClick={() => handleViewFarmer(farmer.id)}
+                              >
+                                <td className="py-3 px-4">
+                                  <div className="font-medium">{farmer.name}</div>
+                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Phone className="h-3 w-3" />
+                                    {farmer.phone}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex flex-wrap gap-1">
+                                    {farmer.locations.map((location, index) => (
+                                        <Badge key={index} variant="outline" className="text-xs">
+                                          {location.name}
+                                        </Badge>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge variant={farmer.isActive ? "default" : "secondary"}>
+                                    {farmer.isActive ? t("active") : t("inactive")}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="text-sm">
+                                    {new Date(farmer.createdAt).toLocaleDateString()}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                      <Button variant="ghost" size="icon">
+                                        <MoreHorizontal className="h-4 w-4" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleViewFarmer(farmer.id);
+                                      }}>
+                                        <User className="h-4 w-4 mr-2" />
+                                        {t("viewProfile")}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditFarmer(farmer);
+                                      }}>
+                                        <Edit className="h-4 w-4 mr-2" />
+                                        {t("editFarmer")}
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={(e) => {
+                                        e.stopPropagation();
+                                        toast.info(t("sendMessageFeatureComingSoon"));
+                                      }}>
+                                        <MessageSquare className="h-4 w-4 mr-2" />
+                                        {t("sendMessage")}
+                                      </DropdownMenuItem>
+                                      <Separator className="my-1" />
+                                      <DropdownMenuItem
+                                          className="text-red-600"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDeleteFarmer(farmer.id);
+                                          }}
+                                      >
+                                        <Trash className="h-4 w-4 mr-2" />
+                                        {t("delete")}
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </td>
+                              </tr>
+                          ))
+                      )}
+                      </tbody>
+                    </table>
+                  </div>
+              )}
+            </CardContent>
 
-                    return (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
-                          <div className="flex items-center gap-4 mb-4">
-                            <div className="bg-muted rounded-full h-16 w-16 flex items-center justify-center">
-                              <User className="h-8 w-8 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <h3 className="text-xl font-semibold">{farmer.name}</h3>
-                              <p className="text-muted-foreground">{farmer.location}</p>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <div className="grid grid-cols-3 gap-2">
-                              <div className="text-sm font-medium">{t("phoneNumber")}</div>
-                              <div className="col-span-2">{farmer.phone}</div>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div className="text-sm font-medium">{t("farmSize")}</div>
-                              {/* <div className="col-span-2">{farmer.farmSize} ha</div> */}
-                            </div>
-                            <div className="grid grid-cols-3 gap-2">
-                              <div className="text-sm font-medium">{t("lastActive")}</div>
-                              <div className="col-span-2">{new Date(farmer.lastActive).toLocaleString()}</div>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div>
-                            <h3 className="font-medium mb-2">{t("cropsGrown")}</h3>
-                            <div className="flex flex-wrap gap-2">
-                              {farmer.crops.map((crop, index) => (
-                                <div key={index} className="bg-muted rounded-md px-3 py-1 text-sm">
-                                  {crop}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <h3 className="font-medium mb-2">{t("subscribedAlerts")}</h3>
-                            <div className="flex flex-wrap gap-2">
-                              {farmer.subscribedAlerts.map((alert, index) => (
-                                <div key={index} className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-md px-3 py-1 text-sm">
-                                  {alert}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div>
-                            <h3 className="font-medium mb-2">{t("recentActivity")}</h3>
-                            <div className="space-y-2 text-sm">
-                              <div className="flex items-start gap-2">
-                                <div className="rounded-full bg-blue-500 h-2 w-2 mt-1.5" />
-                                <span>
-                                  {t("receivedWeatherAlert")} - {new Date(farmer.lastActive).toLocaleDateString()}
-                                </span>
-                              </div>
-                              <div className="flex items-start gap-2">
-                                <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                <span>
-                                  {t("updatedCropInfo")} - {new Date(farmer.lastActive).toLocaleDateString()}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </CardContent>
-                <CardFooter className="flex gap-2 justify-end">
-                  <Button variant="outline">
-                    <Edit className="h-4 w-4 mr-2" />
-                    {t("editProfile")}
-                  </Button>
-                  <Button>
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    {t("sendMessage")}
-                  </Button>
+            {totalCount > 0 && (
+                <CardFooter className="p-4 flex justify-between">
+                  <div className="text-sm text-muted-foreground">
+                    {t("showing")} {Math.min((currentPage - 1) * limit + 1, totalCount)} - {Math.min(currentPage * limit, totalCount)} {t("of")} {totalCount} {t("farmers")}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    >
+                      {t("previous")}
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                  {currentPage} / {totalPages}
+                </span>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={currentPage === totalPages}
+                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    >
+                      {t("next")}
+                    </Button>
+                  </div>
                 </CardFooter>
-              </Card>
             )}
-          </div>
-        )}
+          </Card>
 
-        <div className="text-xs text-muted-foreground text-center mt-4">
-          {t("dataLastUpdated")}: {new Date().toLocaleString()}
+          <div className="text-xs text-muted-foreground text-center mt-4">
+            {t("dataLastUpdated")}: {new Date().toLocaleString()}
+          </div>
         </div>
-      </div>
-    </AppLayout>
+
+        <ImportFarmersDialog
+            open={importDialogOpen}
+            onOpenChange={setImportDialogOpen}
+            locations={locations}
+            onSuccess={handleDialogSuccess}
+        />
+
+        <CreateFarmerDialog
+            open={createDialogOpen}
+            onOpenChange={setCreateDialogOpen}
+            locations={locations}
+            onSuccess={handleDialogSuccess}
+        />
+
+        <ViewFarmerDialog
+            open={viewDialogOpen}
+            onOpenChange={setViewDialogOpen}
+            farmerId={selectedFarmer}
+            onEdit={handleEditFarmer}
+        />
+
+        <EditFarmerDialog
+            open={editDialogOpen}
+            onOpenChange={setEditDialogOpen}
+            farmer={farmerToEdit}
+            locations={locations}
+            onSuccess={handleDialogSuccess}
+        />
+      </AppLayout>
   );
 };
 
