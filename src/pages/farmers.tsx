@@ -34,7 +34,7 @@ const Farmers: NextPage = () => {
   const [selectedFarmer, setSelectedFarmer] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [limit] = useState(20);
 
@@ -202,7 +202,7 @@ const Farmers: NextPage = () => {
     setSelectedFarmer(farmerId);
     setViewDialogOpen(true);
   };
-
+  
   const handleEditFarmer = (farmer: Farmer) => {
     setFarmerToEdit(farmer);
     setViewDialogOpen(false);
