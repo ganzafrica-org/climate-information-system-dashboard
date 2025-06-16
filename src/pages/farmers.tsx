@@ -261,32 +261,32 @@ const Farmers: NextPage = () => {
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="primary" onClick={() => setCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t("addFarmer")}
+                </Button>
+
+                <Button
+                    variant="outline"
+                    onClick={handleImportFarmers}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {t("importData")}
+                </Button>
+
+                <Button
+                    variant="outline"
+                    onClick={handleExportFarmers}
+                    disabled={isExporting}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {isExporting ? t("exporting") : t("exportData")}
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => setCreateDialogOpen(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t("addFarmer")}
-            </Button>
-
-            <Button
-                variant="outline"
-                onClick={handleImportFarmers}
-            >
-              <Upload className="h-4 w-4 mr-2" />
-              {t("importData")}
-            </Button>
-
-            <Button
-                variant="outline"
-                onClick={handleExportFarmers}
-                disabled={isExporting}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              {isExporting ? t("exporting") : t("exportData")}
-            </Button>
-          </div>
 
           <Card>
             <CardHeader className="p-4">
