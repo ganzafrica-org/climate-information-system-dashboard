@@ -176,7 +176,7 @@ const Forecasts: NextPage = () => {
         [t('rainAmount') || 'Rain Amount']: `${day.rainAmount}mm`,
         [t('windSpeed') || 'Wind Speed']: `${day.windSpeed} km/h`,
         [t('windDirection') || 'Wind Direction']: day.windDirection,
-        [t('farmingRecommendation') || 'Farming Recommendation']: day.farmingRecommendation,
+        [t('overview') || 'Overview']: day.farmingRecommendation,
         [t('soilCondition') || 'Soil Condition']: day.soilCondition,
       }));
 
@@ -553,7 +553,7 @@ const Forecasts: NextPage = () => {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <Card>
                               <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{t("farmingRecommendation") || "Farming Recommendation"}</CardTitle>
+                                <CardTitle className="text-base">{t("overview") || "Farming Recommendation"}</CardTitle>
                               </CardHeader>
                               <CardContent>
                                 <p className="text-sm mb-3">
@@ -593,6 +593,12 @@ const Forecasts: NextPage = () => {
                                     <span>{t("windStrength") || "Wind Strength"}:</span>
                                     <span className="font-medium capitalize">
                                   {weatherData.weather.daily[activeDay].windStrength}
+                                </span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span>{t("rainChance") || "Rain Chance"}:</span>
+                                    <span className="font-medium">
+                                  {weatherData.weather.daily[activeDay].rainChance || 'Unknown'}%
                                 </span>
                                   </div>
                                   <div className="flex justify-between">

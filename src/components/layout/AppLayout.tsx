@@ -15,7 +15,7 @@ import {
     ChevronRight,
     LogOut,
     BookOpen,
-    HelpCircle,
+    HelpCircle, MapPin, Loader2,
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
@@ -64,6 +64,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         { href: '/historical', icon: <History size={20} />, label: t('historical') },
         { href: '/alerts', icon: <Bell size={20} />, label: t('alerts') },
         { href: '/farmers', icon: <Users size={20} />, label: t('farmers') },
+        { href: '/locations', icon: <MapPin size={20} />, label: t('locations') },
         { href: '/messages', icon: <MessageSquare size={20} />, label: t('messages') },
         { href: '/training', icon: <BookOpen size={20} />, label: t('training') },
         { href: '/settings', icon: <Settings size={20} />, label: t('settings') }
@@ -84,7 +85,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     if (!isMounted || isLoading) {
         return (
             <div className="flex h-screen items-center justify-center">
-                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-ganz-primary"></div>
+                <Loader2 className="animate-spin h-24 w-24" />
             </div>
         );
     }
