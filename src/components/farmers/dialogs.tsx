@@ -317,7 +317,7 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
                         {t('close')}
                     </Button>
                     {farmer && (
-                        <Button onClick={() => onEdit(farmer)}>
+                        <Button variant="primary" onClick={() => onEdit(farmer)}>
                             <Edit className="h-4 w-4 mr-2" />
                             {t('editFarmer')}
                         </Button>
@@ -476,7 +476,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             {t('cancel')}
                         </Button>
-                        <Button type="submit" disabled={isLoading}>
+                        <Button variant="primary" type="submit" disabled={isLoading}>
                             {isLoading ? t('updating') : t('updateFarmer')}
                         </Button>
                     </DialogFooter>

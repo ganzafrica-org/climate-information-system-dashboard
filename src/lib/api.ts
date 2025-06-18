@@ -56,9 +56,24 @@ class ApiClient {
                 console.log(`✓ ${response.config.method?.toUpperCase()} ${response.config.url}:`, response.status);
                 return response;
             },
+<<<<<<< HEAD
             async (error) => {
                 const originalRequest = error.config;
                 
+=======
+            (error) => {
+
+                if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                    console.error('Request timeout:', error.message);
+
+                    const timeoutError = new Error('Request timeout');
+                    timeoutError.name = 'TimeoutError';
+                    (timeoutError as any).code = 'ECONNABORTED';
+                    (timeoutError as any).isTimeout = true;
+                    return Promise.reject(timeoutError);
+                }
+
+>>>>>>> e06dfd6f0b35f24563c5663ebeed006b33d1207b
                 console.error(`✗ API Error:`, error.response?.status, error.response?.data || error.message);
 
                 // Handle 429 rate limiting with retry
@@ -114,6 +129,7 @@ class ApiClient {
     }
 
     async get<T = any>(url: string, options: RequestOptions = {}): Promise<T> {
+<<<<<<< HEAD
         const config: AxiosRequestConfig = {
             params: options.params,
             headers: options.headers,
@@ -206,12 +222,123 @@ class ApiClient {
             const response = await this.instance.delete<T>(url, config);
             return response.data;
         });
+=======
+        try {
+            const config: AxiosRequestConfig = {
+                params: options.params,
+                headers: options.headers,
+                timeout: options.timeout,
+            };
+
+            const response = await this.instance.get<T>(url, config);
+            return response.data;
+        } catch (error: any) {
+
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                const timeoutError = new Error('Request timeout');
+                (timeoutError as any).code = 'ECONNABORTED';
+                (timeoutError as any).isTimeout = true;
+                throw timeoutError;
+            }
+            throw error;
+        }
+    }
+
+    async post<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<T> {
+        try {
+            const config: AxiosRequestConfig = {
+                params: options.params,
+                headers: options.headers,
+                timeout: options.timeout,
+            };
+
+            const response = await this.instance.post<T>(url, data, config);
+            return response.data;
+        } catch (error: any) {
+
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                const timeoutError = new Error('Request timeout');
+                (timeoutError as any).code = 'ECONNABORTED';
+                (timeoutError as any).isTimeout = true;
+                throw timeoutError;
+            }
+            throw error;
+        }
+    }
+
+    async put<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<T> {
+        try {
+            const config: AxiosRequestConfig = {
+                params: options.params,
+                headers: options.headers,
+                timeout: options.timeout,
+            };
+
+            const response = await this.instance.put<T>(url, data, config);
+            return response.data;
+        } catch (error: any) {
+
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                const timeoutError = new Error('Request timeout');
+                (timeoutError as any).code = 'ECONNABORTED';
+                (timeoutError as any).isTimeout = true;
+                throw timeoutError;
+            }
+            throw error;
+        }
+    }
+
+    async patch<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<T> {
+        try {
+            const config: AxiosRequestConfig = {
+                params: options.params,
+                headers: options.headers,
+                timeout: options.timeout,
+            };
+
+            const response = await this.instance.patch<T>(url, data, config);
+            return response.data;
+        } catch (error: any) {
+
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                const timeoutError = new Error('Request timeout');
+                (timeoutError as any).code = 'ECONNABORTED';
+                (timeoutError as any).isTimeout = true;
+                throw timeoutError;
+            }
+            throw error;
+        }
+    }
+
+    async delete<T = any>(url: string, options: RequestOptions = {}): Promise<T> {
+        try {
+            const config: AxiosRequestConfig = {
+                params: options.params,
+                headers: options.headers,
+                timeout: options.timeout,
+            };
+
+            const response = await this.instance.delete<T>(url, config);
+            return response.data;
+        } catch (error: any) {
+
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                const timeoutError = new Error('Request timeout');
+                (timeoutError as any).code = 'ECONNABORTED';
+                (timeoutError as any).isTimeout = true;
+                throw timeoutError;
+            }
+            throw error;
+        }
+>>>>>>> e06dfd6f0b35f24563c5663ebeed006b33d1207b
     }
 
     async uploadFile<T = any>(url: string, file: File, options: RequestOptions = {}): Promise<T> {
-        const formData = new FormData();
-        formData.append('file', file);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
 
+<<<<<<< HEAD
         const config: AxiosRequestConfig = {
             params: options.params,
             headers: {
@@ -233,6 +360,31 @@ class ApiClient {
         });
     }
 
+=======
+            const config: AxiosRequestConfig = {
+                params: options.params,
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                    ...options.headers,
+                },
+                timeout: options.timeout || 60000,
+            };
+
+            const response = await this.instance.post<T>(url, formData, config);
+            return response.data;
+        } catch (error: any) {
+
+            if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                const timeoutError = new Error('Request timeout');
+                (timeoutError as any).code = 'ECONNABORTED';
+                (timeoutError as any).isTimeout = true;
+                throw timeoutError;
+            }
+            throw error;
+        }
+    }
+
+>>>>>>> e06dfd6f0b35f24563c5663ebeed006b33d1207b
     exportAsCSV(data: any[], filename: string, headers?: string[]): void {
         if (data.length === 0) {
             throw new Error('No data to export');
