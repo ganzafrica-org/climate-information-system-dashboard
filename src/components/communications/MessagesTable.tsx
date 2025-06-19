@@ -1,533 +1,527 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Send, Clock, Users, Eye, MoreHorizontal, Archive, Trash, ArrowUpDown, Edit, MapPin, CheckCircle, XCircle } from 'lucide-react';
+import {
+  MapPin,
+  Edit,
+  Trash,
+  Loader2,
+  RefreshCw,
+  Search,
+  ArrowUpDown,
+  MoreHorizontal,
+  Eye,
+  Navigation,
+  ChevronDown,
+  Send,
+  MessageSquare,
+  X,
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { useLanguage } from '@/i18n';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import api from '@/lib/api';
+import { toast } from 'sonner';
 
 interface Location {
   id: number;
-  locationName: string;
-  coordinates: {
-    lat: number;
-    lon: number;
-  };
+  name: string;
+  type: string;
+  latitude?: number;
+  longitude?: number;
+  coordinates?: string;
   createdAt: string;
-  farmerCount?: number;
-  sector?: string;
+  updatedAt?: string;
+  isActive?: boolean;
+  userId?: number;
 }
 
-interface Message {
-  id: string;
-  content: string;
-  recipients: string[];
-  recipientCount: number;
-  sentAt: string;
-  status: 'sent' | 'scheduled' | 'draft';
-  locationIds: number[];
+interface LocationsResponse {
+  locations: Location[];
+  count: number;
+  pagination?: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+interface ApiResponse<T> {
+  status: string;
+  data: T;
+  message?: string;
+}
+
+interface LocationFilters {
+  limit: number;
+  offset: number;
+  locationId?: number;
+  search?: string;
 }
 
 interface MessagesTableProps {
-  selectedSector?: string;
-  searchTerm?: string;
+  selectedSector: string;
+  searchTerm: string;
 }
 
-export function MessagesTable({ selectedSector = 'all', searchTerm = '' }: MessagesTableProps) {
-  const [activeTab, setActiveTab] = useState<'locations' | 'history'>('locations');
-  const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
-  const [isMessageDialogOpen, setIsMessageDialogOpen] = useState(false);
-  const [customMessage, setCustomMessage] = useState('');
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [messagingResult, setMessagingResult] = useState<{
-    success: number;
-    failed: number;
-    totalFarmers: number;
-  } | null>(null);
-  const [isSending, setIsSending] = useState(false);
+export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }: MessagesTableProps) {
+  const { t } = useLanguage();
+  
   const [locations, setLocations] = useState<Location[]>([]);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [allLocations, setAllLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>("all");
+  const [selectedLocations, setSelectedLocations] = useState<number[]>([]);
+  const [selectedLocationObj, setSelectedLocationObj] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [totalCount, setTotalCount] = useState(0);
+  
+  const [currentPage, setCurrentPage] = useState(1);
+  const [limit] = useState(20);
 
-  // Get auth token from localStorage or context
-  const getAuthToken = () => {
-    // Try different possible token storage keys
-    return localStorage.getItem('token') || 
-           localStorage.getItem('authToken') || 
-           localStorage.getItem('accessToken') ||
-           localStorage.getItem('jwt');
-  };
+  const [searchTerm, setSearchTerm] = useState(initialSearchTerm || "");
 
-  // Fetch locations from backend
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [locationToEdit, setLocationToEdit] = useState<Location | null>(null);
+  
+  // Message sending states
+  const [messageDialogOpen, setMessageDialogOpen] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
+
   useEffect(() => {
-    const fetchLocations = async () => {
-      try {
-        setIsLoading(true);
-        const token = getAuthToken();
-        
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-        };
-        
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
+    fetchAllLocations();
+  }, []);
 
-        const response = await fetch('http://localhost:3000/api/users/locations', {
-          headers
-        });
-        
-        if (!response.ok) {
-          if (response.status === 401) {
-            throw new Error('Authentication required. Please log in again.');
-          }
-          throw new Error(`Failed to fetch locations: ${response.status} ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        setLocations(data);
-        setError(null);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch locations');
-        console.error('Error fetching locations:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchLocations();
-  }, []);
+  }, [selectedLocation, searchTerm, currentPage]);
 
-  // Load messages from localStorage on component mount
-  useEffect(() => {
-    const savedMessages = localStorage.getItem('messageHistory');
-    if (savedMessages) {
-      try {
-        setMessages(JSON.parse(savedMessages));
-      } catch (err) {
-        console.error('Error loading saved messages:', err);
+  const fetchAllLocations = async () => {
+    try {
+      const response = await api.get('/api/users/locations/all');
+      
+      console.log('All locations API response:', response.data);
+      
+      if (response.data && Array.isArray(response.data)) {
+        setAllLocations(response.data);
+      } else if (response.data && response.data.locations && Array.isArray(response.data.locations)) {
+        setAllLocations(response.data.locations);
+      } else {
+        console.warn('No valid locations data received');
+        setAllLocations([]);
       }
-    }
-  }, []);
-
-  // Save messages to localStorage whenever messages array changes
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem('messageHistory', JSON.stringify(messages));
-    }
-  }, [messages]);
-
-  const filteredLocations = locations.filter(location => {
-    const matchesSector = selectedSector === 'all' || 
-      (location.sector && location.sector.toLowerCase().includes(selectedSector.toLowerCase()));
-    const matchesSearch = searchTerm === '' || 
-      location.locationName.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSector && matchesSearch;
-  });
-
-  const filteredMessages = messages.filter(message => {
-    const matchesSector = selectedSector === 'all' || message.recipients.some(r => 
-      r.toLowerCase().includes(selectedSector.toLowerCase())
-    );
-    const matchesSearch = searchTerm === '' || 
-      message.content.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    return matchesSector && matchesSearch;
-  });
-
-  const handleLocationSelect = (locationId: number) => {
-    setSelectedLocations(prev => 
-      prev.includes(locationId) 
-        ? prev.filter(id => id !== locationId)
-        : [...prev, locationId]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedLocations.length === filteredLocations.length) {
-      setSelectedLocations([]);
-    } else {
-      setSelectedLocations(filteredLocations.map(loc => loc.id));
+    } catch (error: any) {
+      console.error('Failed to fetch all locations:', error);
+      toast.error(t('failedToLoadLocations'));
+      setAllLocations([]);
     }
   };
 
-  const getTotalSelectedFarmers = () => {
-    return locations
-      .filter(loc => selectedLocations.includes(loc.id))
-      .reduce((total, loc) => total + (loc.farmerCount || 0), 0);
+  const fetchLocations = async () => {
+    setIsLoading(true);
+    try {
+      const filters: any = {
+        limit,
+        offset: (currentPage - 1) * limit,
+      };
+
+      if (selectedLocation !== "all") {
+        const location = allLocations?.find(l => l.name === selectedLocation);
+        if (location) {
+          filters.locationId = location.id;
+        }
+      }
+
+      if (searchTerm?.trim()) {
+        filters.search = searchTerm.trim();
+      }
+
+      const response = await api.get('/api/users/locations/all', { params: filters });
+
+      console.log('Locations API response:', response.data);
+
+      // Handle the API response directly from your backend
+      let locationsData: any[] = [];
+      let countData = 0;
+
+      if (Array.isArray(response.data)) {
+        locationsData = response.data;
+        countData = response.data.length;
+      } else if (response.data && response.data.locations && Array.isArray(response.data.locations)) {
+        locationsData = response.data.locations;
+        countData = response.data.count || response.data.locations.length;
+      } else {
+        console.warn('No valid locations data received');
+        locationsData = [];
+        countData = 0;
+      }
+
+      // Transform locations to match your backend structure (lat/lon)
+      const transformedLocations = locationsData.map((location: any) => ({
+        id: location.id,
+        name: location.name,
+        type: location.type || 'sector',
+        latitude: location.lat,
+        longitude: location.lon,
+        coordinates: location.lat && location.lon ? `${location.lat}, ${location.lon}` : '',
+        createdAt: location.createdAt,
+        updatedAt: location.updatedAt,
+        isActive: location.isActive !== undefined ? location.isActive : true,
+        userId: location.userId
+      }));
+
+      setLocations(transformedLocations);
+      setTotalCount(countData);
+    } catch (error: any) {
+      console.error('Failed to fetch locations:', error);
+      toast.error(t('failedToLoadLocations'));
+      setLocations([]);
+      setTotalCount(0);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteLocation = async (locationId: number) => {
+    if (!confirm(t('confirmDeleteLocation'))) return;
+
+    try {
+      await api.delete(`/api/users/locations/${locationId}`);
+      toast.success(t('locationDeletedSuccessfully'));
+      await fetchLocations();
+      if (selectedLocationObj === locationId) {
+        setSelectedLocationObj(null);
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || t('failedToDeleteLocation');
+      toast.error(message);
+    }
   };
 
   const handleSendMessage = async () => {
-    if (!customMessage.trim() || selectedLocations.length === 0) return;
+    if (!messageText.trim()) {
+      toast.error(t('pleaseEnterMessage'));
+      return;
+    }
 
-    setIsSending(true);
-    
+    if (selectedLocations.length === 0) {
+      toast.error(t('pleaseSelectLocations'));
+      return;
+    }
+
+    setIsSendingMessage(true);
     try {
-      const token = getAuthToken();
-      
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch('http://localhost:3000/api/weather/messaging/emergency', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          message: customMessage,
-          locationIds: selectedLocations
-        })
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentication required. Please log in again.');
-        }
-        throw new Error(`Failed to send message: ${response.status} ${response.statusText}`);
-      }
-
-      const result = await response.json();
-      
-      // Calculate success metrics (you might get this from the API response)
-      const totalFarmers = getTotalSelectedFarmers();
-      const successCount = result.successCount || Math.floor(totalFarmers * 0.95);
-      const failedCount = totalFarmers - successCount;
-
-      setMessagingResult({
-        success: successCount,
-        failed: failedCount,
-        totalFarmers: totalFarmers
-      });
-
-      // Add the sent message to history
-      const selectedLocationNames = locations
-        .filter(loc => selectedLocations.includes(loc.id))
-        .map(loc => loc.locationName);
-
-      const newMessage: Message = {
-        id: `msg-${Date.now()}`,
-        content: customMessage,
-        recipients: selectedLocationNames,
-        recipientCount: totalFarmers,
-        sentAt: new Date().toISOString(),
-        status: 'sent',
+      const response = await api.post('http://localhost:3000/api/weather/messaging/emergency', {
+        message: messageText.trim(),
         locationIds: selectedLocations
-      };
-
-      setMessages(prev => [newMessage, ...prev]);
-      
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const totalFarmers = getTotalSelectedFarmers();
-      setMessagingResult({
-        success: 0,
-        failed: totalFarmers,
-        totalFarmers: totalFarmers
       });
+
+      // Handle success response
+      const data = response.data;
+      let successMessage = t('messageSentSuccessfully');
+      
+      if (data.successful && data.failed) {
+        successMessage += `\n${t('sentTo')}: ${data.successful} ${t('farmers')}`;
+        if (data.failed > 0) {
+          successMessage += `\n${t('failed')}: ${data.failed} ${t('farmers')}`;
+        }
+      } else if (data.count !== undefined) {
+        successMessage += `\n${t('sentTo')}: ${data.count} ${t('farmers')}`;
+      } else {
+        successMessage += `\n${t('sentTo')}: ${selectedLocations.length} ${t('locations')}`;
+      }
+
+      toast.success(successMessage);
+      
+      // Reset form
+      setMessageText('');
+      setSelectedLocations([]);
+      setMessageDialogOpen(false);
+      
+    } catch (error: any) {
+      console.error('Failed to send message:', error);
+      const errorMessage = error.response?.data?.message || t('failedToSendMessage');
+      toast.error(errorMessage);
     } finally {
-      setIsSending(false);
-      setIsMessageDialogOpen(false);
-      setIsSuccessModalOpen(true);
-      setCustomMessage('');
+      setIsSendingMessage(false);
+    }
+  };
+
+  const handleOpenMessageDialog = () => {
+    if (selectedLocations.length === 0) {
+      toast.error(t('pleaseSelectLocationsFirst'));
+      return;
+    }
+    setMessageDialogOpen(true);
+  };
+
+  const handleViewLocation = (locationId: number) => {
+    setSelectedLocationObj(locationId);
+    setViewDialogOpen(true);
+  };
+  
+  const handleEditLocation = (location: Location) => {
+    setLocationToEdit(location);
+    setViewDialogOpen(false);
+    setEditDialogOpen(true);
+  };
+
+  const handleDialogSuccess = () => {
+    fetchLocations();
+    setSelectedLocationObj(null);
+  };
+
+  const handleSelectLocation = (locationId: number, checked: boolean) => {
+    if (checked) {
+      setSelectedLocations(prev => [...prev, locationId]);
+    } else {
+      setSelectedLocations(prev => prev.filter(id => id !== locationId));
+    }
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked && locations?.length) {
+      setSelectedLocations(locations.map(location => location.id));
+    } else {
       setSelectedLocations([]);
     }
   };
 
-  const formatCoordinates = (coordinates: { lat: number; lon: number }) => {
-    return `${coordinates.lat.toFixed(4)}, ${coordinates.lon.toFixed(4)}`;
+  const getTypeColor = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case 'district': return 'default';
+      case 'sector': return 'secondary';
+      case 'cell': return 'outline';
+      case 'village': return 'outline';
+      default: return 'outline';
+    }
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-6">
-        <Card>
-          <CardContent className="p-8">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-              <span className="ml-2">Loading locations...</span>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <Alert>
-          <AlertDescription>
-            {error.includes('Authentication') ? (
-              <>
-                <strong>Authentication Error:</strong> {error}
-                <br />
-                <span className="text-sm text-muted-foreground mt-1">
-                  Please check if you're logged in and try refreshing the page.
-                </span>
-              </>
-            ) : (
-              <>
-                <strong>Error loading locations:</strong> {error}
-              </>
-            )}
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+  const totalPages = Math.ceil(totalCount / limit);
 
   return (
-    <div className="space-y-6">
-      {/* Tab Navigation */}
-      <div className="flex space-x-1 bg-muted p-1 rounded-lg">
-        <button
-          onClick={() => setActiveTab('locations')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'locations'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <MapPin className="h-4 w-4" />
-            Locations ({filteredLocations.length})
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
+        <div className="flex items-center gap-2">
+          <MapPin className="h-5 w-5 text-ganz-primary" />
+          <h2 className="text-lg font-medium">{t("locationsManagement")}</h2>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" className="ml-2 h-9">
+                <span>{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onClick={() => setSelectedLocation("all")}>{t("allLocations")}</DropdownMenuItem>
+              <Separator className="my-1" />
+              {allLocations?.map((location) => (
+                <DropdownMenuItem key={location.id} onClick={() => setSelectedLocation(location.name)}>
+                  {location.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
+          <div className="relative w-full sm:w-auto">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder={t("searchLocations")}
+              className="pl-8 w-full sm:w-[200px] h-9"
+              value={searchTerm || ''}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
-        </button>
-        <button
-          onClick={() => setActiveTab('history')}
-          className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-            activeTab === 'history'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          <div className="flex items-center justify-center gap-2">
-            <Clock className="h-4 w-4" />
-            Message History ({filteredMessages.length})
+          <div className="flex flex-wrap gap-2">
+            {selectedLocations?.length > 0 && (
+              <>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={handleOpenMessageDialog}
+                  className="bg-[#0c5c2c] hover:bg-green-900"
+                >
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  {t("sendMessage")} ({selectedLocations?.length || 0})
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toast.info('Bulk actions coming soon')}
+                >
+                  {t("bulkActions")} ({selectedLocations?.length || 0})
+                </Button>
+              </>
+            )}
           </div>
-        </button>
+        </div>
       </div>
 
-      {/* Locations Tab */}
-      {activeTab === 'locations' && (
-        <Card>
-          <CardHeader className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Locations & Messaging</CardTitle>
-                <CardDescription>
-                  Select locations to send custom messages to farmers
-                </CardDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                {selectedLocations.length > 0 && (
-                  <Badge variant="secondary" className="px-3 py-1">
-                    {selectedLocations.length} locations selected ({getTotalSelectedFarmers()} farmers)
-                  </Badge>
-                )}
-                <Button
-                  onClick={() => setIsMessageDialogOpen(true)}
-                  disabled={selectedLocations.length === 0}
-                  className="gap-2"
-                >
-                  <Send className="h-4 w-4" />
-                  Send Message
-                </Button>
-              </div>
+      <Card>
+        <CardHeader className="p-4">
+          <CardTitle>{t("registeredLocations")}</CardTitle>
+          <CardDescription>
+            {totalCount} {t("locationsFound")}
+            {selectedLocations?.length > 0 && (
+              <span className="ml-2">
+                ({selectedLocations.length} {t("selected")})
+              </span>
+            )}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="animate-spin h-8 w-8" />
             </div>
-          </CardHeader>
-          <CardContent className="p-0">
+          ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b bg-muted">
-                    <th className="py-3 px-4 text-left">
+                    <th className="py-3 px-4 text-left font-medium text-muted-foreground w-12">
                       <Checkbox
-                        checked={selectedLocations.length === filteredLocations.length && filteredLocations.length > 0}
+                        checked={(selectedLocations?.length || 0) === (locations?.length || 0) && (locations?.length || 0) > 0}
                         onCheckedChange={handleSelectAll}
                       />
                     </th>
                     <th className="py-3 px-4 text-left font-medium text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <span>Location Name</span>
+                        <span>{t("locationName")}</span>
+                        <ArrowUpDown className="h-3 w-3" />
+                      </div>
+                    </th>
+
+                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <span>{t("status")}</span>
                         <ArrowUpDown className="h-3 w-3" />
                       </div>
                     </th>
                     <th className="py-3 px-4 text-left font-medium text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <span>Coordinates</span>
-                        <ArrowUpDown className="h-3 w-3" />
+                        <Navigation className="h-3 w-3" />
+                        <span>{t("coordinates")}</span>
                       </div>
                     </th>
                     <th className="py-3 px-4 text-left font-medium text-muted-foreground">
                       <div className="flex items-center gap-1">
-                        <span>Created At</span>
+                        <span>{t("createdAt")}</span>
                         <ArrowUpDown className="h-3 w-3" />
                       </div>
                     </th>
+                    <th className="py-3 px-4 text-right font-medium text-muted-foreground">{t("actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredLocations.length === 0 ? (
+                  {(!locations || locations.length === 0) ? (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                        No locations found
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                        {t("noLocationsFound")}
                       </td>
                     </tr>
                   ) : (
-                    filteredLocations.map((location) => (
+                    locations.map((location) => (
                       <tr
                         key={location.id}
-                        className={`border-b hover:bg-muted/50 cursor-pointer transition-colors ${
-                          selectedLocations.includes(location.id) ? 'bg-muted/30' : ''
-                        }`}
-                        onClick={() => handleLocationSelect(location.id)}
+                        className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
+                        onClick={() => handleViewLocation(location.id)}
                       >
-                        <td className="py-3 px-4">
+                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
                           <Checkbox
-                            checked={selectedLocations.includes(location.id)}
-                            onCheckedChange={() => handleLocationSelect(location.id)}
+                            checked={selectedLocations?.includes(location.id) || false}
+                            onCheckedChange={(checked) => handleSelectLocation(location.id, checked as boolean)}
                           />
                         </td>
                         <td className="py-3 px-4">
-                          <div className="flex items-center gap-2">
-                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                            <span className="font-medium">{location.locationName}</span>
-                          </div>
+                          <div className="font-medium">{location.name}</div>
+                          {location.userId && (
+                            <div className="text-xs text-muted-foreground">
+                              User ID: {location.userId}
+                            </div>
+                          )}
                         </td>
-                        <td className="py-3 px-4">
-                          <span className="text-sm text-muted-foreground font-mono">
-                            {formatCoordinates(location.coordinates)}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4">
-                          <span className="text-sm text-muted-foreground">
-                            {new Date(location.createdAt).toLocaleDateString()}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Message History Tab */}
-      {activeTab === 'history' && (
-        <Card>
-          <CardHeader className="p-4">
-            <CardTitle>Message History</CardTitle>
-            <CardDescription>
-              {filteredMessages.length} messages found
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted">
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <span>Message Content</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <span>Recipients</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <span>Status</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <span>Date</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </th>
-                    <th className="py-3 px-4 text-right font-medium text-muted-foreground">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredMessages.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                        No messages found
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredMessages.map((message) => (
-                      <tr
-                        key={message.id}
-                        className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
-                      >
                         <td className="py-3 px-4">
-                          <div className="text-sm line-clamp-2">
-                            {message.content}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="flex flex-wrap gap-1">
-                            {message.recipients.map((recipient) => (
-                              <Badge key={recipient} variant="outline" className="text-xs">
-                                {recipient}
-                              </Badge>
-                            ))}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {message.recipientCount} farmers
-                          </div>
-                        </td>
-                        <td className="py-3 px-4">
-                          <Badge variant={
-                            message.status === 'sent' ? "default" : 
-                            message.status === 'scheduled' ? "secondary" : 
-                            "outline"
-                          }>
-                            {message.status === 'sent' ? 'Sent' : 
-                            message.status === 'scheduled' ? 'Scheduled' : 
-                            'Draft'}
+                          <Badge variant={location.isActive ? "default" : "secondary"}>
+                            {location.isActive ? t("active") : t("inactive")}
                           </Badge>
                         </td>
                         <td className="py-3 px-4">
-                          <div className="text-sm font-medium">
-                            {new Date(message.sentAt).toLocaleDateString()}
+                          <div className="text-sm font-mono">
+                            {location.coordinates || (location.latitude && location.longitude) 
+                              ? `${location.latitude}, ${location.longitude}`
+                              : (
+                                <span className="text-muted-foreground italic">
+                                  {t("noCoordinates")}
+                                </span>
+                              )
+                            }
                           </div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(message.sentAt).toLocaleTimeString()}
+                          {location.latitude && location.longitude && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Lat: {location.latitude}, Lng: {location.longitude}
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <div className="text-sm">
+                            {new Date(location.createdAt).toLocaleDateString()}
                           </div>
                         </td>
                         <td className="py-3 px-4 text-right">
                           <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                               <Button variant="ghost" size="icon">
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewLocation(location.id);
+                              }}>
                                 <Eye className="h-4 w-4 mr-2" />
-                                View Details
+                                {t("viewDetails")}
                               </DropdownMenuItem>
-                              <DropdownMenuItem>
-                                <Send className="h-4 w-4 mr-2" />
-                                Resend Message
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditLocation(location);
+                              }}>
+                                <Edit className="h-4 w-4 mr-2" />
+                                {t("editLocation")}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={(e) => {
+                                e.stopPropagation();
+                                if (location.latitude && location.longitude) {
+                                  window.open(`https://maps.google.com/?q=${location.latitude},${location.longitude}`, '_blank');
+                                } else {
+                                  toast.error('No coordinates available for this location');
+                                }
+                              }}>
+                                <Navigation className="h-4 w-4 mr-2" />
+                                {t("viewOnMap")}
+                              </DropdownMenuItem>
+                              <Separator className="my-1" />
+                              <DropdownMenuItem
+                                className="text-red-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteLocation(location.id);
+                                }}
+                              >
+                                <Trash className="h-4 w-4 mr-2" />
+                                {t("delete")}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
@@ -538,127 +532,111 @@ export function MessagesTable({ selectedSector = 'all', searchTerm = '' }: Messa
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
 
-      {/* Custom Message Dialog */}
-      <Dialog open={isMessageDialogOpen} onOpenChange={setIsMessageDialogOpen}>
-        <DialogContent className="sm:max-w-[525px]">
+        {totalCount > 0 && (
+          <CardFooter className="p-4 flex justify-between">
+            <div className="text-sm text-muted-foreground">
+              {t("showing")} {Math.min((currentPage - 1) * limit + 1, totalCount)} - {Math.min(currentPage * limit, totalCount)} {t("of")} {totalCount} {t("locations")}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              >
+                {t("previous")}
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {currentPage} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              >
+                {t("next")}
+              </Button>
+            </div>
+          </CardFooter>
+        )}
+      </Card>
+
+      <div className="text-xs text-muted-foreground text-center mt-4">
+        {t("dataLastUpdated")}: {new Date().toLocaleString()}
+      </div>
+
+      {/* Message Dialog */}
+      <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Send Custom Message</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <MessageSquare className="h-5 w-5" />
+              {t("sendEmergencyMessage")}
+            </DialogTitle>
             <DialogDescription>
-              Send a message to {selectedLocations.length} selected location{selectedLocations.length !== 1 ? 's' : ''} ({getTotalSelectedFarmers()} farmers)
+              {t("sendingMessageTo")} {selectedLocations.length} {selectedLocations.length === 1 ? t("location") : t("locations")}
+              {selectedLocations.length > 0 && (
+                <div className="mt-2 text-sm">
+                  <strong>{t("selectedLocations")}:</strong>
+                  <div className="mt-1 max-h-20 overflow-y-auto text-xs text-muted-foreground">
+                    {selectedLocations.map(id => {
+                      const location = locations.find(l => l.id === id);
+                      return location ? location.name : `ID: ${id}`;
+                    }).join(', ')}
+                  </div>
+                </div>
+              )}
             </DialogDescription>
           </DialogHeader>
           
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Selected Locations:</label>
-              <div className="flex flex-wrap gap-1 mt-1">
-                {selectedLocations.map(id => {
-                  const location = locations.find(loc => loc.id === id);
-                  return location ? (
-                    <Badge key={id} variant="secondary" className="text-xs">
-                      {location.locationName}
-                    </Badge>
-                  ) : null;
-                })}
-              </div>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium">Message Content:</label>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label htmlFor="message" className="text-sm font-medium">
+                {t("messageContent")}
+              </label>
               <textarea
-                placeholder="Enter your message here..."
-                value={customMessage}
-                onChange={(e) => setCustomMessage(e.target.value)}
-                className="mt-1 min-h-[120px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                maxLength={500}
+                id="message"
+                placeholder={t("enterYourMessage")}
+                value={messageText}
+                onChange={(e) => setMessageText(e.target.value)}
+                rows={4}
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+                disabled={isSendingMessage}
               />
-              <div className="text-xs text-muted-foreground mt-1">
-                {customMessage.length}/500 characters
+              <div className="text-xs text-muted-foreground text-right">
+                {messageText.length} {t("characters")}
               </div>
             </div>
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsMessageDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSendMessage} 
-              disabled={!customMessage.trim() || isSending}
-              className="gap-2"
+            <Button
+              variant="outline"
+              onClick={() => setMessageDialogOpen(false)}
+              disabled={isSendingMessage}
             >
-              {isSending ? (
+              {t("cancel")}
+            </Button>
+            <Button
+              onClick={handleSendMessage}
+              disabled={isSendingMessage || !messageText.trim()}
+              className="bg-[#0c5c2c] hover:bg-green-900"
+            >
+              {isSendingMessage ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Sending...
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t("sending")}
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" />
-                  Send Message
+                  <Send className="h-4 w-4 mr-2" />
+                  {t("sendMessage")}
                 </>
               )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Success Modal */}
-      <Dialog open={isSuccessModalOpen} onOpenChange={setIsSuccessModalOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-              </div>
-              Message Sent Successfully
-            </DialogTitle>
-          </DialogHeader>
-          
-          {messagingResult && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="text-center p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {messagingResult.success}
-                  </div>
-                  <div className="text-sm text-green-700">
-                    Successfully Sent
-                  </div>
-                </div>
-                {messagingResult.failed > 0 && (
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <div className="text-2xl font-bold text-red-600">
-                      {messagingResult.failed}
-                    </div>
-                    <div className="text-sm text-red-700">
-                      Failed to Send
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <Alert>
-                <AlertDescription>
-                  Your message was sent to {messagingResult.success} out of {messagingResult.totalFarmers} farmers.
-                  {messagingResult.failed > 0 && (
-                    <span className="text-red-600">
-                      {' '}
-                      {messagingResult.failed} messages failed due to network issues or invalid contact information.
-                    </span>
-                  )}
-                </AlertDescription>
-              </Alert>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button onClick={() => setIsSuccessModalOpen(false)}>
-              Close
             </Button>
           </DialogFooter>
         </DialogContent>

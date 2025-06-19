@@ -124,6 +124,15 @@ const getConditionStatus = (value: number, type: 'planting' | 'harvesting' | 'pe
     return { status: 'unknown', color: 'text-gray-600' };
 };
 
+type Alert = {
+    type: string;
+    severity: string;
+    message: string;
+    sectors: string[];
+    color: string;
+    icon: React.ReactNode;
+};
+
 const Dashboard: NextPage = () => {
     const { t } = useLanguage();
     const router = useRouter();
@@ -498,8 +507,6 @@ const Dashboard: NextPage = () => {
                         <OptimizedMap
                             onLocationChange={handleLocationChange}
                             alerts={mapAlerts}
-                            locations={allLocationsWeather}
-                            isLoading={isLoadingAllWeather}
                         />
                         <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                             <Card className="col-span-1">
@@ -571,32 +578,34 @@ const Dashboard: NextPage = () => {
                                 </CardHeader>
                                 <CardContent className="max-h-[260px] overflow-y-auto space-y-3">
                                     {alerts.length > 0 ? (
-                                        alerts.map((alert, index) => (
-                                            <div
-                                                key={index}
-                                                className={`rounded-md p-3 ${
-                                                    alert.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                        alert.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                                                            alert.color === 'blue' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                                                                'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                                }`}
-                                            >
-                                                <div className="flex items-start gap-2">
-                                                    <div className="mt-0.5 flex-shrink-0">
-                                                        {alert.icon}
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium">{alert.type}</p>
-                                                        <p className="text-sm mt-1">{alert.message}</p>
-                                                        {alert.sectors && (
-                                                            <p className="text-sm mt-1 font-medium">
-                                                                {t('affectedAreas')}: {alert.sectors.join(', ')}
-                                                            </p>
-                                                        )}
+                                        alerts.map(function(alert: Alert, index: number) {
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    className={`rounded-md p-3 ${
+                                                        alert.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                            alert.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                                                alert.color === 'blue' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                                    }`}
+                                                >
+                                                    <div className="flex items-start gap-2">
+                                                        <div className="mt-0.5 flex-shrink-0">
+                                                            {alert.icon}
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium">{alert.type}</p>
+                                                            <p className="text-sm mt-1">{alert.message}</p>
+                                                            {alert.sectors && (
+                                                                <p className="text-sm mt-1 font-medium">
+                                                                    {t('affectedAreas')}: {alert.sectors.join(', ')}
+                                                                </p>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))
+                                            );
+                                        })
                                     ) : (
                                         <div className="text-center p-4 text-muted-foreground">
                                             <AlertCircle className="h-10 w-10 mx-auto mb-2 opacity-50" />

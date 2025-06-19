@@ -65,7 +65,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         { href: '/communications', icon: <MessageSquare size={20} />, label: t('communications')},
         { href: '/farmers', icon: <Users size={20} />, label: t('farmers') },
         { href: '/locations', icon: <MapPin size={20} />, label: t('locations') },
-        { href: '/messages', icon: <MessageSquare size={20} />, label: t('messages') },
         { href: '/training', icon: <BookOpen size={20} />, label: t('training') },
         { href: '/settings', icon: <Settings size={20} />, label: t('settings') }
     ];
