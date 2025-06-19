@@ -276,7 +276,6 @@
   "composeMessage": "Andika Ubutumwa",
   "newTemplate": "Urugero Rushya",
 
-  "searchMessages": "Shakisha Ubutumwa...",
   "filter": "Impungenge",
 
   "useTemplate": "Koresha Urugero",
@@ -645,11 +644,6 @@
   "noFAQsFound": "Nta Bibazo Bibazwa Kenshi Byabonetse",
   "cantFindAnswer": "Ntushobora kubona icyo ushakisha?",
 
-  "faqQuestion5": "Nabona nte amakuru y'ibihe byashize mu gace kanjye?",
-  "faqAnswer5": "Yego, amakuru y'ibihe byashize aboneka binyuze mu gice cy'Amakuru y'Amateka ya Sisitemu y'Amakuru y'Ibihe. Ushobora kubona ubushyuhe, imvura, n'ibindi bihe by'ibihe kugeza ku myaka 5 ishize, bigufasha kumenya imihango n'imihindukire.",
-
-  "faqQuestion6": "Natanga nte ibitekerezo ku kuri k'iteganyagihe?",
-  "faqAnswer6": "Duha agaciro ibitekerezo byawe ku kuri k'iteganyagihe. Ushobora gutanga amakuru ku makosa hagati y'iteganyagihe n'ibihe nyakuri binyuze ku ifishi y'ibitekerezo mu ipaji y'Igenamiterere cyangwa uvugishe ikipe yacu y'ubufasha mu buryo butaziguye.",
 
   "login": "Kwinjira",
   "loginToAccessCIS": "Injira kugira ngo ugere kuri Sisitemu y'Amakuru y'Ibihe",
@@ -692,7 +686,6 @@
   "failedToLoadLocation": "Byanze gukuramo amakuru y'ahantu",
 
   "farmersManagement": "Gucunga Abahinzi",
-  "allLocations": "Ahantu Hose",
 
   "locations": "Ahantu",
   "joinedDate": "Itariki Yinjiriye",
@@ -753,7 +746,6 @@
   "importSuccessful": "Kwinjiza byagenze neza: {created} abahinzi baremwe",
   "failedToImportFarmers": "Byanze kwinjiza abahinzi",
   "historicalWeatherData": "Amakuru y'Ibihe Byashize",
-  "selectLocation": "Hitamo Ahantu",
   "updateData": "Vugurura Amakuru",
   "dataFilters": "Impungenge z'Amakuru",
   "viewType": "Ubwoko bw'Kureba",
@@ -828,7 +820,6 @@
   "noWeatherDataDescription": "Ntibyashobotse gukuramo amakuru y'ibihe ubu",
   "noWeatherDataAvailable": "Nta makuru y'ibihe aboneka kuri aha hantu",
   "weatherDataRefreshed": "Amakuru y'ibihe yavuguruwe neza",
-  "refresh": "Vugurura",
   "exportForecast": "Kuramo Iteganyagihe",
   "shareForecast": "Gusangira Iteganyagihe",
   "noDataToShare": "Nta makuru yo gusangira",
@@ -975,10 +966,7 @@
   "loadingMapData": "Kuramo Amakuru y'Ikarita...",
   "refresh": "Kuvugurura",
   "refreshing": "Urimo Kuvugurura...",
-  "failedToLoadLocations": "Byanze kubona ahantu",
-  "failedToLoadWeather": "Byanze kubona amakuru y'ibihe",
   "failedToLoadAllWeather": "Byanze kubona amakuru y'ibihe y'ahantu hose",
-  "weatherDataRefreshed": "Amakuru y'ibihe avuguruwe",
   "failedToRefreshWeather": "Byanze kuvugurura amakuru y'ibihe",
   "goodTimeToPlantBeans": "Igihe cyiza cyo gutera ibishyimbo n'imboga",
   "applyFertilizerToMaize": "Shyira ifumbire mu bigori",
@@ -1004,7 +992,6 @@
   "sentAt": "Yoherejwe ku",
   "deliveryMethod": "Uburyo bwo Gutanga",
   "timeline": "Gahunda y'Ibihe",
-  "created": "Byaremwe",
   "updated": "Byavuguruwe",
   "sent": "Byoherejwe",
   "sendAlert": "Ohereza Imburizi",
