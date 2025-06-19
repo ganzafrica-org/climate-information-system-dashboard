@@ -9,7 +9,7 @@ useEffect(() => {
       const timeout = setTimeout(() => {
         router.replace('/dashboard');
       }, 5000);
-
+      
       return () => clearTimeout(timeout);
     }, [router]);
 

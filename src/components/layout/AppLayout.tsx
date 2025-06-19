@@ -91,7 +91,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     const DesktopSidebar = () => (
         <div
-            className={`fixed inset-y-0 left-0 z-50 w-64 bg-sidebar text-sidebar-foreground border-r border-border transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
+            className={`fixed inset-y-0 left-0 z-50 w-64 text-sidebar-foreground border-r border-border transition-transform duration-300 ease-in-out md:relative md:translate-x-0 ${
                 sidebarOpen ? 'translate-x-0' : '-translate-x-full'
             } ${!sidebarOpen && !isMobile ? 'md:w-20' : ''}`}
         >
