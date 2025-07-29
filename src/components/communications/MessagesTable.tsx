@@ -27,6 +27,45 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import api from '@/lib/api';
 import { toast } from 'sonner';
 
+// Custom badge components
+const StatusBadge = ({ status }: { status: string }) => {
+    switch (status?.toLowerCase()) {
+        case 'active':
+            return (
+                <Badge style={{ backgroundColor: '#ECFDF6', color: '#16a34a', border: '1px solid #ECFDF6' }} className="hover:opacity-80">
+                    Active
+                </Badge>
+            );
+        case 'inactive':
+            return (
+                <Badge style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: '1px solid #f3f4f6' }} className="hover:opacity-80">
+                    Inactive
+                </Badge>
+            );
+        default:
+            return (
+                <Badge style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: '1px solid #f3f4f6' }} className="hover:opacity-80">
+                    {status}
+                </Badge>
+            );
+    }
+};
+
+// Custom Blue Checkbox Component
+const BlueCheckbox = ({ checked, onCheckedChange, ...props }: any) => {
+  return (
+    <div className="relative inline-flex items-center">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onCheckedChange?.(e.target.checked)}
+        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2 checked:bg-blue-600 checked:border-blue-600"
+        {...props}
+      />
+    </div>
+  );
+};
+
 interface Location {
   id: number;
   name: string;
@@ -308,63 +347,6 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
   return (
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-ganz-primary" />
-          <h2 className="text-lg font-medium">{t("locationsManagement")}</h2>
-
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="ml-2 h-9">
-                <span>{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => setSelectedLocation("all")}>{t("allLocations")}</DropdownMenuItem>
-              <Separator className="my-1" />
-              {allLocations?.map((location) => (
-                <DropdownMenuItem key={location.id} onClick={() => setSelectedLocation(location.name)}>
-                  {location.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
-          <div className="relative w-full sm:w-auto">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder={t("searchLocations")}
-              className="pl-8 w-full sm:w-[200px] h-9"
-              value={searchTerm || ''}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {selectedLocations?.length > 0 && (
-              <>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleOpenMessageDialog}
-                  className="bg-[#0c5c2c] hover:bg-green-900"
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  {t("sendMessage")} ({selectedLocations?.length || 0})
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => toast.info('Bulk actions coming soon')}
-                >
-                  {t("bulkActions")} ({selectedLocations?.length || 0})
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
       </div>
 
       <Card>
@@ -387,40 +369,40 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead>
-                  <tr className="border-b bg-muted">
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground w-12">
-                      <Checkbox
+                <thead className="bg-blue-600 text-white">
+                  <tr>
+                    <th className="py-4 px-6 text-left font-semibold text-sm w-12">
+                      <BlueCheckbox
                         checked={(selectedLocations?.length || 0) === (locations?.length || 0) && (locations?.length || 0) > 0}
                         onCheckedChange={handleSelectAll}
                       />
                     </th>
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                    <th className="py-4 px-6 text-left font-semibold text-sm">
                       <div className="flex items-center gap-1">
                         <span>{t("locationName")}</span>
                         <ArrowUpDown className="h-3 w-3" />
                       </div>
                     </th>
 
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                    <th className="py-4 px-6 text-left font-semibold text-sm">
                       <div className="flex items-center gap-1">
                         <span>{t("status")}</span>
                         <ArrowUpDown className="h-3 w-3" />
                       </div>
                     </th>
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                    <th className="py-4 px-6 text-left font-semibold text-sm">
                       <div className="flex items-center gap-1">
                         <Navigation className="h-3 w-3" />
                         <span>{t("coordinates")}</span>
                       </div>
                     </th>
-                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                    <th className="py-4 px-6 text-left font-semibold text-sm">
                       <div className="flex items-center gap-1">
                         <span>{t("createdAt")}</span>
                         <ArrowUpDown className="h-3 w-3" />
                       </div>
                     </th>
-                    <th className="py-3 px-4 text-right font-medium text-muted-foreground">{t("actions")}</th>
+                    <th className="py-4 px-6 text-right font-semibold text-sm">{t("actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -437,10 +419,13 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
                         className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
                         onClick={() => handleViewLocation(location.id)}
                       >
-                        <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                          <Checkbox
-                            checked={selectedLocations?.includes(location.id) || false}
-                            onCheckedChange={(checked) => handleSelectLocation(location.id, checked as boolean)}
+                        <td
+                          className="py-3 px-4"
+                          onClick={(e: React.MouseEvent<HTMLTableCellElement>) => e.stopPropagation()}
+                        >
+                          <BlueCheckbox
+                          checked={selectedLocations?.includes(location.id) || false}
+                          onCheckedChange={(checked: boolean) => handleSelectLocation(location.id, checked)}
                           />
                         </td>
                         <td className="py-3 px-4">
@@ -453,9 +438,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
                         </td>
 
                         <td className="py-3 px-4">
-                          <Badge variant={location.isActive ? "default" : "secondary"}>
-                            {location.isActive ? t("active") : t("inactive")}
-                          </Badge>
+                          <StatusBadge status={location.isActive ? "active" : "inactive"} />
                         </td>
                         <td className="py-3 px-4">
                           <div className="text-sm font-mono">

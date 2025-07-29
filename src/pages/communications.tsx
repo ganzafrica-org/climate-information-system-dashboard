@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { AlertsTable } from '@/components/communications/AlertsTable';
 import { MessagesTable } from '@/components/communications/MessagesTable';
-import { AlertTriangle, MessageSquare, Bell, Plus, Filter, Search, MapPin, ChevronDown, Loader2 } from 'lucide-react';
+import { WeatherSchedulerTable } from '@/components/communications/SchedulerTable';
+import { AlertTriangle, MessageSquare, Bell, Plus, Filter, Search, MapPin, ChevronDown, Loader2, Clock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Head from 'next/head';
 import { useLanguage } from '@/i18n';
@@ -62,8 +63,8 @@ export default function Communications() {
       <AppLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <Loader2 className="animate-spin h-8 w-8 mx-auto" />
-            <p className="mt-2 text-muted-foreground">{t('loadingLocations')}</p>
+            <Loader2 className="animate-spin h-8 w-8 mx-auto" style={{ color: '#2580f5' }} />
+            <p className="mt-2 text-gray-500">{t('loadingLocations')}</p>
           </div>
         </div>
       </AppLayout>
@@ -79,58 +80,82 @@ export default function Communications() {
         </Head>
 
         <div className="space-y-4 md:space-y-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-ganz-primary" />
+            {/* Header section with white background */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    {/* Left side - Title only */}
+                    <div className="flex items-center gap-2">
                         <h2 className="text-lg font-medium">{t("Agricultural Alerts & Messages")}</h2>
-            
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="outline" className="ml-2 h-9">
-                              <span>{getSelectedLocationName()}</span>
-                              <ChevronDown className="ml-2 h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => setSelectedLocation(null)}>
-                              {t("allLocations") || "All Locations"}
-                            </DropdownMenuItem>
-                            <Separator className="my-1" />
-                            {locations.map((location) => (
-                              <DropdownMenuItem 
-                                key={location.id} 
-                                onClick={() => setSelectedLocation(location)}
-                              >
-                                {location.name}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-            
-                      <div className="flex w-full sm:w-auto items-center gap-2">
-                        <div className="relative w-full sm:w-auto">
-                          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                          <Input 
-                            type="search" 
-                            placeholder={t("searchMessages")} 
-                            className="pl-8 w-full sm:w-[180px] h-9" 
-                            value={searchTerm} 
-                            onChange={(e) => setSearchTerm(e.target.value)} 
-                          />
+                    </div>
+
+                    {/* Right side - All Locations and Search */}
+                    {activeTab !== 'scheduler' && (
+                        <div className="flex flex-wrap w-full lg:w-auto items-center gap-2">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        style={{ borderColor: '#66a9e3', color: '#66a9e3' }}
+                                        className="hover:bg-blue-50"
+                                    >
+                                        <MapPin className="h-4 w-4 mr-2" />
+                                        <span>{getSelectedLocationName()}</span>
+                                        <ChevronDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuItem onClick={() => setSelectedLocation(null)}>
+                                        {t("allLocations") || "All Locations"}
+                                    </DropdownMenuItem>
+                                    <Separator className="my-1" />
+                                    {locations.map((location) => (
+                                        <DropdownMenuItem 
+                                            key={location.id} 
+                                            onClick={() => setSelectedLocation(location)}
+                                        >
+                                            {location.name}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                <Input
+                                    type="search"
+                                    placeholder={t("searchMessages") || "Search messages..."}
+                                    className="pl-10 w-[300px] bg-gray-50 border-gray-200"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
                         </div>
-                      </div>
+                    )}
+                </div>
             </div>
             
             <Tabs defaultValue="alerts" onValueChange={setActiveTab}>
                 <TabsList>
-                    <TabsTrigger value="alerts">
-                    <AlertTriangle className="h-4 w-4 mr-2" />
-                    {t("alerts")}
+                    <TabsTrigger 
+                        value="alerts"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      {t("alerts")}
                     </TabsTrigger>
-                    <TabsTrigger value="messages">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    {t("customMessages")}
+                    <TabsTrigger 
+                        value="messages"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      {t("customMessages")}
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="scheduler"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Weather Scheduler
                     </TabsTrigger>
                 </TabsList>
             </Tabs>
@@ -142,12 +167,14 @@ export default function Communications() {
                       selectedSector={getSelectedLocationValue()} 
                       searchTerm={searchTerm} 
                     />
-                ) : (
+                ) : activeTab === 'messages' ? (
                     <MessagesTable 
                       selectedSector={getSelectedLocationValue()} 
                       searchTerm={searchTerm} 
                     />
-                )}
+                ) : activeTab === 'scheduler' ? (
+                    <WeatherSchedulerTable />
+                ) : null}
             </div>
         </div>
     
