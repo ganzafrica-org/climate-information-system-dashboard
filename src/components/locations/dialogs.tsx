@@ -114,7 +114,6 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Plus className="h-5 w-5" />
                         {t('addNewLocation') || 'Add New Location'}
                     </DialogTitle>
                     <DialogDescription>
@@ -188,6 +187,10 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
                             id="isDefault"
                             checked={formData.isDefault}
                             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isDefault: !!checked }))}
+                            style={{
+                                accentColor: '#3a93f2'
+                            }}
+                            className="data-[state=checked]:bg-[#3a93f2] data-[state=checked]:border-[#3a93f2]"
                         />
                         <Label htmlFor="isDefault">{t('setAsDefault') || 'Set as default location'}</Label>
                     </div>
@@ -196,7 +199,12 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             {t('cancel') || 'Cancel'}
                         </Button>
-                        <Button type="submit" disabled={isLoading}>
+                        <Button 
+                            type="submit" 
+                            disabled={isLoading}
+                            style={{ backgroundColor: '#3a93f2', borderColor: '#3a93f2' }}
+                            className="hover:opacity-90 text-white"
+                        >
                             {isLoading ? (t('creating') || 'Creating...') : (t('createLocation') || 'Create Location')}
                         </Button>
                     </DialogFooter>
@@ -281,7 +289,10 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
                                     )}
                                 </div>
                                 {location.isDefault && (
-                                    <Badge variant="secondary" className="mt-2">
+                                    <Badge 
+                                        style={{ backgroundColor: '#FEF2D6', color: '#F38C19', border: '1px solid #FEF2D6' }} 
+                                        className="mt-2 hover:opacity-80"
+                                    >
                                         {t('defaultLocation') || 'Default Location'}
                                     </Badge>
                                 )}
@@ -324,7 +335,12 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
                         {t('close') || 'Close'}
                     </Button>
                     {location && (
-                        <Button variant="primary" onClick={() => onEdit(location)}>
+                        <Button 
+                            variant="primary" 
+                            onClick={() => onEdit(location)}
+                            style={{ backgroundColor: '#3a93f2', borderColor: '#3a93f2' }}
+                            className="hover:opacity-90 text-white"
+                        >
                             <Edit className="h-4 w-4 mr-2" />
                             {t('editLocation') || 'Edit Location'}
                         </Button>
@@ -508,6 +524,10 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
                             id="edit-isDefault"
                             checked={formData.isDefault}
                             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isDefault: !!checked }))}
+                            style={{
+                                accentColor: '#3a93f2'
+                            }}
+                            className="data-[state=checked]:bg-[#3a93f2] data-[state=checked]:border-[#3a93f2]"
                         />
                         <Label htmlFor="edit-isDefault">{t('setAsDefault') || 'Set as default location'}</Label>
                     </div>
@@ -516,7 +536,13 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             {t('cancel') || 'Cancel'}
                         </Button>
-                        <Button variant="primary" type="submit" disabled={isLoading}>
+                        <Button 
+                            variant="primary" 
+                            type="submit" 
+                            disabled={isLoading}
+                            style={{ backgroundColor: '#3a93f2', borderColor: '#3a93f2' }}
+                            className="hover:opacity-90 text-white"
+                        >
                             {isLoading ? (t('updating') || 'Updating...') : (t('updateLocation') || 'Update Location')}
                         </Button>
                     </DialogFooter>

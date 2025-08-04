@@ -8,10 +8,13 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import {
-    ArrowUpDown, Download, Edit, Loader2, MapPin,
-    Plus, Search, Trash, RefreshCw, AlertTriangle, WifiOff
+    ArrowUpDown, ChevronDown, Download, Edit, Loader2, MapPin, MessageSquare,
+    MoreHorizontal, Phone, Plus, Search, Trash, Upload, User, ChevronLeft, ChevronRight,
+    ChevronsLeft, ChevronsRight, RefreshCw, AlertTriangle, WifiOff
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -36,7 +39,7 @@ const Locations: NextPage = () => {
     const [errorType, setErrorType] = useState<string>('');
 
     const [currentPage, setCurrentPage] = useState(1);
-    const [limit] = useState(20);
+    const [limit, setLimit] = useState(10);
 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -58,7 +61,7 @@ const Locations: NextPage = () => {
         if (isAuthenticated && user?.role === 'admin') {
             fetchLocations();
         }
-    }, [searchTerm, currentPage, isAuthenticated, user]);
+    }, [searchTerm, currentPage, limit, isAuthenticated, user]);
 
     const handleApiError = (error: any) => {
         console.error('API Error:', error);
@@ -217,57 +220,32 @@ const Locations: NextPage = () => {
 
     const totalPages = Math.ceil(totalCount / limit);
 
-    const renderEmptyState = () => {
-        let icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
-        let title = t('noLocationsData') || 'No Locations Data';
-        let description = t('noLocationsDataDescription') || 'Unable to load locations data at the moment.';
-
-        switch (errorType) {
-            case 'timeout':
-                icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
-                title = t('requestTimeout') || 'Request Timed Out';
-                description = t('timeoutDescription') || 'The request took too long to complete. Please check your connection and try again.';
-                break;
-            case 'network_error':
-                icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
-                title = t('networkError') || 'Network Error';
-                description = t('networkErrorDescription') || 'Please check your internet connection and try again.';
-                break;
-            case 'server_error':
-                icon = <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
-                title = t('serverError') || 'Server Error';
-                description = t('serverErrorDescription') || 'Our servers are experiencing issues. Please try again later.';
-                break;
-            case 'not_found':
-                icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
-                title = t('dataNotFound') || 'Data Not Found';
-                description = t('dataNotFoundDescription') || 'No locations data available.';
-                break;
-            default:
-                break;
+    const handlePageChange = (page: number) => {
+        if (page >= 1 && page <= totalPages) {
+            setCurrentPage(page);
         }
+    };
 
-        return (
-            <Card>
-                <CardContent className="flex items-center justify-center py-12">
-                    <div className="text-center max-w-md">
-                        {icon}
-                        <h3 className="text-lg font-medium mb-2">{title}</h3>
-                        <p className="text-muted-foreground mb-4">
-                            {description}
-                        </p>
-                        <Button
-                            variant="outline"
-                            onClick={handleRefresh}
-                            disabled={isRefreshing || isLoading}
-                        >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${(isRefreshing || isLoading) ? 'animate-spin' : ''}`} />
-                            {(isRefreshing || isLoading) ? (t('loading') || 'Loading...') : (t('tryAgain') || 'Try Again')}
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-        );
+    const handleLimitChange = (newLimit: number) => {
+        setLimit(newLimit);
+        setCurrentPage(1);
+    };
+
+    // Custom status badge component for default locations
+    const DefaultBadge = ({ isDefault }: { isDefault: boolean }) => {
+        if (isDefault) {
+            return (
+                <Badge style={{ backgroundColor: '#FEF2D6', color: '#F38C19', border: '1px solid #FEF2D6' }} className="hover:opacity-80">
+                    {t("default")}
+                </Badge>
+            );
+        } else {
+            return (
+                <Badge style={{ backgroundColor: '#E0EDDD', color: '#37662B', border: '1px solid #E0EDDD' }} className="hover:opacity-80">
+                    {t("standard")}
+                </Badge>
+            );
+        }
     };
 
     return (
@@ -279,29 +257,16 @@ const Locations: NextPage = () => {
             </Head>
 
             <div className="space-y-4 md:space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-                    <div className="flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-ganz-primary" />
-                        <h2 className="text-lg font-medium">{t("locationsManagement") || "Locations Management"}</h2>
-                    </div>
-
-                    <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
-                        <div className="relative w-full sm:w-auto">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                placeholder={t("searchLocations") || "Search locations..."}
-                                className="pl-8 w-full sm:w-[200px] h-9"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                {/* Header section with white background */}
+                <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                        {/* Left side - Title only */}
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-medium">{t("locationsManagement") || "Locations Management"}</h2>
                         </div>
-                        <div className="flex flex-wrap gap-2">
-                            <Button variant="primary" onClick={() => setCreateDialogOpen(true)}>
-                                <Plus className="h-4 w-4 mr-2" />
-                                {t("addLocation") || "Add Location"}
-                            </Button>
 
+                        {/* Right side - Action buttons */}
+                        <div className="flex flex-wrap w-full lg:w-auto items-center gap-2">
                             <Button
                                 variant="outline"
                                 onClick={handleRefresh}
@@ -323,106 +288,152 @@ const Locations: NextPage = () => {
                     </div>
                 </div>
 
-                <Card>
-                    <CardHeader className="p-4">
-                        <CardTitle>{t("registeredLocations") || "Registered Locations"}</CardTitle>
-                        <CardDescription>
-                            {totalCount} {t("locationsFound") || "locations found"}
-                        </CardDescription>
-                    </CardHeader>
+                <Card className="shadow-sm border border-gray-200 rounded-lg overflow-hidden">
                     <CardContent className="p-0">
-                        {isLoading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="animate-spin h-8 w-8" />
+                        {/* Header with Add Location and Search */}
+                        <div className="p-4 bg-white border-b border-gray-200 flex justify-end items-center gap-4">
+                            <Button 
+                                variant="primary" 
+                                onClick={() => setCreateDialogOpen(true)} 
+                                style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                                className="hover:opacity-90 text-white"
+                            >
+                                <Plus className="h-4 w-4 mr-2" />
+                                {t("addLocation") || "Add Location"}
+                            </Button>
+                            
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                <Input
+                                    type="search"
+                                    placeholder={t("searchLocations") || "Search locations..."}
+                                    className="pl-10 w-[300px] bg-gray-50 border-gray-200"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
                             </div>
-                        ) : hasError ? (
-                            renderEmptyState()
+                        </div>
+
+                        {isLoading ? (
+                            <div className="flex items-center justify-center py-16">
+                                <div className="flex flex-col items-center space-y-3">
+                                    <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
+                                    <span className="text-gray-500">{t("loading") || "Loading..."}</span>
+                                </div>
+                            </div>
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
-                                    <thead>
-                                    <tr className="border-b bg-muted">
-                                        <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                                            <div className="flex items-center gap-1">
-                                                <span>{t("name") || "Name"}</span>
-                                                <ArrowUpDown className="h-3 w-3" />
-                                            </div>
+                                    <thead style={{ backgroundColor: '#2580f5' }} className="text-white">
+                                    <tr>
+                                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                                            #
                                         </th>
-                                        <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                                            <div className="flex items-center gap-1">
-                                                <span>{t("coordinates") || "Coordinates"}</span>
-                                                <ArrowUpDown className="h-3 w-3" />
-                                            </div>
+                                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                                            {t("name") || "Location Name"}
                                         </th>
-                                        <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                                            <div className="flex items-center gap-1">
-                                                <span>{t("createdAt") || "Created"}</span>
-                                                <ArrowUpDown className="h-3 w-3" />
-                                            </div>
+                                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                                            {t("coordinates") || "Coordinates"}
                                         </th>
-                                        <th className="py-3 px-4 text-right font-medium text-muted-foreground">{t("actions") || "Actions"}</th>
+                                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                                            {t("type") || "Type"}
+                                        </th>
+                                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                                            {t("createdAt") || "Created Date"}
+                                        </th>
+                                        <th className="py-4 px-6 text-center font-semibold text-sm">
+                                            {t("actions") || "Actions"}
+                                        </th>
                                     </tr>
                                     </thead>
-                                    <tbody>
+                                    <tbody className="bg-white">
                                     {locations.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                                                {hasError ? (t("errorLoadingLocations") || "Error loading locations") : (t("noLocationsFound") || "No locations found")}
+                                            <td colSpan={6} className="py-16 text-center">
+                                                <div className="flex flex-col items-center space-y-3">
+                                                    <MapPin className="h-12 w-12 text-gray-300" />
+                                                    <div className="text-gray-500 font-medium">{t("noLocationsFound") || "No locations found"}</div>
+                                                    <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
+                                                </div>
                                             </td>
                                         </tr>
                                     ) : (
-                                        locations.map((location) => (
+                                        locations.map((location, index) => (
                                             <tr
                                                 key={location.id}
-                                                className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
+                                                className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors duration-150 ${
+                                                    index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                                }`}
                                                 onClick={() => handleViewLocation(location.id)}
                                             >
-                                                <td className="py-3 px-4">
-                                                    <div className="font-medium">{location.name}</div>
-                                                    {location.isDefault && (
-                                                        <Badge variant="secondary" className="mt-1">
-                                                            {t("default") || "Default"}
-                                                        </Badge>
-                                                    )}
+                                                <td className="py-4 px-6 text-sm text-gray-900">
+                                                    {(currentPage - 1) * limit + index + 1}
                                                 </td>
-                                                <td className="py-3 px-4">
-                                                    <div className="text-sm">
+                                                <td className="py-4 px-6">
+                                                    <div className="font-medium text-gray-900">{location.name}</div>
+                                                </td>
+                                                <td className="py-4 px-6">
+                                                    <div className="text-sm text-gray-600 font-mono">
                                                         {location.lat && location.lon ? (
                                                             <span>{location.lat.toFixed(6)}, {location.lon.toFixed(6)}</span>
                                                         ) : (
-                                                            <span className="text-muted-foreground">{t("notSpecified") || "Not specified"}</span>
+                                                            <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>
                                                         )}
                                                     </div>
                                                 </td>
-                                                <td className="py-3 px-4">
-                                                    <div className="text-sm">
+                                                <td className="py-4 px-6">
+                                                    <DefaultBadge isDefault={location.isDefault ?? false} />
+                                                </td>
+                                                <td className="py-4 px-6">
+                                                    <div className="text-sm text-gray-600">
                                                         {location.createdAt ? new Date(location.createdAt).toLocaleDateString() : '-'}
                                                     </div>
                                                 </td>
-                                                <td className="py-3 px-4 text-right">
-                                                    <div className="flex justify-end gap-1">
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleEditLocation(location);
-                                                            }}
-                                                        >
-                                                            <Edit className="h-4 w-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleDeleteLocation(location.id);
-                                                            }}
-                                                            className="text-red-600"
-                                                        >
-                                                            <Trash className="h-4 w-4" />
-                                                        </Button>
-                                                    </div>
+                                                <td className="py-4 px-6 text-center">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="sm" 
+                                                                className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
+                                                            >
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-56">
+                                                            <DropdownMenuItem 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleViewLocation(location.id);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-blue-50"
+                                                            >
+                                                                <MapPin className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
+                                                                {t("viewLocation") || "View Location"}
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem 
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleEditLocation(location);
+                                                                }}
+                                                                className="cursor-pointer hover:bg-green-50"
+                                                            >
+                                                                <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
+                                                                {t("editLocation") || "Edit Location"}
+                                                            </DropdownMenuItem>
+                                                            <Separator className="my-1" />
+                                                            <DropdownMenuItem
+                                                                className="cursor-pointer hover:bg-red-50"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    handleDeleteLocation(location.id);
+                                                                }}
+                                                            >
+                                                                <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
+                                                                <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </td>
                                             </tr>
                                         ))
@@ -431,36 +442,78 @@ const Locations: NextPage = () => {
                                 </table>
                             </div>
                         )}
-                    </CardContent>
 
-                    {totalCount > 0 && (
-                        <CardFooter className="p-4 flex justify-between">
-                            <div className="text-sm text-muted-foreground">
-                                {t("showing") || "Showing"} {Math.min((currentPage - 1) * limit + 1, totalCount)} - {Math.min(currentPage * limit, totalCount)} {t("of") || "of"} {totalCount} {t("locations") || "locations"}
+                        {/* Pagination Footer - Matching the provided design exactly */}
+                        {totalCount > 0 && (
+                            <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-gray-200">
+                                <div className="flex items-center text-sm text-gray-600 gap-2">
+                                    <span>
+                                        {locations.length === 0 ? "0" : `${Math.min((currentPage - 1) * limit + 1, totalCount)}-${Math.min(currentPage * limit, totalCount)}`} of {totalCount} row(s) selected.
+                                    </span>
+                                    <span>Rows per page</span>
+                                    <select 
+                                        className="border border-gray-300 rounded px-2 py-1 text-sm bg-white ml-2"
+                                        value={limit}
+                                        onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                                    >
+                                        <option value="10">10</option>
+                                        <option value="20">20</option>
+                                        <option value="50">50</option>
+                                        <option value="100">100</option>
+                                    </select>
+                                </div>
+                                
+                                <div className="flex items-center space-x-4">
+                                    <span className="text-sm text-gray-600">
+                                        Page {currentPage} of {totalPages}
+                                    </span>
+                                    
+                                    <div className="flex items-center space-x-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={currentPage === 1}
+                                            onClick={() => handlePageChange(1)}
+                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                                            title="First page"
+                                        >
+                                            <ChevronsLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={currentPage === 1}
+                                            onClick={() => handlePageChange(currentPage - 1)}
+                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                                            title="Previous page"
+                                        >
+                                            <ChevronLeft className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={currentPage === totalPages}
+                                            onClick={() => handlePageChange(currentPage + 1)}
+                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                                            title="Next page"
+                                        >
+                                            <ChevronRight className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            disabled={currentPage === totalPages}
+                                            onClick={() => handlePageChange(totalPages)}
+                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                                            title="Last page"
+                                        >
+                                            <ChevronsRight className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={currentPage === 1}
-                                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                >
-                                    {t("previous") || "Previous"}
-                                </Button>
-                                <span className="text-sm text-muted-foreground">
-                      {currentPage} / {totalPages}
-                    </span>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    disabled={currentPage === totalPages}
-                                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                >
-                                    {t("next") || "Next"}
-                                </Button>
-                            </div>
-                        </CardFooter>
-                    )}
+                        )}
+                    </CardContent>
                 </Card>
 
                 <div className="text-xs text-muted-foreground text-center mt-4">
