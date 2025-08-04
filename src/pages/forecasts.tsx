@@ -19,18 +19,19 @@ import {
 } from "@/types/weather";
 import { Location, LocationsResponse } from "@/types/farmer";
 
-const getWeatherIcon = (condition: string): React.ReactElement => {
+const getWeatherIcon = (condition: string, isActive = false): React.ReactElement => {
+  const baseClass = "h-8 w-8";
   const iconMap: { [key: string]: React.ReactElement } = {
-    'clear': <Sun className="h-8 w-8" />,
-    'clouds': <Cloud className="h-8 w-8" />,
-    'rain': <CloudRain className="h-8 w-8" />,
-    'drizzle': <CloudDrizzle className="h-8 w-8" />,
-    'snow': <CloudDrizzle className="h-8 w-8" />,
-    'thunderstorm': <CloudRain className="h-8 w-8" />,
+    'clear': <Sun className={`${baseClass} ${isActive ? 'text-white' : 'text-yellow-500'}`} />,
+    'clouds': <Cloud className={`${baseClass} ${isActive ? 'text-white' : 'text-slate-400'}`} />,
+    'rain': <CloudRain className={`${baseClass} ${isActive ? 'text-white' : 'text-blue-900'}`} />,
+    'drizzle': <CloudDrizzle className={`${baseClass} ${isActive ? 'text-white' : 'text-blue-400'}`} />,
+    'snow': <CloudDrizzle className={`${baseClass} ${isActive ? 'text-white' : 'text-cyan-400'}`} />,
+    'thunderstorm': <CloudRain className={`${baseClass} ${isActive ? 'text-white' : 'text-purple-600'}`} />,
   };
 
   const conditionKey = condition.toLowerCase();
-  return iconMap[conditionKey] || <Cloud className="h-8 w-8" />;
+  return iconMap[conditionKey] || <Cloud className={`${baseClass} ${isActive ? 'text-white' : 'text-slate-500'}`} />;
 };
 
 const handleApiError = (error: any, t: any) => {
@@ -126,7 +127,6 @@ const Forecasts: NextPage = () => {
           setActiveDay(0);
         }
       } else {
-
         setWeatherData(null);
         setHasError(true);
         setErrorType('no_data');
@@ -219,33 +219,33 @@ const Forecasts: NextPage = () => {
   };
 
   const renderEmptyState = () => {
-    let icon = <CloudRain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+    let icon = <CloudRain className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
     let title = t('noWeatherData') || 'No Weather Data';
     let description = t('noWeatherDataDescription') || 'Unable to load weather data at the moment.';
 
     switch (errorType) {
       case 'timeout':
-        icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+        icon = <WifiOff className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
         title = t('requestTimeout') || 'Request Timed Out';
         description = t('timeoutDescription') || 'The request took too long to complete. Please check your connection and try again.';
         break;
       case 'network_error':
-        icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+        icon = <WifiOff className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
         title = t('networkError') || 'Network Error';
         description = t('networkErrorDescription') || 'Please check your internet connection and try again.';
         break;
       case 'server_error':
-        icon = <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+        icon = <AlertTriangle className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
         title = t('serverError') || 'Server Error';
         description = t('serverErrorDescription') || 'Our servers are experiencing issues. Please try again later.';
         break;
       case 'not_found':
-        icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+        icon = <MapPin className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
         title = t('dataNotFound') || 'Data Not Found';
         description = t('dataNotFoundDescription') || 'No weather data available for the selected location.';
         break;
       case 'no_locations':
-        icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+        icon = <MapPin className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
         title = t('noLocations') || 'No Locations';
         description = t('noLocationsDescription') || 'No locations available. Please add a location first.';
         break;
@@ -254,18 +254,19 @@ const Forecasts: NextPage = () => {
     }
 
     return (
-        <Card>
+        <Card className="border-0 shadow-lg">
           <CardContent className="flex items-center justify-center py-12">
             <div className="text-center max-w-md">
               {icon}
-              <h3 className="text-lg font-medium mb-2">{title}</h3>
-              <p className="text-muted-foreground mb-4">
+              <h3 className="text-lg font-medium mb-2 text-slate-700">{title}</h3>
+              <p className="text-slate-500 mb-4">
                 {description}
               </p>
               <Button
                   variant="outline"
                   onClick={errorType === 'no_locations' ? fetchLocations : handleRefresh}
                   disabled={isRefreshing || isLoading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${(isRefreshing || isLoading) ? 'animate-spin' : ''}`} />
                 {(isRefreshing || isLoading) ? (t('loading') || 'Loading...') : (t('tryAgain') || 'Try Again')}
@@ -281,8 +282,8 @@ const Forecasts: NextPage = () => {
         <AppLayout>
           <div className="flex items-center justify-center min-h-[400px]">
             <div className="text-center">
-              <Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" />
-              <p className="text-muted-foreground">{t('loadingWeatherData') || 'Loading weather data...'}</p>
+              <Loader2 className="animate-spin h-8 w-8 mx-auto mb-2 text-blue-600" />
+              <p className="text-slate-600">{t('loadingWeatherData') || 'Loading weather data...'}</p>
             </div>
           </div>
         </AppLayout>
@@ -299,15 +300,22 @@ const Forecasts: NextPage = () => {
 
         <div className="space-y-4 md:space-y-6">
           
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-ganz-primary" />
-              <h2 className="text-lg font-medium">{t("weatherForecast") || "Weather Forecast"}</h2>
+          <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center gap-4">
+                <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
+                  <CloudRain className="h-6 w-6" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold">{t("weatherForecast") || "Weather Forecast"}</h2>
+                </div>
+              </div>
 
               {locations.length > 0 && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="sm" className="ml-2 h-9">
+                      <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm">
+                        <MapPin className="h-4 w-4 mr-2" />
                         <span>{selectedLocation?.name || t("selectLocation") || "Select Location"}</span>
                         <ChevronDown className="ml-2 h-4 w-4" />
                       </Button>
@@ -325,78 +333,84 @@ const Forecasts: NextPage = () => {
                   </DropdownMenu>
               )}
             </div>
-
-            
-            <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
-              <Button
-                  variant="outline"
-                  onClick={handleRefresh}
-                  disabled={isRefreshing || isLoading || !selectedLocation}
-                  className="h-9"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
-              </Button>
-
-              <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportForecast}
-                  className="h-9"
-                  disabled={!weatherData || !weatherData.weather?.daily?.length}
-              >
-                <Download className="mr-2 h-4 w-4" />
-                {t("exportForecast") || "Export Forecast"}
-              </Button>
-
-              <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleShareForecast}
-                  className="h-9"
-                  disabled={!weatherData || !weatherData.weather?.daily?.length}
-              >
-                <Share2 className="mr-2 h-4 w-4" />
-                {t("shareForecast") || "Share Forecast"}
-              </Button>
-            </div>
           </div>
 
           
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+                variant="outline"
+                onClick={handleRefresh}
+                disabled={isRefreshing || isLoading || !selectedLocation}
+                className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-blue-600"
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
+            </Button>
+
+            <Button
+                variant="outline"
+                onClick={handleExportForecast}
+                className="bg-green-600 hover:bg-green-700 text-white hover:text-white border-green-600"
+                disabled={!weatherData || !weatherData.weather?.daily?.length}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              {t("exportForecast") || "Export Forecast"}
+            </Button>
+
+            <Button
+                variant="outline"
+                onClick={handleShareForecast}
+                className="bg-amber-600 hover:bg-amber-700 text-white hover:text-white border-amber-600"
+                disabled={!weatherData || !weatherData.weather?.daily?.length}
+            >
+              <Share2 className="mr-2 h-4 w-4" />
+              {t("shareForecast") || "Share Forecast"}
+            </Button>
+          </div>
+
           {weatherData && weatherData.weather?.daily?.length > 0 ? (
               <>
-                
                 <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   
                   <div className="lg:col-span-1 order-1">
                     <div className="md:hidden">
-                      
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="flex space-x-3 pb-4">
                           {weatherData.weather.daily.map((day, index) => (
                               <Card
                                   key={day.date}
-                                  className={`w-[120px] flex-shrink-0 cursor-pointer transition-colors ${
-                                      activeDay === index ? "border-green-950" : ""
+                                  className={`w-[120px] flex-shrink-0 cursor-pointer transition-all duration-200 border-0 shadow-md ${
+                                      activeDay === index
+                                          ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg scale-105"
+                                          : "bg-white hover:bg-blue-50 hover:shadow-lg"
                                   }`}
                                   onClick={() => setActiveDay(index)}
                               >
                                 <CardContent className="p-3 text-center">
-                                  <div className="font-medium">
-                                    {day.isToday ? (t('today') || 'Today') : day.dayOfWeek}
+                                  <div className={`font-medium ${activeDay === index ? 'text-white' : 'text-slate-700'}`}>
+                                    {day.isToday ? (t('today') || 'Today') : (t(`${day.dayOfWeek}`))}
                                   </div>
-                                  <div className="text-xs text-muted-foreground">{day.formattedDate}</div>
-                                  <div className="my-2 flex justify-center text-blue-500">
-                                    {getWeatherIcon(day.conditionMain)}
+                                  <div className={`text-xs ${activeDay === index ? 'text-blue-100' : 'text-slate-500'}`}>
+                                    {(() => {
+                                      const formattedDate = weatherData.weather.daily[activeDay].formattedDate;
+                                      const [month, day] = formattedDate.split(' ');
+                                      const translatedMonth = t(month);
+
+                                      return `${translatedMonth} ${day}`;
+                                    })()}
+
                                   </div>
-                                  <div className="flex justify-center gap-2 text-sm">
-                                    <span className="text-medium">{day.tempMin}°</span>
+                                  <div className="my-2 flex justify-center">
+                                    {getWeatherIcon(day.conditionMain, activeDay === index)}
+                                  </div>
+                                  <div className={`flex justify-center gap-2 text-sm ${activeDay === index ? 'text-white' : 'text-slate-600'}`}>
+                                    <span>{day.tempMin}°</span>
                                     <span className="font-medium">-</span>
                                     <span className="font-medium">{day.tempMax}°</span>
                                   </div>
                                   {day.rainChance > 50 && (
                                       <div className="mt-1 flex justify-center">
-                                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                                        <AlertCircle className={`h-4 w-4 ${activeDay === index ? 'text-amber-200' : 'text-amber-500'}`} />
                                       </div>
                                   )}
                                 </CardContent>
@@ -407,38 +421,48 @@ const Forecasts: NextPage = () => {
                       </ScrollArea>
                     </div>
 
+                    
                     <div className="hidden md:block">
-                      
                       <ScrollArea className="h-[600px]">
                         <div className="space-y-3">
                           {weatherData.weather.daily.map((day, index) => (
                               <Card
                                   key={day.date}
-                                  className={`cursor-pointer transition-colors ${
-                                      activeDay === index ? "border-green-950 bg-muted/50" : ""
+                                  className={`cursor-pointer transition-all duration-200 border-0 shadow-md ${
+                                      activeDay === index
+                                          ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg"
+                                          : "bg-white hover:bg-blue-50 hover:shadow-lg hover:border-blue-200"
                                   }`}
                                   onClick={() => setActiveDay(index)}
                               >
                                 <CardContent className="p-3">
                                   <div className="text-center">
-                                    <div className="font-medium text-sm">
-                                      {day.isToday ? (t('today') || 'Today') : day.dayOfWeek}
+                                    <div className={`font-medium text-sm ${activeDay === index ? 'text-white' : 'text-slate-700'}`}>
+                                      {day.isToday ? (t('today') || 'Today') : (t(`${day.dayOfWeek}`))}
                                     </div>
-                                    <div className="text-xs text-muted-foreground mb-2">{day.formattedDate}</div>
-                                    <div className="flex justify-center text-blue-500 mb-2">
-                                      {getWeatherIcon(day.conditionMain)}
+                                    <div className={`text-xs mb-2 ${activeDay === index ? 'text-blue-100' : 'text-slate-500'}`}>
+                                      {(() => {
+                                        const formattedDate = weatherData.weather.daily[activeDay].formattedDate;
+                                        const [month, day] = formattedDate.split(' ');
+                                        const translatedMonth = t(month);
+
+                                        return `${translatedMonth} ${day}`;
+                                      })()}
                                     </div>
-                                    <div className="flex justify-center gap-1 text-sm">
-                                      <span className="text-medium">{day.tempMin}°</span>
+                                    <div className="flex justify-center mb-2">
+                                      {getWeatherIcon(day.conditionMain, activeDay === index)}
+                                    </div>
+                                    <div className={`flex justify-center gap-1 text-sm ${activeDay === index ? 'text-white' : 'text-slate-600'}`}>
+                                      <span>{day.tempMin}°</span>
                                       <span>-</span>
                                       <span className="font-medium">{day.tempMax}°</span>
                                     </div>
-                                    <div className="text-xs text-muted-foreground mt-1 capitalize">
-                                      {day.condition}
+                                    <div className={`text-xs mt-1 capitalize ${activeDay === index ? 'text-blue-100' : 'text-slate-500'}`}>
+                                      {(t(`${day.condition}`))}
                                     </div>
                                     {day.rainChance > 50 && (
                                         <div className="mt-2 flex justify-center">
-                                          <AlertCircle className="h-4 w-4 text-amber-500" />
+                                          <AlertCircle className={`h-4 w-4 ${activeDay === index ? 'text-amber-200' : 'text-amber-500'}`} />
                                         </div>
                                     )}
                                   </div>
@@ -450,19 +474,27 @@ const Forecasts: NextPage = () => {
                     </div>
                   </div>
 
+                  
                   <div className="md:col-span-3 lg:col-span-4 order-2">
-                    <Card>
-                      <CardHeader>
+                    <Card className="border-0 shadow-xl">
+                      <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
                         <div className="flex items-center justify-between">
                           <div>
-                            <CardTitle>
+                            <CardTitle className="text-blue-900">
                               {weatherData.weather.daily[activeDay].isToday
                                   ? (t('today') || 'Today')
-                                  : weatherData.weather.daily[activeDay].dayOfWeek
+                                  : (t(`${weatherData.weather.daily[activeDay].dayOfWeek}`))
                               }
                             </CardTitle>
-                            <CardDescription>
-                              {weatherData.weather.daily[activeDay].formattedDate} - {selectedLocation?.name}
+                            <CardDescription className="text-blue-700">
+                              {(() => {
+                                const formattedDate = weatherData.weather.daily[activeDay].formattedDate;
+                                const [month, day] = formattedDate.split(' ');
+                                const translatedMonth = t(month);
+
+                                return `${translatedMonth} ${day}`;
+                              })()}
+                              - {selectedLocation?.name}
                             </CardDescription>
                           </div>
                           <div className="flex space-x-2">
@@ -471,22 +503,24 @@ const Forecasts: NextPage = () => {
                                 size="icon"
                                 disabled={activeDay === 0}
                                 onClick={() => setActiveDay((prev) => Math.max(0, prev - 1))}
+                                className="border-blue-200 hover:bg-blue-50 hover:border-blue-300"
                             >
-                              <ChevronLeft className="h-4 w-4" />
+                              <ChevronLeft className="h-4 w-4 text-blue-600" />
                             </Button>
                             <Button
                                 variant="outline"
                                 size="icon"
                                 disabled={activeDay === weatherData.weather.daily.length - 1}
                                 onClick={() => setActiveDay((prev) => Math.min(weatherData.weather.daily.length - 1, prev + 1))}
+                                className="border-blue-200 hover:bg-blue-50 hover:border-blue-300"
                             >
-                              <ChevronRight className="h-4 w-4" />
+                              <ChevronRight className="h-4 w-4 text-blue-600" />
                             </Button>
                           </div>
                         </div>
                       </CardHeader>
 
-                      <CardContent className="space-y-6">
+                      <CardContent className="space-y-6 p-6">
                         
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                           <div className="flex items-center">
@@ -494,52 +528,52 @@ const Forecasts: NextPage = () => {
                               {getWeatherIcon(weatherData.weather.daily[activeDay].conditionMain)}
                             </div>
                             <div>
-                              <div className="text-4xl font-bold">
+                              <div className="text-4xl font-bold text-slate-900">
                                 {weatherData.weather.daily[activeDay].tempMax}°C
                               </div>
-                              <div className="text-sm text-muted-foreground">
+                              <div className="text-sm text-slate-500">
                                 {t("lowTemp") || "Low"}: {weatherData.weather.daily[activeDay].tempMin}°C
                               </div>
-                              <div className="text-sm text-muted-foreground capitalize">
-                                {weatherData.weather.daily[activeDay].condition}
+                              <div className="text-sm text-slate-600 capitalize mt-1">
+                                {(t(`${weatherData.weather.daily[activeDay].condition}`))}
                               </div>
                             </div>
                           </div>
 
                           
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl">
                               <CloudRain className="h-5 w-5 text-blue-500" />
                               <div>
-                                <div className="text-sm text-muted-foreground">{t("precipitation") || "Precipitation"}</div>
-                                <div className="font-medium">
+                                <div className="text-sm text-blue-700 font-medium">{t("precipitation") || "Precipitation"}</div>
+                                <div className="font-semibold text-blue-900">
                                   {weatherData.weather.daily[activeDay].rainChance}%
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Wind className="h-5 w-5 text-blue-500" />
+                            <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl">
+                              <Wind className="h-5 w-5 text-slate-500" />
                               <div>
-                                <div className="text-sm text-muted-foreground">{t("wind") || "Wind"}</div>
-                                <div className="font-medium">
+                                <div className="text-sm text-slate-700 font-medium">{t("wind") || "Wind"}</div>
+                                <div className="font-semibold text-slate-900">
                                   {weatherData.weather.daily[activeDay].windSpeed} km/h
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Droplets className="h-5 w-5 text-blue-500" />
+                            <div className="flex items-center gap-2 p-3 bg-cyan-50 rounded-xl">
+                              <Droplets className="h-5 w-5 text-cyan-500" />
                               <div>
-                                <div className="text-sm text-muted-foreground">{t("humidity") || "Humidity"}</div>
-                                <div className="font-medium">
+                                <div className="text-sm text-cyan-700 font-medium">{t("humidity") || "Humidity"}</div>
+                                <div className="font-semibold text-cyan-900">
                                   {weatherData.weather.daily[activeDay].humidity}%
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Sun className="h-5 w-5 text-blue-500" />
+                            <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-xl">
+                              <Sun className="h-5 w-5 text-yellow-500" />
                               <div>
-                                <div className="text-sm text-muted-foreground">{t("uvIndex") || "UV Index"}</div>
-                                <div className="font-medium">
+                                <div className="text-sm text-yellow-700 font-medium">{t("uvIndex") || "UV Index"}</div>
+                                <div className="font-semibold text-yellow-900">
                                   {weatherData.weather.daily[activeDay].uvIndex}
                                 </div>
                               </div>
@@ -549,25 +583,25 @@ const Forecasts: NextPage = () => {
 
                         
                         <div>
-                          <h3 className="font-semibold mb-3">{t("weatherInsights") || "Weather Insights"}</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{t("overview") || "Farming Recommendation"}</CardTitle>
+                          <h3 className="font-semibold mb-4 text-slate-800 text-lg">{t("weatherInsights") || "Weather Insights"}</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500">
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base text-green-900">{t("overview") || "Farming Recommendation"}</CardTitle>
                               </CardHeader>
                               <CardContent>
-                                <p className="text-sm mb-3">
+                                <p className="text-sm mb-4 text-slate-700 leading-relaxed">
                                   {weatherData.weather.daily[activeDay].farmingRecommendation}
                                 </p>
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="outline">
+                                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
                                       {t("soilCondition") || "Soil Condition"}: {weatherData.weather.daily[activeDay].soilCondition}
                                     </Badge>
                                   </div>
                                   {weatherData.weather.daily[activeDay].rainAmount > 0 && (
                                       <div className="flex items-center gap-2">
-                                        <Badge variant="secondary">
+                                        <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
                                           {t("expectedRainfall") || "Expected Rainfall"}: {weatherData.weather.daily[activeDay].rainAmount}mm
                                         </Badge>
                                       </div>
@@ -576,43 +610,42 @@ const Forecasts: NextPage = () => {
                               </CardContent>
                             </Card>
 
-                            
-                            <Card>
-                              <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{t("additionalInsights") || "Additional Insights"}</CardTitle>
+                            <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-l-blue-500">
+                              <CardHeader className="pb-3">
+                                <CardTitle className="text-base text-blue-900">{t("additionalInsights") || "Additional Insights"}</CardTitle>
                               </CardHeader>
                               <CardContent>
-                                <div className="space-y-2 text-sm">
-                                  <div className="flex justify-between">
-                                    <span>{t("windDirection") || "Wind Direction"}:</span>
-                                    <span className="font-medium capitalize">
-                                  {weatherData.weather.daily[activeDay].windDirection}
-                                </span>
+                                <div className="space-y-3 text-sm">
+                                  <div className="flex justify-between p-2 bg-white rounded-lg">
+                                    <span className="text-slate-600">{t("windDirection") || "Wind Direction"}:</span>
+                                    <span className="font-medium capitalize text-slate-800">
+                                      {weatherData.weather.daily[activeDay].windDirection}
+                                    </span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span>{t("windStrength") || "Wind Strength"}:</span>
-                                    <span className="font-medium capitalize">
-                                  {weatherData.weather.daily[activeDay].windStrength}
-                                </span>
+                                  <div className="flex justify-between p-2 bg-white rounded-lg">
+                                    <span className="text-slate-600">{t("windStrength") || "Wind Strength"}:</span>
+                                    <span className="font-medium capitalize text-slate-800">
+                                      {weatherData.weather.daily[activeDay].windStrength}
+                                    </span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span>{t("rainChance") || "Rain Chance"}:</span>
-                                    <span className="font-medium">
-                                  {weatherData.weather.daily[activeDay].rainChance || 'Unknown'}%
-                                </span>
+                                  <div className="flex justify-between p-2 bg-white rounded-lg">
+                                    <span className="text-slate-600">{t("rainChance") || "Rain Chance"}:</span>
+                                    <span className="font-medium text-slate-800">
+                                      {weatherData.weather.daily[activeDay].rainChance || 'Unknown'}%
+                                    </span>
                                   </div>
-                                  <div className="flex justify-between">
-                                    <span>{t("rainPrediction") || "Rain Prediction"}:</span>
-                                    <span className="font-medium">
-                                  {weatherData.weather.daily[activeDay].rainPrediction?.confidence || 'Unknown'}
-                                </span>
+                                  <div className="flex justify-between p-2 bg-white rounded-lg">
+                                    <span className="text-slate-600">{t("rainPrediction") || "Rain Prediction"}:</span>
+                                    <span className="font-medium text-slate-800">
+                                      {weatherData.weather.daily[activeDay].rainPrediction?.confidence || 'Unknown'}
+                                    </span>
                                   </div>
                                   {weatherData.weather.daily[activeDay].extremeWeatherConditions && (
-                                      <div className="mt-2">
-                                        <span className="text-xs text-muted-foreground">{t("conditions") || "Conditions"}:</span>
-                                        <div className="flex flex-wrap gap-1 mt-1">
+                                      <div className="mt-3">
+                                        <span className="text-xs text-slate-500 font-medium">{t("conditions") || "Conditions"}:</span>
+                                        <div className="flex flex-wrap gap-1 mt-2">
                                           {weatherData.weather.daily[activeDay].extremeWeatherConditions.map((condition, index) => (
-                                              <Badge key={index} variant="outline" className="text-xs">
+                                              <Badge key={index} variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
                                                 {condition}
                                               </Badge>
                                           ))}
@@ -628,18 +661,18 @@ const Forecasts: NextPage = () => {
                         
                         {weatherData.weather.alerts && weatherData.weather.alerts.length > 0 && (
                             <div>
-                              <h3 className="font-semibold mb-3">{t("weatherAlerts") || "Weather Alerts"}</h3>
-                              <div className="space-y-2">
+                              <h3 className="font-semibold mb-4 text-slate-800 text-lg">{t("weatherAlerts") || "Weather Alerts"}</h3>
+                              <div className="space-y-3">
                                 {weatherData.weather.alerts.map((alert) => (
                                     <div
                                         key={alert.id}
-                                        className="rounded-md bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 p-3"
+                                        className="rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-4 shadow-md"
                                     >
-                                      <div className="flex items-start gap-2">
-                                        <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0" />
+                                      <div className="flex items-start gap-3">
+                                        <AlertCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-amber-600" />
                                         <div>
-                                          <p className="font-medium">{alert.title || t('weatherAlert') || 'Weather Alert'}</p>
-                                          <p className="text-sm mt-1">
+                                          <p className="font-medium text-amber-900">{alert.title || t('weatherAlert') || 'Weather Alert'}</p>
+                                          <p className="text-sm mt-2 text-amber-800 leading-relaxed">
                                             {alert.message || alert.description || t('checkWeatherConditions') || 'Check weather conditions'}
                                           </p>
                                         </div>
@@ -659,8 +692,11 @@ const Forecasts: NextPage = () => {
               renderEmptyState()
           )}
 
-          <div className="text-xs text-muted-foreground text-center mt-4">
-            {t("forecastDisclaimer") || "Weather forecasts are estimates and may vary from actual conditions."}
+          
+          <div className="text-center p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl border border-slate-200">
+            <p className="text-xs text-slate-500">
+              {t("forecastDisclaimer") || "Weather forecasts are estimates and may vary from actual conditions."}
+            </p>
           </div>
         </div>
       </AppLayout>

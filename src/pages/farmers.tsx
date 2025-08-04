@@ -13,7 +13,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from "@/components/ui/badge";
 import {
   ArrowUpDown, ChevronDown, Download, Edit, Loader2, MapPin, MessageSquare,
-  MoreHorizontal, Phone, Plus, Search, Trash, Upload, User
+  MoreHorizontal, Phone, Plus, Search, Trash, Upload, User, ChevronLeft, ChevronRight,
+  ChevronsLeft, ChevronsRight
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -36,7 +37,7 @@ const Farmers: NextPage = () => {
   const [totalCount, setTotalCount] = useState(0);
   
   const [currentPage, setCurrentPage] = useState(1);
-  const [limit] = useState(20);
+  const [limit, setLimit] = useState(10);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -62,7 +63,7 @@ const Farmers: NextPage = () => {
     if (isAuthenticated && user?.role === 'admin') {
       fetchFarmers();
     }
-  }, [selectedLocation, searchTerm, currentPage, isAuthenticated, user]);
+  }, [selectedLocation, searchTerm, currentPage, limit, isAuthenticated, user]);
 
   const fetchLocations = async () => {
     try {
@@ -216,6 +217,33 @@ const Farmers: NextPage = () => {
 
   const totalPages = Math.ceil(totalCount / limit);
 
+  const handlePageChange = (page: number) => {
+    if (page >= 1 && page <= totalPages) {
+      setCurrentPage(page);
+    }
+  };
+
+  const handleLimitChange = (newLimit: number) => {
+    setLimit(newLimit);
+    setCurrentPage(1);
+  };
+
+  // Custom status badge component
+  const StatusBadge = ({ isActive }: { isActive: boolean }) => {
+    if (isActive) {
+      return (
+        <Badge style={{ backgroundColor: '#ECFDF6', color: '#16a34a', border: '1px solid #ECFDF6' }} className="hover:opacity-80">
+          {t("active")}
+        </Badge>
+      );
+    } else {
+      return (
+        <Badge style={{ backgroundColor: '#adc9e3', color: '#eab308', border: '1px solid #eab308' }} className="hover:opacity-80">
+          {t("inactive")}
+        </Badge>
+      );
+    }
+  };
 
   return (
       <AppLayout>
@@ -226,47 +254,16 @@ const Farmers: NextPage = () => {
         </Head>
 
         <div className="space-y-4 md:space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-            <div className="flex items-center gap-2">
-              <MapPin className="h-5 w-5 text-ganz-primary" />
-              <h2 className="text-lg font-medium">{t("farmersManagement")}</h2>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="ml-2 h-9">
-                    <span>{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                  <DropdownMenuItem onClick={() => setSelectedLocation("all")}>{t("allLocations")}</DropdownMenuItem>
-                  <Separator className="my-1" />
-                  {locations.map((location) => (
-                      <DropdownMenuItem key={location.id} onClick={() => setSelectedLocation(location.name)}>
-                        {location.name}
-                      </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
-              <div className="relative w-full sm:w-auto">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <Input
-                    type="search"
-                    placeholder={t("searchFarmers")}
-                    className="pl-8 w-full sm:w-[200px] h-9"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                />
+          {/* Header section with white background */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+              {/* Left side - Title only */}
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-medium">{t("farmersManagement")}</h2>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button variant="primary" onClick={() => setCreateDialogOpen(true)}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t("addFarmer")}
-                </Button>
 
+              {/* Right side - Action buttons */}
+              <div className="flex flex-wrap w-full lg:w-auto items-center gap-2">
                 <Button
                     variant="outline"
                     onClick={handleImportFarmers}
@@ -287,130 +284,187 @@ const Farmers: NextPage = () => {
             </div>
           </div>
 
-
-          <Card>
-            <CardHeader className="p-4">
-              <CardTitle>{t("registeredFarmers")}</CardTitle>
-              <CardDescription>
-                {totalCount} {t("farmersFound")}
-              </CardDescription>
-            </CardHeader>
+          <Card className="shadow-sm border border-gray-200 rounded-lg overflow-hidden">
             <CardContent className="p-0">
+              {/* Header with Add Farmer, All Locations dropdown, and Search */}
+              <div className="p-4 bg-white border-b border-gray-200 flex justify-end items-center gap-4">
+                <Button 
+                  variant="primary" 
+                  onClick={() => setCreateDialogOpen(true)} 
+                  style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                  className="hover:opacity-90 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t("addFarmer")}
+                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      style={{ borderColor: '#66a9e3', color: '#66a9e3' }}
+                      className="hover:bg-blue-50"
+                    >
+                      <MapPin className="h-4 w-4 mr-2" />
+                      <span>{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
+                      {/* <ChevronDown className="ml-2 h-4 w-4" /> */}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    {locations.map((location) => (
+                      <DropdownMenuItem key={location.id} onClick={() => setSelectedLocation(location.name)}>
+                        {location.name}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    type="search"
+                    placeholder={t("searchFarmers") || "Search farmers..."}
+                    className="pl-10 w-[300px] bg-gray-50 border-gray-200"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
+              </div>
+
               {isLoading ? (
-                  <div className="flex items-center justify-center py-12">
-                    <Loader2 className="animate-spin h-8 w-8" />
+                  <div className="flex items-center justify-center py-16">
+                    <div className="flex flex-col items-center space-y-3">
+                      <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
+                      <span className="text-gray-500">{t("loading") || "Loading..."}</span>
+                    </div>
                   </div>
               ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead>
-                      <tr className="border-b bg-muted">
-                        <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <span>{t("name")}</span>
-                            <ArrowUpDown className="h-3 w-3" />
-                          </div>
+                      <thead  className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                          #
                         </th>
-                        <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <span>{t("locations")}</span>
-                            <ArrowUpDown className="h-3 w-3" />
-                          </div>
+                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                          {t("name") || "Farmer Name"}
                         </th>
-                        <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <span>{t("status")}</span>
-                            <ArrowUpDown className="h-3 w-3" />
-                          </div>
+                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                          {t("phone") || "Phone"}
                         </th>
-                        <th className="py-3 px-4 text-left font-medium text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <span>{t("joinedDate")}</span>
-                            <ArrowUpDown className="h-3 w-3" />
-                          </div>
+                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                          {t("locations") || "Location"}
                         </th>
-                        <th className="py-3 px-4 text-right font-medium text-muted-foreground">{t("actions")}</th>
+                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                          {t("status") || "Status"}
+                        </th>
+                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                          {t("joinedDate") || "Joined Date"}
+                        </th>
+                        <th className="py-4 px-6 text-center font-semibold text-sm">
+                          {t("actions") || "Actions"}
+                        </th>
                       </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="bg-white">
                       {farmers.length === 0 ? (
                           <tr>
-                            <td colSpan={5} className="py-8 text-center text-muted-foreground">
-                              {t("noFarmersFound")}
+                            <td colSpan={7} className="py-16 text-center">
+                              <div className="flex flex-col items-center space-y-3">
+                                <User className="h-12 w-12 text-gray-300" />
+                                <div className="text-gray-500 font-medium">{t("noFarmersFound") || "No farmers found"}</div>
+                                <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
+                              </div>
                             </td>
                           </tr>
                       ) : (
-                          farmers.map((farmer) => (
+                          farmers.map((farmer, index) => (
                               <tr
                                   key={farmer.id}
-                                  className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
+                                  className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors duration-150 ${
+                                    index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                  }`}
                                   onClick={() => handleViewFarmer(farmer.id)}
                               >
-                                <td className="py-3 px-4">
-                                  <div className="font-medium">{farmer.name}</div>
-                                  <div className="text-xs text-muted-foreground flex items-center gap-1">
-                                    <Phone className="h-3 w-3" />
-                                    {farmer.phone}
-                                  </div>
+                                <td className="py-4 px-6 text-sm text-gray-900">
+                                  {(currentPage - 1) * limit + index + 1}
                                 </td>
-                                <td className="py-3 px-4">
+                                <td className="py-4 px-6">
+                                  <div className="font-medium text-gray-900">{farmer.name}</div>
+                                </td>
+                                <td className="py-4 px-6">
+                                  <div className="text-sm text-gray-600 font-mono">{farmer.phone}</div>
+                                </td>
+                                <td className="py-4 px-6">
                                   <div className="flex flex-wrap gap-1">
-                                    {farmer.locations.map((location, index) => (
-                                        <Badge key={index} variant="outline" className="text-xs">
+                                    {farmer.locations.map((location, idx) => (
+                                        <span key={idx} className="text-sm text-gray-700">
                                           {location.name}
-                                        </Badge>
+                                          {idx < farmer.locations.length - 1 && ", "}
+                                        </span>
                                     ))}
                                   </div>
                                 </td>
-                                <td className="py-3 px-4">
-                                  <Badge variant={farmer.isActive ? "default" : "secondary"}>
-                                    {farmer.isActive ? t("active") : t("inactive")}
-                                  </Badge>
+                                <td className="py-4 px-6">
+                                  <StatusBadge isActive={farmer.isActive} />
                                 </td>
-                                <td className="py-3 px-4">
-                                  <div className="text-sm">
+                                <td className="py-4 px-6">
+                                  <div className="text-sm text-gray-600">
                                     {new Date(farmer.createdAt).toLocaleDateString()}
                                   </div>
                                 </td>
-                                <td className="py-3 px-4 text-right">
+                                <td className="py-4 px-6 text-center">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                      <Button variant="ghost" size="icon">
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
+                                      >
                                         <MoreHorizontal className="h-4 w-4" />
                                       </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleViewFarmer(farmer.id);
-                                      }}>
-                                        <User className="h-4 w-4 mr-2" />
-                                        {t("viewProfile")}
+                                    <DropdownMenuContent align="end" className="w-56">
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleViewFarmer(farmer.id);
+                                        }}
+                                        className="cursor-pointer hover:bg-blue-50"
+                                      >
+                                        <User className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
+                                        {t("viewProfile") || "View Profile"}
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        handleEditFarmer(farmer);
-                                      }}>
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        {t("editFarmer")}
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleEditFarmer(farmer);
+                                        }}
+                                        className="cursor-pointer hover:bg-green-50"
+                                      >
+                                        <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
+                                        {t("editFarmer") || "Edit Farmer"}
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={(e) => {
-                                        e.stopPropagation();
-                                        toast.info(t("sendMessageFeatureComingSoon"));
-                                      }}>
-                                        <MessageSquare className="h-4 w-4 mr-2" />
-                                        {t("sendMessage")}
+                                      <DropdownMenuItem 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          toast.info(t("sendMessageFeatureComingSoon") || "Feature coming soon");
+                                        }}
+                                        className="cursor-pointer hover:bg-purple-50"
+                                      >
+                                        <MessageSquare className="h-4 w-4 mr-2" style={{ color: '#adc9e3' }} />
+                                        {t("sendMessage") || "Send Message"}
                                       </DropdownMenuItem>
                                       <Separator className="my-1" />
                                       <DropdownMenuItem
-                                          className="text-red-600"
+                                          className="cursor-pointer hover:bg-red-50"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             handleDeleteFarmer(farmer.id);
                                           }}
                                       >
-                                        <Trash className="h-4 w-4 mr-2" />
-                                        {t("delete")}
+                                        <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
+                                        <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
                                       </DropdownMenuItem>
                                     </DropdownMenuContent>
                                   </DropdownMenu>
@@ -422,36 +476,78 @@ const Farmers: NextPage = () => {
                     </table>
                   </div>
               )}
-            </CardContent>
 
-            {totalCount > 0 && (
-                <CardFooter className="p-4 flex justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {t("showing")} {Math.min((currentPage - 1) * limit + 1, totalCount)} - {Math.min(currentPage * limit, totalCount)} {t("of")} {totalCount} {t("farmers")}
+              {/* Pagination Footer - Matching the provided design exactly */}
+              {totalCount > 0 && (
+                <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-gray-200">
+                  <div className="flex items-center text-sm text-gray-600 gap-2">
+                    <span>
+                      {farmers.length === 0 ? "0" : `${Math.min((currentPage - 1) * limit + 1, totalCount)}-${Math.min(currentPage * limit, totalCount)}`} of {totalCount} row(s) selected.
+                    </span>
+                    <span>Rows per page</span>
+                    <select 
+                      className="border border-gray-300 rounded px-2 py-1 text-sm bg-white ml-2"
+                      value={limit}
+                      onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                    >
+                      <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </select>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                        variant="outline"
+                  
+                  <div className="flex items-center space-x-4">
+                    <span className="text-sm text-gray-600">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        variant="ghost"
                         size="sm"
                         disabled={currentPage === 1}
-                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    >
-                      {t("previous")}
-                    </Button>
-                    <span className="text-sm text-muted-foreground">
-                  {currentPage} / {totalPages}
-                </span>
-                    <Button
-                        variant="outline"
+                        onClick={() => handlePageChange(1)}
+                        className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                        title="First page"
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={currentPage === 1}
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                        title="Previous page"
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
                         size="sm"
                         disabled={currentPage === totalPages}
-                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    >
-                      {t("next")}
-                    </Button>
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                        title="Next page"
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={currentPage === totalPages}
+                        onClick={() => handlePageChange(totalPages)}
+                        className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
+                        title="Last page"
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </CardFooter>
-            )}
+                </div>
+              )}
+            </CardContent>
           </Card>
 
           <div className="text-xs text-muted-foreground text-center mt-4">

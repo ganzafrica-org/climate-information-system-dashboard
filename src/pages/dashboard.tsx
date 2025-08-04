@@ -1,13 +1,11 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { NextPage } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useLanguage } from '@/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import {
     DropdownMenu,
@@ -15,18 +13,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
-import {
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Line,
-    LineChart,
-    Tooltip,
-    XAxis,
-    YAxis,
-    Legend
-} from 'recharts';
-import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import {
     AlertCircle,
     ArrowRight,
@@ -39,12 +25,19 @@ import {
     Droplets,
     Eye,
     MapPin,
-    Search,
     Thermometer,
     Umbrella,
     Loader2,
     RefreshCw,
     Wind,
+    TrendingUp,
+    Users,
+    MessageSquare,
+    Activity,
+    AlertTriangle,
+    Zap,
+    Target,
+    TrendingDown
 } from 'lucide-react';
 import dynamic from "next/dynamic";
 import { toast } from 'sonner';
@@ -52,75 +45,44 @@ import api from '@/lib/api';
 import { Location, LocationsResponse } from '@/types/farmer';
 import { ApiResponse, WeatherData, WeatherRequestParams } from '@/types/weather';
 
-const OptimizedMap = dynamic(
+const RainfallHeatmap = dynamic(
     () => import('@/components/dashboard-map'),
     { ssr: false }
 );
 
-// Amakuru y'ibihe y'amateka ku binyabupfasoni (amakuru y'amateka)
-const historicalWeatherData = [
-    { month: 'Mut', temperature: 22, rainfall: 60, humidity: 65, season: 'A' },
-    { month: 'Gas', temperature: 23, rainfall: 40, humidity: 60, season: 'A' },
-    { month: 'Wer', temperature: 21, rainfall: 120, humidity: 75, season: 'B' },
-    { month: 'Mat', temperature: 20, rainfall: 150, humidity: 80, season: 'B' },
-    { month: 'Gic', temperature: 19, rainfall: 80, humidity: 72, season: 'B' },
-    { month: 'Kam', temperature: 18, rainfall: 30, humidity: 68, season: 'B' },
-    { month: 'Nya', temperature: 17, rainfall: 20, humidity: 65, season: 'C' },
-    { month: 'Kan', temperature: 19, rainfall: 25, humidity: 67, season: 'C' },
-    { month: 'Nze', temperature: 20, rainfall: 40, humidity: 70, season: 'A' },
-    { month: 'Ukw', temperature: 21, rainfall: 70, humidity: 73, season: 'A' },
-    { month: 'Ugu', temperature: 21, rainfall: 90, humidity: 75, season: 'A' },
-    { month: 'Uku', temperature: 22, rainfall: 70, humidity: 70, season: 'A' }
-];
-
-const chartConfig = {
-    temperature: {
-        label: 'Ubushyuhe (°C)',
-        color: 'hsl(var(--primary))',
-    },
-    rainfall: {
-        label: 'Imvura (mm)',
-        color: '#3b82f6',
-    },
-    humidity: {
-        label: 'Ubuhehere (%)',
-        color: '#60a5fa',
-    },
-};
-
 const getWeatherIcon = (condition: string): React.ReactElement => {
     const iconMap: { [key: string]: React.ReactElement } = {
-        'clear': <Sun className="h-10 w-10 text-blue-500" />,
-        'clouds': <Cloud className="h-10 w-10 text-blue-500" />,
-        'rain': <CloudRain className="h-10 w-10 text-blue-500" />,
-        'drizzle': <CloudDrizzle className="h-10 w-10 text-blue-500" />,
-        'snow': <CloudDrizzle className="h-10 w-10 text-blue-500" />,
-        'thunderstorm': <CloudRain className="h-10 w-10 text-blue-500" />,
+        'clear': <Sun className="h-10 w-10 text-yellow-500" />,
+        'clouds': <Cloud className="h-10 w-10 text-gray-500" />,
+        'rain': <CloudRain className="h-10 w-10 text-blue-600" />,
+        'drizzle': <CloudDrizzle className="h-10 w-10 text-blue-400" />,
+        'snow': <CloudDrizzle className="h-10 w-10 text-cyan-400" />,
+        'thunderstorm': <CloudRain className="h-10 w-10 text-purple-600" />,
     };
 
     const conditionKey = condition.toLowerCase();
-    return iconMap[conditionKey] || <Cloud className="h-10 w-10 text-blue-500" />;
+    return iconMap[conditionKey] || <Cloud className="h-10 w-10 text-gray-500" />;
 };
 
 const getConditionStatus = (value: number, type: 'planting' | 'harvesting' | 'pest' | 'disease'): { status: string, color: string } => {
     if (type === 'planting') {
-        if (value >= 70) return { status: 'favorable', color: 'text-green-600 dark:text-green-400' };
-        if (value >= 40) return { status: 'moderate', color: 'text-amber-600 dark:text-amber-400' };
-        return { status: 'unfavorable', color: 'text-red-600 dark:text-red-400' };
+        if (value >= 70) return { status: 'favorable', color: 'text-green-600' };
+        if (value >= 40) return { status: 'moderate', color: 'text-amber-600' };
+        return { status: 'unfavorable', color: 'text-red-600' };
     }
-    
+
     if (type === 'harvesting') {
-        if (value <= 30) return { status: 'favorable', color: 'text-green-600 dark:text-green-400' };
-        if (value <= 60) return { status: 'moderate', color: 'text-amber-600 dark:text-amber-400' };
-        return { status: 'unfavorable', color: 'text-red-600 dark:text-red-400' };
+        if (value <= 30) return { status: 'favorable', color: 'text-green-600' };
+        if (value <= 60) return { status: 'moderate', color: 'text-amber-600' };
+        return { status: 'unfavorable', color: 'text-red-600' };
     }
-    
+
     if (type === 'pest' || type === 'disease') {
-        if (value <= 30) return { status: 'low', color: 'text-green-600 dark:text-green-400' };
-        if (value <= 60) return { status: 'moderate', color: 'text-amber-600 dark:text-amber-400' };
-        return { status: 'high', color: 'text-red-600 dark:text-red-400' };
+        if (value <= 30) return { status: 'low', color: 'text-green-600' };
+        if (value <= 60) return { status: 'moderate', color: 'text-amber-600' };
+        return { status: 'high', color: 'text-red-600' };
     }
-    
+
     return { status: 'unknown', color: 'text-gray-600' };
 };
 
@@ -139,11 +101,10 @@ const Dashboard: NextPage = () => {
     const [locations, setLocations] = useState<Location[]>([]);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-    const [allLocationsWeather, setAllLocationsWeather] = useState<any[]>([]);
-    const [dashboardView, setDashboardView] = useState<'map' | 'charts'>('map');
+    const [, setAllLocationsWeather] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [isLoadingAllWeather, setIsLoadingAllWeather] = useState(false);
+    const [, setIsLoadingAllWeather] = useState(false);
     const [todayWeather, setTodayWeather] = useState<any>(null);
 
     useEffect(() => {
@@ -169,7 +130,6 @@ const Dashboard: NextPage = () => {
             });
             setLocations(response.data.locations);
 
-            // Hitamo ahantu ha mbere ku ikurikiranyagihe
             if (response.data.locations.length > 0) {
                 setSelectedLocation(response.data.locations[0]);
             }
@@ -190,8 +150,7 @@ const Dashboard: NextPage = () => {
             );
 
             setWeatherData(response.data);
-            
-            // Shiraho ibihe by'uyumunsi (icya mbere mu rutonde rwa buri munsi cyangwa gishaka uyumunsi)
+
             const todayIndex = response.data.weather.daily.findIndex(day => day.isToday);
             const today = todayIndex !== -1 ? response.data.weather.daily[todayIndex] : response.data.weather.daily[0];
             setTodayWeather(today);
@@ -223,7 +182,7 @@ const Dashboard: NextPage = () => {
                         temperature: todayWeather?.currentTemp || 20,
                         condition: todayWeather?.condition || 'Bitazwi',
                         rainChance: todayWeather?.rainChance || 0,
-                        humidity: todayWeather?.currentTemp ? Math.round(Math.random() * 30 + 50) : 65, // Ubusumbane
+                        humidity: todayWeather?.currentTemp ? Math.round(Math.random() * 30 + 50) : 65,
                         windSpeed: todayWeather?.windInfo ? parseFloat(todayWeather.windInfo.split(' ')[0]) || 5 : 5,
                         alerts: location.intelligentAlerts || [],
                         hasExtremeConditions: todayWeather?.hasExtremeConditions || false,
@@ -258,108 +217,51 @@ const Dashboard: NextPage = () => {
     };
 
     const getCurrentSeason = () => {
-        const month = new Date().getMonth() + 1; // 1-12
+        const month = new Date().getMonth() + 1;
         if (month >= 9 || month <= 2) return 'seasons.seasonA';
         if (month >= 3 && month <= 6) return 'seasons.seasonB';
         return 'seasons.seasonC';
     };
 
-    const handleLocationChange = (location: any) => {
-        if (location.sector || location.name) {
-            const locationName = location.sector || location.name;
-            const foundLocation = locations.find(loc => loc.name === locationName);
-            if (foundLocation) {
-                setSelectedLocation(foundLocation);
-            }
-        }
-    };
-
-    const handleViewDetails = () => {
-        router.push('/forecasts');
-    };
-
-    const handleViewAllAlerts = () => {
-        router.push('/communications');
-    };
-
     const getIntelligentAlerts = () => {
-        // Reba niba weatherData ifite imburizi z'ubwenge, ubundi usubize urutonde rwiza
         const alerts = (weatherData as any)?.intelligentAlerts || [];
         if (!alerts || alerts.length === 0) return [];
-        
+
         return alerts.map((alert: any) => ({
             type: alert.type,
             severity: alert.level,
             message: alert.message,
             sectors: [selectedLocation?.name || ''],
-            color: alert.level === 'critical' ? 'red' : 
-                   alert.level === 'high' ? 'amber' : 
-                   alert.level === 'medium' ? 'blue' : 'green',
+            color: alert.level === 'critical' ? 'red' :
+                alert.level === 'high' ? 'amber' :
+                    alert.level === 'medium' ? 'blue' : 'green',
             icon: alert.category === 'rainfall' ? <CloudRain className="h-5 w-5" /> :
-                  alert.category === 'pest_management' ? <AlertCircle className="h-5 w-5" /> :
-                  alert.category === 'irrigation' ? <Droplets className="h-5 w-5" /> :
-                  alert.category === 'temperature' ? <Thermometer className="h-5 w-5" /> :
-                  alert.category === 'wind' ? <Wind className="h-5 w-5" /> : <Sun className="h-5 w-5" />
+                alert.category === 'pest_management' ? <AlertCircle className="h-5 w-5" /> :
+                    alert.category === 'irrigation' ? <Droplets className="h-5 w-5" /> :
+                        alert.category === 'temperature' ? <Thermometer className="h-5 w-5" /> :
+                            alert.category === 'wind' ? <Wind className="h-5 w-5" /> : <Sun className="h-5 w-5" />
         }));
-    };
-
-    const getMapAlerts = () => {
-        // Huza imburizi z'ahantu hose ku karita
-        const mapAlerts: any[] = [];
-        
-        allLocationsWeather.forEach(location => {
-            if (location.alerts && location.alerts.length > 0) {
-                location.alerts.forEach((alert: any) => {
-                    mapAlerts.push({
-                        type: alert.type || 'imburizi_y\'ibihe',
-                        severity: alert.level || 'medium',
-                        message: alert.message || `Imburizi y'ibihe ya ${location.name}`,
-                        sectors: [location.name],
-                        color: alert.level === 'critical' ? 'red' : 
-                               alert.level === 'high' ? 'amber' : 
-                               alert.level === 'medium' ? 'blue' : 'green',
-                        icon: alert.category === 'rainfall' ? <CloudRain /> :
-                              alert.category === 'pest_management' ? <AlertCircle /> :
-                              alert.category === 'irrigation' ? <Droplets /> :
-                              alert.category === 'temperature' ? <Thermometer /> :
-                              alert.category === 'wind' ? <Wind /> : <Sun />,
-                        location: {
-                            lat: location.lat,
-                            lon: location.lon,
-                            name: location.name
-                        }
-                    });
-                });
-            }
-        });
-
-        return mapAlerts;
     };
 
     const getFarmingConditions = () => {
         if (!todayWeather) return null;
 
-        // Kubara imiterere y'ubuhinzi ukurikije amakuru y'ibihe
         const temp = todayWeather.tempMax;
         const humidity = todayWeather.humidity;
         const rainChance = todayWeather.rainChance;
         const windSpeed = todayWeather.windSpeed;
 
-        // Imiterere yo gutera (ubushyuhe bwiza + ubuhehere bumwe)
-        const plantingScore = temp >= 18 && temp <= 28 && humidity >= 50 ? 70 : 
-                             temp >= 15 && temp <= 32 && humidity >= 40 ? 50 : 30;
+        const plantingScore = temp >= 18 && temp <= 28 && humidity >= 50 ? 70 :
+            temp >= 15 && temp <= 32 && humidity >= 40 ? 50 : 30;
 
-        // Imiterere yo kweza (ikirere cyumutse gikunda)
-        const harvestingScore = rainChance <= 20 && windSpeed <= 5 ? 80 : 
-                               rainChance <= 40 && windSpeed <= 8 ? 50 : 20;
+        const harvestingScore = rainChance <= 20 && windSpeed <= 5 ? 80 :
+            rainChance <= 40 && windSpeed <= 8 ? 50 : 20;
 
-        // Ibyago by'udukoko (ubushyuhe + ubuhehere = ibyago byinshi)
-        const pestRisk = temp > 25 && humidity > 70 ? 80 : 
-                        temp > 20 && humidity > 60 ? 50 : 20;
+        const pestRisk = temp > 25 && humidity > 70 ? 80 :
+            temp > 20 && humidity > 60 ? 50 : 20;
 
-        // Ibyago by'indwara (bisa n'udukoko ariko harimo ubuhehere)
-        const diseaseRisk = temp > 20 && humidity > 65 && rainChance > 40 ? 75 : 
-                           temp > 15 && humidity > 55 ? 45 : 25;
+        const diseaseRisk = temp > 20 && humidity > 65 && rainChance > 40 ? 75 :
+            temp > 15 && humidity > 55 ? 45 : 25;
 
         return {
             planting: getConditionStatus(plantingScore, 'planting'),
@@ -377,7 +279,6 @@ const Dashboard: NextPage = () => {
         const rainChance = todayWeather.rainChance;
         const humidity = todayWeather.humidity;
 
-        // Tanga impanuro z'ibikorwa ukurikije imiterere y'ibihe
         if (temp >= 18 && temp <= 28 && rainChance > 30) {
             activities.push(t('goodTimeToPlantBeans') || 'Igihe cyiza cyo gutera ibishyimbo n\'imboga');
         }
@@ -410,8 +311,8 @@ const Dashboard: NextPage = () => {
             <AppLayout>
                 <div className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                        <Loader2 className="animate-spin h-8 w-8 mx-auto" />
-                        <p className="mt-2 text-muted-foreground">{t('loadingLocations')}</p>
+                        <Loader2 className="animate-spin h-8 w-8 mx-auto text-blue-600" />
+                        <p className="mt-2 text-slate-600">{t('loadingLocations')}</p>
                     </div>
                 </div>
             </AppLayout>
@@ -419,7 +320,6 @@ const Dashboard: NextPage = () => {
     }
 
     const alerts = getIntelligentAlerts();
-    const mapAlerts = getMapAlerts();
     const farmingConditions = getFarmingConditions();
     const recommendedActivities = getRecommendedActivities();
 
@@ -429,442 +329,395 @@ const Dashboard: NextPage = () => {
                 <title>{t('dashboard')} | {t('climateInformationSystem')}</title>
             </Head>
 
-            <div className="space-y-4 md:space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-                    <div className="flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-ganz-primary" />
-                        <h2 className="text-lg font-medium">{t('dashboard')}</h2>
+            <div className="space-y-6">
+                
+                <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
+                                <Activity className="h-7 w-7" />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-bold">{t('dashboard')}</h1>
+                                <p className="text-blue-100 text-lg">{t('climateInformationSystem')}</p>
+                            </div>
+                        </div>
 
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="ml-2">
-                                    <span>{selectedLocation?.name || t('selectLocation')}</span>
-                                    <ChevronDown className="ml-2 h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                {locations.map((location) => (
-                                    <DropdownMenuItem 
-                                        key={location.id} 
-                                        onClick={() => setSelectedLocation(location)}
-                                    >
-                                        {location.name}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex items-center gap-3">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm">
+                                        <MapPin className="h-4 w-4 mr-2" />
+                                        {selectedLocation?.name || t('selectLocation')}
+                                        <ChevronDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    {locations.map((location) => (
+                                        <DropdownMenuItem
+                                            key={location.id}
+                                            onClick={() => setSelectedLocation(location)}
+                                        >
+                                            {location.name}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
 
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRefresh}
-                            disabled={isRefreshing}
-                            className="ml-2"
-                        >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                            {isRefreshing ? t('refreshing') : t('refresh')}
-                        </Button>
-                    </div>
-
-                    <div className="flex w-full sm:w-auto items-center gap-2">
-                        <div className="relative w-full sm:w-auto">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                placeholder={t('search')}
-                                className="pl-8 w-full sm:w-[180px] h-9"
-                            />
+                            <Button
+                                variant="outline"
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {isRefreshing ? t('refreshing') : t('refresh')}
+                            </Button>
                         </div>
                     </div>
                 </div>
 
-                <Card className="bg-ganz-primary/10 border-ganz-primary/30">
-                    <CardContent className="p-4">
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                            <div className="flex items-center gap-2">
-                                <Calendar className="h-5 w-5 text-ganz-primary" />
-                                <span className="font-medium">{t('currentSeason')}: </span>
-                                <span className="font-bold">{t(getCurrentSeason())}</span>
-                                {selectedLocation && (
-                                    <>
-                                        <span className="mx-2">•</span>
-                                        <span className="font-medium">{selectedLocation.name}</span>
-                                    </>
-                                )}
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-l-amber-500">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-amber-100 p-2 rounded-lg">
+                                    <Calendar className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-amber-600">Current Season</p>
+                                    <p className="font-bold text-amber-900">{t(getCurrentSeason())}</p>
+                                </div>
                             </div>
-                            {isLoadingAllWeather && (
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                    <Loader2 className="animate-spin h-4 w-4" />
-                                    <span>{t('loadingMapData')}</span>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-green-100 p-2 rounded-lg">
+                                    <Target className="h-5 w-5 text-green-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-green-600">System Status</p>
+                                    <p className="font-bold text-green-900">Operational</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-l-blue-500">
+                        <CardContent className="p-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-blue-100 p-2 rounded-lg">
+                                    <Zap className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm font-medium text-blue-600">Active Locations</p>
+                                    <p className="font-bold text-blue-900">{locations.length} Sectors</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                
+                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    <Card className="border-0 shadow-md bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-blue-100 text-sm font-medium">Farmers Reached</p>
+                                    <p className="text-3xl font-bold">1,245</p>
+                                    <div className="flex items-center gap-1 mt-2">
+                                        <TrendingUp className="h-4 w-4 text-green-300" />
+                                        <span className="text-xs text-green-300">+12% this month</span>
+                                    </div>
+                                </div>
+                                <div className="bg-white/20 p-3 rounded-lg">
+                                    <Users className="h-6 w-6" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-0 shadow-md bg-gradient-to-br from-green-500 to-green-600 text-white">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-green-100 text-sm font-medium">Messages Sent</p>
+                                    <p className="text-3xl font-bold">5,832</p>
+                                    <div className="flex items-center gap-1 mt-2">
+                                        <TrendingUp className="h-4 w-4 text-blue-300" />
+                                        <span className="text-xs text-blue-300">+24% this month</span>
+                                    </div>
+                                </div>
+                                <div className="bg-white/20 p-3 rounded-lg">
+                                    <MessageSquare className="h-6 w-6" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-0 shadow-md bg-gradient-to-br from-amber-500 to-orange-500 text-white">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-amber-100 text-sm font-medium">Active Alerts</p>
+                                    <p className="text-3xl font-bold">18</p>
+                                    <div className="flex items-center gap-1 mt-2">
+                                        <TrendingDown className="h-4 w-4 text-green-300" />
+                                        <span className="text-xs text-green-300">-5% from last week</span>
+                                    </div>
+                                </div>
+                                <div className="bg-white/20 p-3 rounded-lg">
+                                    <AlertTriangle className="h-6 w-6" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                </div>
+
+                
+                <RainfallHeatmap />
+
+                
+                <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
+                    
+                    <Card className="border-0 shadow-md bg-white lg:col-span-1">
+                        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100 pb-4">
+                            <CardTitle className="flex items-center gap-2 text-blue-900">
+                                <Sun className="h-5 w-5 text-yellow-500" />
+                                {t('todayForecast')}
+                            </CardTitle>
+                            <CardDescription className="text-blue-700">
+                                {selectedLocation ? selectedLocation.name : t('selectLocation')}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="p-6 space-y-4">
+                            {todayWeather ? (
+                                <>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-sm font-medium text-slate-600">
+                                                {t('temperature')}
+                                            </p>
+                                            <p className="text-4xl font-bold text-slate-900">{todayWeather.tempMax}°C</p>
+                                            <p className="text-sm text-slate-500">Feels like {todayWeather.tempMax + 2}°C</p>
+                                        </div>
+                                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center">
+                                            {getWeatherIcon(todayWeather.conditionMain)}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <CloudRain className="h-4 w-4 text-blue-600" />
+                                                <p className="text-sm font-medium text-blue-700">Rainfall</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-blue-900">{todayWeather.rainAmount}mm</p>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-xl border border-cyan-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Droplets className="h-4 w-4 text-cyan-600" />
+                                                <p className="text-sm font-medium text-cyan-700">Humidity</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-cyan-900">{todayWeather.humidity}%</p>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Wind className="h-4 w-4 text-gray-600" />
+                                                <p className="text-sm font-medium text-gray-700">Wind</p>
+                                            </div>
+                                            <p className="text-2xl font-bold text-gray-900">{Math.round(todayWeather.windSpeed * 3.6)} km/h</p>
+                                        </div>
+                                        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Eye className="h-4 w-4 text-green-600" />
+                                                <p className="text-sm font-medium text-green-700">Soil</p>
+                                            </div>
+                                            <p className="text-lg font-bold text-green-900">{todayWeather.soilCondition}</p>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="animate-spin h-6 w-6 text-blue-600" />
                                 </div>
                             )}
-                        </div>
-                    </CardContent>
-                </Card>
+                        </CardContent>
+                        <CardFooter className="bg-slate-50 border-t border-slate-100">
+                            <Button className="w-full bg-blue-600 hover:bg-blue-700 h-11" onClick={() => router.push('/forecasts')}>
+                                {t('viewDetails')}
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </CardFooter>
+                    </Card>
 
-                {dashboardView === 'map' && (
-                    <div className="space-y-4">
-                        <OptimizedMap
-                            onLocationChange={handleLocationChange}
-                            alerts={mapAlerts}
-                        />
-                        <div className="grid gap-4 md:gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-                            <Card className="col-span-1">
-                                <CardHeader className="pb-2">
-                                    <CardTitle>{t('todayForecast')}</CardTitle>
-                                    <CardDescription>
-                                        {selectedLocation ? selectedLocation.name : t('selectLocation')}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {todayWeather ? (
-                                        <>
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <p className="text-sm font-medium text-muted-foreground">
-                                                        {t('temperature')}
-                                                    </p>
-                                                    <p className="text-3xl font-bold">{todayWeather.tempMax}°C</p>
-                                                </div>
-                                                <div className="h-16 w-16 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                                                    {getWeatherIcon(todayWeather.conditionMain)}
+                    
+                    <div className="lg:col-span-2 space-y-6">
+                        
+                        <Card className="border-0 shadow-md bg-white">
+                            <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 pb-4">
+                                <CardTitle className="flex items-center gap-2 text-amber-900">
+                                    <AlertTriangle className="h-5 w-5 text-amber-600" />
+                                    {t('alerts')} & Advisories
+                                </CardTitle>
+                                <CardDescription className="text-amber-700">{t('farmingActionAdvisories')}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6 max-h-[300px] overflow-y-auto space-y-3">
+                                {alerts.length > 0 ? (
+                                    alerts.map(function(alert: Alert, index: number) {
+                                        return (
+                                            <div
+                                                key={index}
+                                                className={`rounded-xl p-4 border-l-4 transition-all hover:shadow-md ${
+                                                    alert.color === 'amber' ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-l-amber-500' :
+                                                        alert.color === 'red' ? 'bg-gradient-to-r from-red-50 to-pink-50 border-l-red-500' :
+                                                            alert.color === 'blue' ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-l-blue-500' :
+                                                                'bg-gradient-to-r from-green-50 to-emerald-50 border-l-green-500'
+                                                }`}
+                                            >
+                                                <div className="flex items-start gap-3">
+                                                    <div className={`mt-0.5 flex-shrink-0 ${
+                                                        alert.color === 'amber' ? 'text-amber-600' :
+                                                            alert.color === 'red' ? 'text-red-600' :
+                                                                alert.color === 'blue' ? 'text-blue-600' :
+                                                                    'text-green-600'
+                                                    }`}>
+                                                        {alert.icon}
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className={`font-semibold ${
+                                                            alert.color === 'amber' ? 'text-amber-900' :
+                                                                alert.color === 'red' ? 'text-red-900' :
+                                                                    alert.color === 'blue' ? 'text-blue-900' :
+                                                                        'text-green-900'
+                                                        }`}>{alert.type}</p>
+                                                        <p className={`text-sm mt-1 ${
+                                                            alert.color === 'amber' ? 'text-amber-800' :
+                                                                alert.color === 'red' ? 'text-red-800' :
+                                                                    alert.color === 'blue' ? 'text-blue-800' :
+                                                                        'text-green-800'
+                                                        }`}>{alert.message}</p>
+                                                        {alert.sectors && (
+                                                            <p className={`text-sm mt-1 font-medium ${
+                                                                alert.color === 'amber' ? 'text-amber-700' :
+                                                                    alert.color === 'red' ? 'text-red-700' :
+                                                                        alert.color === 'blue' ? 'text-blue-700' :
+                                                                            'text-green-700'
+                                                            }`}>
+                                                                {t('affectedAreas')}: {alert.sectors.join(', ')}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <p className="text-sm font-medium text-muted-foreground">
-                                                        {t('rainfall')}
-                                                    </p>
-                                                    <p className="text-xl font-medium">{todayWeather.rainAmount}mm</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-muted-foreground">
-                                                        {t('humidity')}
-                                                    </p>
-                                                    <p className="text-xl font-medium">{todayWeather.humidity}%</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-muted-foreground">
-                                                        {t('wind')}
-                                                    </p>
-                                                    <p className="text-xl font-medium">{Math.round(todayWeather.windSpeed * 3.6)} km/h</p>
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-medium text-muted-foreground">
-                                                        {t('soilMoisture')}
-                                                    </p>
-                                                    <p className="text-xl font-medium">{todayWeather.soilCondition}</p>
-                                                </div>
-                                            </div>
-                                        </>
-                                    ) : (
-                                        <div className="flex items-center justify-center py-8">
-                                            <Loader2 className="animate-spin h-6 w-6" />
+                                        );
+                                    })
+                                ) : (
+                                    <div className="text-center p-8 text-slate-500">
+                                        <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                                            <AlertCircle className="h-8 w-8 text-green-600" />
                                         </div>
-                                    )}
-                                </CardContent>
-                                <CardFooter>
-                                    <Button className="w-full" variant="outline" onClick={handleViewDetails}>
-                                        {t('viewDetails')}
-                                        <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </CardFooter>
-                            </Card>
+                                        <p className="font-medium text-slate-600">{t('noAlertsForRegion')}</p>
+                                        <p className="text-sm mt-1 text-slate-500">All conditions are normal</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                            <CardFooter className="bg-slate-50 border-t border-slate-100">
+                                <Button className="w-full bg-amber-600 hover:bg-amber-700 h-11" variant="outline" onClick={() => router.push('/communications')}>
+                                    {t('viewAllAlerts')}
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </CardFooter>
+                        </Card>
 
-                            <Card className="col-span-1">
-                                <CardHeader className="pb-2">
-                                    <CardTitle>{t('alerts')}</CardTitle>
-                                    <CardDescription>{t('farmingActionAdvisories')}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="max-h-[260px] overflow-y-auto space-y-3">
-                                    {alerts.length > 0 ? (
-                                        alerts.map(function(alert: Alert, index: number) {
-                                            return (
-                                                <div
-                                                    key={index}
-                                                    className={`rounded-md p-3 ${
-                                                        alert.color === 'amber' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                                                            alert.color === 'red' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                                                                alert.color === 'blue' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-                                                                    'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                                                    }`}
-                                                >
-                                                    <div className="flex items-start gap-2">
-                                                        <div className="mt-0.5 flex-shrink-0">
-                                                            {alert.icon}
-                                                        </div>
-                                                        <div>
-                                                            <p className="font-medium">{alert.type}</p>
-                                                            <p className="text-sm mt-1">{alert.message}</p>
-                                                            {alert.sectors && (
-                                                                <p className="text-sm mt-1 font-medium">
-                                                                    {t('affectedAreas')}: {alert.sectors.join(', ')}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                        
+                        <Card className="border-0 shadow-md bg-white">
+                            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 pb-4">
+                                <CardTitle className="flex items-center gap-2 text-green-900">
+                                    <Droplets className="h-5 w-5 text-green-600" />
+                                    {t('farmingConditions')}
+                                </CardTitle>
+                                <CardDescription className="text-green-700">{t('forNextWeek')}</CardDescription>
+                            </CardHeader>
+                            <CardContent className="p-6 space-y-4">
+                                {farmingConditions ? (
+                                    <>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Droplets className="h-4 w-4 text-blue-600" />
+                                                    <span className="font-medium text-blue-900">{t('planting')}</span>
                                                 </div>
-                                            );
-                                        })
-                                    ) : (
-                                        <div className="text-center p-4 text-muted-foreground">
-                                            <AlertCircle className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                                            <p>{t('noAlertsForRegion')}</p>
-                                        </div>
-                                    )}
-                                </CardContent>
-                                <CardFooter>
-                                    <Button className="w-full" variant="outline" onClick={handleViewAllAlerts}>
-                                        {t('viewAllAlerts')}
-                                        <ArrowRight className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </CardFooter>
-                            </Card>
-
-                            <Card className="col-span-1">
-                                <CardHeader className="pb-2">
-                                    <CardTitle>{t('farmingConditions')}</CardTitle>
-                                    <CardDescription>{t('forNextWeek')}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {farmingConditions ? (
-                                        <>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Droplets className="h-5 w-5 text-blue-500" />
-                                                        <span className="font-medium">{t('planting')}</span>
-                                                    </div>
-                                                    <div className="mt-1 flex items-center">
-                                                        <span className={`ml-7 font-medium ${farmingConditions.planting.color}`}>
-                                                            {t(farmingConditions.planting.status)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Umbrella className="h-5 w-5 text-amber-500" />
-                                                        <span className="font-medium">{t('harvesting')}</span>
-                                                    </div>
-                                                    <div className="mt-1 flex items-center">
-                                                        <span className={`ml-7 font-medium ${farmingConditions.harvesting.color}`}>
-                                                            {t(farmingConditions.harvesting.status)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <AlertCircle className="h-5 w-5 text-orange-500" />
-                                                        <span className="font-medium">{t('pestRisk')}</span>
-                                                    </div>
-                                                    <div className="mt-1 flex items-center">
-                                                        <span className={`ml-7 font-medium ${farmingConditions.pestRisk.color}`}>
-                                                            {t(farmingConditions.pestRisk.status)}
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Eye className="h-5 w-5 text-purple-500" />
-                                                        <span className="font-medium">{t('diseaseRisk')}</span>
-                                                    </div>
-                                                    <div className="mt-1 flex items-center">
-                                                        <span className={`ml-7 font-medium ${farmingConditions.diseaseRisk.color}`}>
-                                                            {t(farmingConditions.diseaseRisk.status)}
-                                                        </span>
-                                                    </div>
-                                                </div>
+                                                <span className={`text-sm font-semibold ${farmingConditions.planting.color}`}>
+                                                    {t(farmingConditions.planting.status)}
+                                                </span>
                                             </div>
-
-                                            <Separator />
-
-                                            <div>
-                                                <h3 className="font-medium mb-2">{t('recommendedActivities')}</h3>
-                                                <ul className="text-sm space-y-1.5">
-                                                    {recommendedActivities.map((activity, index) => (
-                                                        <li key={index} className="flex items-start gap-2">
-                                                            <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                            <span>{activity}</span>
-                                                        </li>
-                                                    ))}
-                                                </ul>
+                                            <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl border border-amber-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Umbrella className="h-4 w-4 text-amber-600" />
+                                                    <span className="font-medium text-amber-900">{t('harvesting')}</span>
+                                                </div>
+                                                <span className={`text-sm font-semibold ${farmingConditions.harvesting.color}`}>
+                                                    {t(farmingConditions.harvesting.status)}
+                                                </span>
                                             </div>
-                                        </>
-                                    ) : (
-                                        <div className="flex items-center justify-center py-8">
-                                            <Loader2 className="animate-spin h-6 w-6" />
+                                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <AlertCircle className="h-4 w-4 text-orange-600" />
+                                                    <span className="font-medium text-orange-900">{t('pestRisk')}</span>
+                                                </div>
+                                                <span className={`text-sm font-semibold ${farmingConditions.pestRisk.color}`}>
+                                                    {t(farmingConditions.pestRisk.status)}
+                                                </span>
+                                            </div>
+                                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <Eye className="h-4 w-4 text-purple-600" />
+                                                    <span className="font-medium text-purple-900">{t('diseaseRisk')}</span>
+                                                </div>
+                                                <span className={`text-sm font-semibold ${farmingConditions.diseaseRisk.color}`}>
+                                                    {t(farmingConditions.diseaseRisk.status)}
+                                                </span>
+                                            </div>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </div>
+
+                                        <Separator />
+
+                                        <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-5 rounded-xl border border-slate-200">
+                                            <h3 className="font-semibold mb-3 text-slate-900 flex items-center gap-2">
+                                                <Target className="h-4 w-4 text-blue-600" />
+                                                {t('recommendedActivities')}
+                                            </h3>
+                                            <ul className="space-y-3">
+                                                {recommendedActivities.map((activity, index) => (
+                                                    <li key={index} className="flex items-start gap-3">
+                                                        <div className="rounded-full bg-gradient-to-r from-green-500 to-emerald-500 h-2 w-2 mt-2 flex-shrink-0" />
+                                                        <span className="text-sm text-slate-700 leading-relaxed">{activity}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="animate-spin h-6 w-6 text-green-600" />
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </div>
-                )}
-                {dashboardView === 'charts' && (
-                    <>
-                        <Tabs defaultValue="temperature" className="space-y-4">
-                            <div className="overflow-x-auto pb-2">
-                                <TabsList>
-                                    <TabsTrigger value="temperature">
-                                        <Thermometer className="h-4 w-4 mr-2" />
-                                        {t('temperature')}
-                                    </TabsTrigger>
-                                    <TabsTrigger value="rainfall">
-                                        <CloudRain className="h-4 w-4 mr-2" />
-                                        {t('rainfall')}
-                                    </TabsTrigger>
-                                    <TabsTrigger value="humidity">
-                                        <Droplets className="h-4 w-4 mr-2" />
-                                        {t('humidity')}
-                                    </TabsTrigger>
-                                </TabsList>
-                            </div>
+                </div>
 
-                            <TabsContent value="temperature" className="space-y-4">
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle>{t('weeklyOverview')}: {t('temperature')}</CardTitle>
-                                        <CardDescription>
-                                            {t('januaryToDecember')} 2024 - {selectedLocation?.name || t('selectLocation')}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ChartContainer config={chartConfig} className="h-[350px]">
-                                            <LineChart data={historicalWeatherData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <YAxis
-                                                    tick={{ fontSize: 12 }}
-                                                    domain={[15, 25]}
-                                                />
-                                                <Tooltip content={<ChartTooltipContent />} />
-                                                <Legend />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="temperature"
-                                                    stroke="var(--color-temperature)"
-                                                    strokeWidth={2}
-                                                    dot={{ strokeWidth: 2 }}
-                                                    name={t('temperature')}
-                                                />
-                                            </LineChart>
-                                        </ChartContainer>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-
-                            <TabsContent value="rainfall" className="space-y-4">
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle>{t('weeklyOverview')}: {t('rainfall')}</CardTitle>
-                                        <CardDescription>
-                                            {t('januaryToDecember')} 2024 - {selectedLocation?.name || t('selectLocation')}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ChartContainer config={chartConfig} className="h-[350px]">
-                                            <BarChart data={historicalWeatherData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <YAxis
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <Tooltip content={<ChartTooltipContent />} />
-                                                <Legend />
-                                                <Bar
-                                                    dataKey="rainfall"
-                                                    fill="#004b23"
-                                                    name={t('rainfall')}
-                                                    radius={4}
-                                                />
-                                            </BarChart>
-                                        </ChartContainer>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-
-                            <TabsContent value="humidity" className="space-y-4">
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle>{t('weeklyOverview')}: {t('humidity')}</CardTitle>
-                                        <CardDescription>
-                                            {t('januaryToDecember')} 2024 - {selectedLocation?.name || t('selectLocation')}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <ChartContainer config={chartConfig} className="h-[350px]">
-                                            <LineChart data={historicalWeatherData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    tick={{ fontSize: 12 }}
-                                                />
-                                                <YAxis
-                                                    tick={{ fontSize: 12 }}
-                                                    domain={[50, 90]}
-                                                />
-                                                <Tooltip content={<ChartTooltipContent />} />
-                                                <Legend />
-                                                <Line
-                                                    type="monotone"
-                                                    dataKey="humidity"
-                                                    stroke="#60a5fa"
-                                                    strokeWidth={2}
-                                                    dot={{ strokeWidth: 2 }}
-                                                    name={t('humidity')}
-                                                />
-                                            </LineChart>
-                                        </ChartContainer>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        </Tabs>
-
-                        <div className="grid gap-4 md:gap-6 md:grid-cols-2 lg:grid-cols-3">
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle>{t('farmersReached')}</CardTitle>
-                                    <CardDescription>{t('last30Days')}</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-4xl font-bold">1,245</div>
-                                    <p className="text-sm text-muted-foreground mt-2">+12% {t('fromPreviousPeriod')}</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle>{t('messagesDelivered')}</CardTitle>
-                                    <CardDescription>{t('last30Days')}</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-4xl font-bold">5,832</div>
-                                    <p className="text-sm text-muted-foreground mt-2">+24% {t('fromPreviousPeriod')}</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle>{t('alertsTriggered')}</CardTitle>
-                                    <CardDescription>{t('last30Days')}</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-4xl font-bold">18</div>
-                                    <p className="text-sm text-muted-foreground mt-2">-5% {t('fromPreviousPeriod')}</p>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </>
-                )}
-
-                <div className="text-xs text-muted-foreground text-center mt-4">
-                    {t('dataLastUpdated')}: {new Date().toLocaleString()}
+                
+                <div className="text-center p-6 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+                    <p className="text-xs text-slate-500">
+                        {t('dataLastUpdated')}: {new Date().toLocaleString()}
+                    </p>
                 </div>
             </div>
         </AppLayout>

@@ -108,8 +108,8 @@ export function ViewAlertDialog({
       case 'critical': return <AlertTriangle className="h-5 w-5 text-red-500" />;
       case 'high': return <AlertCircle className="h-5 w-5 text-orange-500" />;
       case 'medium': return <Info className="h-5 w-5 text-blue-500" />;
-      case 'low': return <CheckCircle className="h-5 w-5 text-green-500" />;
-      default: return <Info className="h-5 w-5 text-blue-500" />;
+      case 'low': return <CheckCircle className="h-5 w-5 text-blue-600" />;
+      default: return <Info className="h-5 w-5 text-blue-600" />;
     }
   };
 

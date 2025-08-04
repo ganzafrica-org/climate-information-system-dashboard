@@ -89,7 +89,6 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Plus className="h-5 w-5" />
                         {t('addNewFarmer')}
                     </DialogTitle>
                     <DialogDescription>
@@ -101,7 +100,7 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="name">
-                                {t('farmerName')} <span className="text-red-500">*</span>
+                                {t('farmerName')} <span style={{ color: '#e46064' }}>*</span>
                             </Label>
                             <Input
                                 id="name"
@@ -113,7 +112,7 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="phone">
-                                {t('phoneNumber')} <span className="text-red-500">*</span>
+                                {t('phoneNumber')} <span style={{ color: '#e46064' }}>*</span>
                             </Label>
                             <Input
                                 id="phone"
@@ -127,7 +126,7 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
 
                     <div className="space-y-2">
                         <Label>
-                            {t('locations')} <span className="text-red-500">*</span>
+                            {t('locations')} <span style={{ color: '#e46064' }}>*</span>
                         </Label>
                         <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
                             {locations.map((location) => (
@@ -136,6 +135,10 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                                         id={`location-${location.id}`}
                                         checked={formData.locationIds.includes(location.id)}
                                         onCheckedChange={() => handleLocationToggle(location.id)}
+                                        style={{ 
+                                            backgroundColor: formData.locationIds.includes(location.id) ? '#3a93f2' : 'transparent',
+                                            borderColor: '#3a93f2'
+                                        }}
                                     />
                                     <Label htmlFor={`location-${location.id}`} className="text-sm cursor-pointer">
                                         {location.name}
@@ -148,7 +151,7 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                                 {formData.locationIds.map((locationId) => {
                                     const location = locations.find(l => l.id === locationId);
                                     return location ? (
-                                        <Badge key={locationId} variant="secondary" className="text-xs">
+                                        <Badge key={locationId} style={{ backgroundColor: '#adc9e3', color: '#2580f5' }} className="text-xs">
                                             {location.name}
                                         </Badge>
                                     ) : null;
@@ -162,6 +165,10 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                             id="isActive"
                             checked={formData.isActive}
                             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: !!checked }))}
+                            style={{ 
+                                backgroundColor: formData.isActive ? '#3a93f2' : 'transparent',
+                                borderColor: '#3a93f2'
+                            }}
                         />
                         <Label htmlFor="isActive">{t('activeFarmer')}</Label>
                     </div>
@@ -170,7 +177,12 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             {t('cancel')}
                         </Button>
-                        <Button type="submit" disabled={isLoading}>
+                        <Button 
+                            type="submit" 
+                            disabled={isLoading}
+                            style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                            className="hover:opacity-90 text-white"
+                        >
                             {isLoading ? t('creating') : t('createFarmer')}
                         </Button>
                     </DialogFooter>
@@ -244,7 +256,7 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
             <DialogContent className="sm:max-w-[600px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <User className="h-5 w-5" />
+                        <User className="h-5 w-5" style={{ color: '#2580f5' }} />
                         {t('farmerProfile')}
                     </DialogTitle>
                     <DialogDescription>
@@ -254,28 +266,34 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
 
                 {isLoading ? (
                     <div className="flex items-center justify-center py-8">
-                        <Loader2 className="animate-spin h-8 w-8" />
+                        <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
                     </div>
                 ) : farmer ? (
                     <div className="space-y-6">
                         <div className="flex items-start gap-4">
-                            <div className="bg-muted rounded-full h-16 w-16 flex items-center justify-center">
-                                <User className="h-8 w-8 text-muted-foreground" />
+                            <div className="rounded-full h-16 w-16 flex items-center justify-center" style={{ backgroundColor: '#3a93f2' }}>
+                                <User className="h-8 w-8" style={{ color: '#2580f5' }} />
                             </div>
                             <div className="flex-1">
                                 <h3 className="text-xl font-semibold">{farmer.name}</h3>
                                 <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                                    <Phone className="h-4 w-4" />
+                                    <Phone className="h-4 w-4" style={{ color: '#66a9e3' }} />
                                     <span>{farmer.phone}</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                                    <Calendar className="h-4 w-4" />
+                                    <Calendar className="h-4 w-4" style={{ color: '#66a9e3' }} />
                                     <span>{t('joinedOn')} {new Date(farmer.createdAt).toLocaleDateString()}</span>
                                 </div>
                             </div>
-                            <Badge variant={farmer.isActive ? "default" : "secondary"}>
-                                {farmer.isActive ? t('active') : t('inactive')}
-                            </Badge>
+                            {farmer.isActive ? (
+                                <Badge style={{ backgroundColor: '#ECFDF6', color: '#16a34a', border: '1px solid #ECFDF6' }}>
+                                    {t('active')}
+                                </Badge>
+                            ) : (
+                                <Badge style={{ backgroundColor: '#adc9e3', color: '#eab308', border: '1px solid #eab308' }}>
+                                    {t('inactive')}
+                                </Badge>
+                            )}
                         </div>
 
                         <Separator />
@@ -283,12 +301,12 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
                                 <h4 className="font-medium mb-3 flex items-center gap-2">
-                                    <MapPin className="h-4 w-4" />
+                                    <MapPin className="h-4 w-4" style={{ color: '#2580f5' }} />
                                     {t('locations')}
                                 </h4>
                                 <div className="flex flex-wrap gap-2">
                                     {farmer.locations.map((location) => (
-                                        <Badge key={location.id} variant="outline">
+                                        <Badge key={location.id} style={{ backgroundColor: '#adc9e3', color: '#2580f5' }}>
                                             {location.name}
                                         </Badge>
                                     ))}
@@ -317,7 +335,11 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
                         {t('close')}
                     </Button>
                     {farmer && (
-                        <Button variant="primary" onClick={() => onEdit(farmer)}>
+                        <Button 
+                            onClick={() => onEdit(farmer)}
+                            style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                            className="hover:opacity-90 text-white"
+                        >
                             <Edit className="h-4 w-4 mr-2" />
                             {t('editFarmer')}
                         </Button>
@@ -395,7 +417,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Edit className="h-5 w-5" />
+                        <Edit className="h-5 w-5" style={{ color: '#2580f5' }} />
                         {t('editFarmer')}
                     </DialogTitle>
                     <DialogDescription>
@@ -407,7 +429,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
                             <Label htmlFor="edit-name">
-                                {t('farmerName')} <span className="text-red-500">*</span>
+                                {t('farmerName')} <span style={{ color: '#e46064' }}>*</span>
                             </Label>
                             <Input
                                 id="edit-name"
@@ -419,7 +441,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                         </div>
                         <div className="space-y-2">
                             <Label htmlFor="edit-phone">
-                                {t('phoneNumber')} <span className="text-red-500">*</span>
+                                {t('phoneNumber')} <span style={{ color: '#e46064' }}>*</span>
                             </Label>
                             <Input
                                 id="edit-phone"
@@ -433,7 +455,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
 
                     <div className="space-y-2">
                         <Label>
-                            {t('locations')} <span className="text-red-500">*</span>
+                            {t('locations')} <span style={{ color: '#e46064' }}>*</span>
                         </Label>
                         <div className="border rounded-md p-3 max-h-40 overflow-y-auto">
                             {locations.map((location) => (
@@ -442,6 +464,10 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                                         id={`edit-location-${location.id}`}
                                         checked={formData.locationIds?.includes(location.id) || false}
                                         onCheckedChange={() => handleLocationToggle(location.id)}
+                                        style={{ 
+                                            backgroundColor: formData.locationIds?.includes(location.id) ? '#3a93f2' : 'transparent',
+                                            borderColor: '#3a93f2'
+                                        }}
                                     />
                                     <Label htmlFor={`edit-location-${location.id}`} className="text-sm cursor-pointer">
                                         {location.name}
@@ -454,7 +480,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                                 {formData.locationIds.map((locationId) => {
                                     const location = locations.find(l => l.id === locationId);
                                     return location ? (
-                                        <Badge key={locationId} variant="secondary" className="text-xs">
+                                        <Badge key={locationId} style={{ backgroundColor: '#adc9e3', color: '#2580f5' }} className="text-xs">
                                             {location.name}
                                         </Badge>
                                     ) : null;
@@ -468,6 +494,10 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                             id="edit-isActive"
                             checked={formData.isActive}
                             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: !!checked }))}
+                            style={{ 
+                                backgroundColor: formData.isActive ? '#3a93f2' : 'transparent',
+                                borderColor: '#3a93f2'
+                            }}
                         />
                         <Label htmlFor="edit-isActive">{t('activeFarmer')}</Label>
                     </div>
@@ -476,7 +506,12 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             {t('cancel')}
                         </Button>
-                        <Button variant="primary" type="submit" disabled={isLoading}>
+                        <Button 
+                            type="submit" 
+                            disabled={isLoading}
+                            style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                            className="hover:opacity-90 text-white"
+                        >
                             {isLoading ? t('updating') : t('updateFarmer')}
                         </Button>
                     </DialogFooter>
@@ -634,7 +669,7 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
             <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Upload className="h-5 w-5" />
+                        <Upload className="h-5 w-5" style={{ color: '#2580f5' }} />
                         {t('importFarmers')}
                     </DialogTitle>
                     <DialogDescription>
@@ -643,17 +678,23 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                 </DialogHeader>
 
                 <div className="space-y-6">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                    <div className="p-4 rounded-lg" style={{ backgroundColor: '#3a93f2' }}>
                         <div className="flex items-start gap-3">
-                            <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+                            <FileText className="h-5 w-5 mt-0.5" style={{ color: '#2580f5' }} />
                             <div className="flex-1">
-                                <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-1">
+                                <h4 className="font-medium mb-1" style={{ color: '#2580f5' }}>
                                     {t('csvTemplate')}
                                 </h4>
-                                <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                                <p className="text-sm mb-3" style={{ color: '#2580f5' }}>
                                     {t('downloadTemplateDescription')}
                                 </p>
-                                <Button variant="outline" size="sm" onClick={generateTemplate}>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={generateTemplate}
+                                    style={{ borderColor: '#2580f5', color: '#2580f5' }}
+                                    className="hover:bg-blue-50"
+                                >
                                     <Download className="h-4 w-4 mr-2" />
                                     <span className="hidden md:block">{t('downloadTemplate')}</span>
                                 </Button>
@@ -661,25 +702,28 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                         </div>
                     </div>
 
-
                     <div className="space-y-4">
                         <h4 className="font-medium">{t('uploadCSVFile')}</h4>
 
                         <div
                             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                                 dragOver
-                                    ? 'border-primary bg-primary/5'
+                                    ? 'bg-blue-50'
                                     : selectedFile
-                                        ? 'border-green-500 bg-green-50 dark:bg-green-900/20'
-                                        : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+                                        ? 'border-green-500'
+                                        : 'border-gray-300 hover:border-gray-400'
                             }`}
+                            style={{
+                                borderColor: dragOver ? '#2580f5' : selectedFile ? '#16a34a' : '#d1d5db',
+                                backgroundColor: dragOver ? '#3a93f2' : selectedFile ? '#ECFDF6' : 'transparent'
+                            }}
                             onDrop={handleDrop}
                             onDragOver={handleDragOver}
                             onDragLeave={handleDragLeave}
                         >
                             {selectedFile ? (
                                 <div className="space-y-2">
-                                    <CheckCircle className="h-8 w-8 text-green-600 mx-auto" />
+                                    <CheckCircle className="h-8 w-8 mx-auto" style={{ color: '#16a34a' }} />
                                     <p className="font-medium">{selectedFile.name}</p>
                                     <p className="text-sm text-muted-foreground">
                                         {(selectedFile.size / 1024).toFixed(1)} KB
@@ -688,6 +732,8 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                                         variant="outline"
                                         size="sm"
                                         onClick={() => setSelectedFile(null)}
+                                        style={{ borderColor: '#e46064', color: '#e46064' }}
+                                        className="hover:bg-red-50"
                                     >
                                         <X className="h-4 w-4 mr-2" />
                                         {t('removeFile')}
@@ -699,7 +745,12 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                                     <p className="text-muted-foreground">
                                         {t('dragDropOrClick')}
                                     </p>
-                                    <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+                                    <Button 
+                                        variant="outline" 
+                                        onClick={() => fileInputRef.current?.click()}
+                                        style={{ borderColor: '#2580f5', color: '#2580f5' }}
+                                        className="hover:bg-blue-50"
+                                    >
                                         {t('selectFile')}
                                     </Button>
                                 </div>
@@ -730,33 +781,33 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                             <h4 className="font-medium">{t('importResults')}</h4>
 
                             <div className="grid grid-cols-3 gap-4">
-                                <div className="text-center p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-green-600">{importResult.created}</div>
-                                    <div className="text-sm text-green-700 dark:text-green-300">{t('created')}</div>
+                                <div className="text-center p-3 rounded-lg" style={{ backgroundColor: '#ECFDF6' }}>
+                                    <div className="text-2xl font-bold" style={{ color: '#16a34a' }}>{importResult.created}</div>
+                                    <div className="text-sm" style={{ color: '#16a34a' }}>{t('created')}</div>
                                 </div>
-                                <div className="text-center p-3 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-red-600">{importResult.errors}</div>
-                                    <div className="text-sm text-red-700 dark:text-red-300">{t('errors')}</div>
+                                <div className="text-center p-3 rounded-lg" style={{ backgroundColor: '#f5e8e9' }}>
+                                    <div className="text-2xl font-bold" style={{ color: '#e46064' }}>{importResult.errors}</div>
+                                    <div className="text-sm" style={{ color: '#e46064' }}>{t('errors')}</div>
                                 </div>
-                                <div className="text-center p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                                    <div className="text-2xl font-bold text-blue-600">{importResult.total}</div>
-                                    <div className="text-sm text-blue-700 dark:text-blue-300">{t('total')}</div>
+                                <div className="text-center p-3 rounded-lg" style={{ backgroundColor: '#3a93f2' }}>
+                                    <div className="text-2xl font-bold" style={{ color: '#2580f5' }}>{importResult.total}</div>
+                                    <div className="text-sm" style={{ color: '#2580f5' }}>{t('total')}</div>
                                 </div>
                             </div>
 
                             {importResult.errorDetails.length > 0 && (
                                 <div className="space-y-2">
-                                    <h5 className="font-medium text-red-600">{t('errorDetails')}</h5>
+                                    <h5 className="font-medium" style={{ color: '#e46064' }}>{t('errorDetails')}</h5>
                                     <div className="max-h-40 overflow-y-auto space-y-2">
                                         {importResult.errorDetails.map((error, index) => (
-                                            <Alert key={index} variant="destructive">
-                                                <AlertCircle className="h-4 w-4" />
+                                            <Alert key={index} className="border-red-200" style={{ backgroundColor: '#f5e8e9' }}>
+                                                <AlertCircle className="h-4 w-4" style={{ color: '#e46064' }} />
                                                 <AlertDescription className="text-sm">
                                                     <strong>{t('row')} {index + 1}:</strong> {error.error}
                                                     <br />
                                                     <span className="text-xs opacity-75">
-                            {t('data')}: {JSON.stringify(error.row)}
-                          </span>
+                                                        {t('data')}: {JSON.stringify(error.row)}
+                                                    </span>
                                                 </AlertDescription>
                                             </Alert>
                                         ))}
@@ -775,6 +826,8 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                         <Button
                             onClick={handleImport}
                             disabled={!selectedFile || isUploading}
+                            style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                            className="hover:opacity-90 text-white"
                         >
                             {isUploading ? t('importing') : t('importFarmers')}
                         </Button>

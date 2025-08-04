@@ -26,6 +26,77 @@ import { EditAlertDialog } from './AlertsDialogs';
 import api from '@/lib/api';
 import { toast } from 'sonner';
 
+// Custom badge components
+const StatusBadge = ({ status }: { status: string }) => {
+    switch (status?.toLowerCase()) {
+        case 'sent':
+            return (
+                <Badge style={{ backgroundColor: '#ECFDF6', color: '#16a34a', border: '1px solid #ECFDF6' }} className="hover:opacity-80">
+                    Sent
+                </Badge>
+            );
+        case 'scheduled':
+            return (
+                <Badge style={{ backgroundColor: '#dbeafe', color: '#3b82f6', border: '1px solid #dbeafe' }} className="hover:opacity-80">
+                    Scheduled
+                </Badge>
+            );
+        case 'draft':
+            return (
+                <Badge style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: '1px solid #f3f4f6' }} className="hover:opacity-80">
+                    Draft
+                </Badge>
+            );
+        case 'failed':
+            return (
+                <Badge style={{ backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #fee2e2' }} className="hover:opacity-80">
+                    Failed
+                </Badge>
+            );
+        default:
+            return (
+                <Badge style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: '1px solid #f3f4f6' }} className="hover:opacity-80">
+                    {status}
+                </Badge>
+            );
+    }
+};
+
+const PriorityBadge = ({ priority }: { priority: string }) => {
+    switch (priority?.toLowerCase()) {
+        case 'critical':
+            return (
+                <Badge style={{ backgroundColor: '#fee2e2', color: '#ef4444', border: '1px solid #fee2e2' }} className="hover:opacity-80">
+                    Critical
+                </Badge>
+            );
+        case 'high':
+            return (
+                <Badge style={{ backgroundColor: '#fef3c7', color: '#f59e0b', border: '1px solid #fef3c7' }} className="hover:opacity-80">
+                    High
+                </Badge>
+            );
+        case 'medium':
+            return (
+                <Badge style={{ backgroundColor: '#dbeafe', color: '#3b82f6', border: '1px solid #dbeafe' }} className="hover:opacity-80">
+                    Medium
+                </Badge>
+            );
+        case 'low':
+            return (
+                <Badge style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: '1px solid #f3f4f6' }} className="hover:opacity-80">
+                    Low
+                </Badge>
+            );
+        default:
+            return (
+                <Badge style={{ backgroundColor: '#f3f4f6', color: '#6b7280', border: '1px solid #f3f4f6' }} className="hover:opacity-80">
+                    {priority}
+                </Badge>
+            );
+    }
+};
+
 interface Alert {
   id: number;
   type: string;
@@ -326,25 +397,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
         ];
     };
 
-    const getPriorityColor = (priority: string = 'medium') => {
-        switch (priority.toLowerCase()) {
-            case 'critical': return 'destructive';
-            case 'high': return 'secondary';
-            case 'medium': return 'outline';
-            case 'low': return 'outline';
-            default: return 'outline';
-        }
-    };
-
-    const getStatusColor = (status: string) => {
-        switch (status?.toLowerCase()) {
-            case 'sent': return 'default';
-            case 'scheduled': return 'secondary';
-            case 'draft': return 'outline';
-            case 'failed': return 'destructive';
-            default: return 'outline';
-        }
-    };
+    // Remove unused functions - replaced by custom badge components
 
     if (isLoading && alerts.length === 0) {
         return (
@@ -387,57 +440,60 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead>
-                                <tr className="border-b bg-muted">
-                                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                            <thead className="bg-blue-600 text-white">
+                                <tr>
+                                    <th className="py-4 px-6 text-left font-semibold text-sm w-12">
+                                        <span>#</span>
+                                    </th>
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">
                                         <button
-                                            className="flex items-center gap-1 hover:text-foreground"
+                                            className="flex items-center gap-1 hover:text-white/80"
                                             onClick={() => handleSort('type')}
                                         >
                                             <span>{t("type")}</span>
                                             <ArrowUpDown className="h-3 w-3" />
                                         </button>
                                     </th>
-                                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">
                                         <button
-                                            className="flex items-center gap-1 hover:text-foreground"
+                                            className="flex items-center gap-1 hover:text-white/80"
                                             onClick={() => handleSort('message')}
                                         >
                                             <span>{t("message")}</span>
                                             <ArrowUpDown className="h-3 w-3" />
                                         </button>
                                     </th>
-                                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">
                                         <button
-                                            className="flex items-center gap-1 hover:text-foreground"
+                                            className="flex items-center gap-1 hover:text-white/80"
                                             onClick={() => handleSort('location')}
                                         >
                                             <span>{t("location")}</span>
                                             <ArrowUpDown className="h-3 w-3" />
                                         </button>
                                     </th>
-                                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">
                                         <span>{t("priority")}</span>
                                     </th>
-                                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">
                                         <button
-                                            className="flex items-center gap-1 hover:text-foreground"
+                                            className="flex items-center gap-1 hover:text-white/80"
                                             onClick={() => handleSort('isSent')}
                                         >
                                             <span>{t("status")}</span>
                                             <ArrowUpDown className="h-3 w-3" />
                                         </button>
                                     </th>
-                                    <th className="py-3 px-4 text-left font-medium text-muted-foreground">
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">
                                         <button
-                                            className="flex items-center gap-1 hover:text-foreground"
+                                            className="flex items-center gap-1 hover:text-white/80"
                                             onClick={() => handleSort('createdAt')}
                                         >
                                             <span>{t("created")}</span>
                                             <ArrowUpDown className="h-3 w-3" />
                                         </button>
                                     </th>
-                                    <th className="py-3 px-4 text-right font-medium text-muted-foreground">
+                                    <th className="py-4 px-6 text-center font-semibold text-sm">
                                         {t("actions")}
                                     </th>
                                 </tr>
@@ -457,12 +513,15 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                         </td>
                                     </tr>
                                 ) : (
-                                    alerts.map((alert) => (
+                                    alerts.map((alert, index) => (
                                         <tr
                                             key={alert.id}
                                             className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
                                             onClick={() => handleViewDetails(alert)}
                                         >
+                                            <td className="py-3 px-4 text-sm font-medium">
+                                                {index + 1}
+                                            </td>
                                             <td className="py-3 px-4">
                                                 <div className="font-medium capitalize">{alert.type}</div>
                                                 {alert.category && (
@@ -496,15 +555,11 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                             </td>
 
                                             <td className="py-3 px-4">
-                                                <Badge variant={getPriorityColor(alert.priority)}>
-                                                    {typeof alert.priority === 'string' ? alert.priority : 'medium'}
-                                                </Badge>
+                                                <PriorityBadge priority={alert.priority || 'medium'} />
                                             </td>
 
                                             <td className="py-3 px-4">
-                                                <Badge variant={getStatusColor(alert.status || (alert.isSent ? 'sent' : 'draft'))}>
-                                                    {alert.status || (alert.isSent ? t("sent") : t("draft"))}
-                                                </Badge>
+                                                <StatusBadge status={alert.status || (alert.isSent ? 'sent' : 'draft')} />
                                                 {alert.sentAt && (
                                                     <div className="text-xs text-muted-foreground mt-1">
                                                         <Clock className="h-3 w-3 inline mr-1" />
