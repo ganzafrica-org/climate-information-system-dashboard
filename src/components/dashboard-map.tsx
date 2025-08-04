@@ -1,50 +1,26 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { MapContainer, TileLayer, GeoJSON, ZoomControl, useMap, Marker, Popup } from 'react-leaflet';
-import { Sectors, Cells, Villages } from 'rwanda';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue
-} from '@/components/ui/select';
-import {
-    Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger
-} from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
+import React, { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useLanguage } from '@/i18n';
 import {
     CloudRain,
-    Thermometer,
-    AlertTriangle,
-    Sun,
-    CloudDrizzle,
+    MapPin,
+    Droplets,
+    Loader2
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import api from "@/lib/api";
 
-interface Location {
-    province: string;
-    district: string;
-    sector?: string;
-    cell?: string;
-    village?: string;
-}
+declare global {
 
-interface Alert {
-    type: string;
-    severity: string;
-    message: string;
-    sectors: string[];
-    color: string;
-    icon: React.ReactNode;
+    // eslint-disable-next-line @typescript-eslint/no-namespace
+    namespace L {
+        function heatLayer(latlngs: Array<[number, number, number]>, options?: any): any;
+    }
 }
 
 interface WeatherDataPoint {
@@ -56,11 +32,10 @@ interface WeatherDataPoint {
     wind: number;
     weatherCode: string;
     alerts: string[];
+    intensity?: number;
 }
 
-interface OptimizedMapProps {
-    onLocationChange?: (location: Location) => void;
-    alerts?: Alert[];
+interface RainfallHeatmapProps {
     className?: string;
 }
 
@@ -74,477 +49,216 @@ const MapViewUpdater = ({ center, zoom }: { center: [number, number], zoom: numb
     return null;
 };
 
-const OptimizedMap: React.FC<OptimizedMapProps> = ({
-                                                       onLocationChange,
-                                                       alerts = [],
-                                                       className = ""
-                                                   }) => {
-    const { t } = useLanguage();
-    const [geoJsonData, setGeoJsonData] = useState<any>(null);
-    const [, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'weather' | 'location'>('weather');
-    const [weatherDataView, setWeatherDataView] = useState<'temperature' | 'rainfall' | 'alerts'>('temperature');
-
-    const [selectedSector, setSelectedSector] = useState<string>('');
-    const [selectedCell, setSelectedCell] = useState<string>('');
-    const [selectedVillage, setSelectedVillage] = useState<string>('');
-
-    const [availableSectors, setAvailableSectors] = useState<string[]>([]);
-    const [availableCells, setAvailableCells] = useState<string[]>([]);
-    const [availableVillages, setAvailableVillages] = useState<string[]>([]);
-
-    const [mapCenter, setMapCenter] = useState<[number, number]>([-1.5006, 29.6348]);
-    const [mapZoom, setMapZoom] = useState(10);
-
-    const sampleWeatherData: WeatherDataPoint[] = useMemo(() => [
-        {
-            location: 'Kinigi',
-            coordinates: [-1.4168, 29.6372],
-            temperature: 19,
-            rainfall: 80,
-            humidity: 85,
-            wind: 12,
-            weatherCode: 'cloudy',
-            alerts: ['heavyRainAlert']
-        },
-        {
-            location: 'Muhoza',
-            coordinates: [-1.4981, 29.6362],
-            temperature: 21,
-            rainfall: 40,
-            humidity: 70,
-            wind: 8,
-            weatherCode: 'partlyCloudy',
-            alerts: []
-        },
-        {
-            location: 'Musanze',
-            coordinates: [-1.5006, 29.6348],
-            temperature: 22,
-            rainfall: 30,
-            humidity: 65,
-            wind: 6,
-            weatherCode: 'sunny',
-            alerts: ['irrigationNeeded']
-        },
-        {
-            location: 'Nyange',
-            coordinates: [-1.5331, 29.5819],
-            temperature: 18,
-            rainfall: 95,
-            humidity: 90,
-            wind: 15,
-            weatherCode: 'rainy',
-            alerts: ['heavyRainAlert', 'floodRiskAlert']
-        },
-        {
-            location: 'Shingiro',
-            coordinates: [-1.4648, 29.6130],
-            temperature: 20,
-            rainfall: 65,
-            humidity: 78,
-            wind: 10,
-            weatherCode: 'rainy',
-            alerts: ['heavyRainAlert']
-        }
-    ], []);
+const HeatmapController = ({ weatherData }: { weatherData: WeatherDataPoint[] }) => {
+    const map = useMap();
+    const [heatLayer, setHeatLayer] = useState<any>(null);
 
     useEffect(() => {
-        setIsLoading(true);
 
-        fetch('/musanze_geo.json')
-            .then(res => res.json())
-            .then(data => {
-                setGeoJsonData(data);
-                setIsLoading(false);
-            })
-            .catch(error => {
-                console.error('Error loading Musanze GeoJSON:', error);
-                setIsLoading(false);
-            });
+        const loadHeatPlugin = async () => {
+            if (typeof window !== 'undefined' && !(window as any).L?.heatLayer) {
+                try {
+                    await import('leaflet.heat');
+                } catch (error) {
+                    console.warn('Leaflet.heat plugin not available, using fallback visualization');
+                }
+            }
+        };
 
-        const musanzeSectors = Sectors('North', 'Musanze') || [];
-        setAvailableSectors(musanzeSectors);
+        loadHeatPlugin();
     }, []);
 
     useEffect(() => {
-        if (selectedSector) {
-            const cells = Cells('North', 'Musanze', selectedSector);
-            setAvailableCells(cells || []);
-            if (!cells?.includes(selectedCell)) {
-                setSelectedCell('');
-            }
-            setSelectedVillage('');
+        if (!map || !weatherData.length) return;
 
-            const sectorData = sampleWeatherData.find(d => d.location === selectedSector);
-            if (sectorData) {
-                setMapCenter(sectorData.coordinates);
-                setMapZoom(12);
-            }
+        if (heatLayer) {
+            map.removeLayer(heatLayer);
         }
-    }, [selectedSector, selectedCell, sampleWeatherData]);
 
-    useEffect(() => {
-        if (selectedSector && selectedCell) {
-            const villages = Villages('North', 'Musanze', selectedSector, selectedCell);
-            setAvailableVillages(villages || []);
-            if (!villages?.includes(selectedVillage)) {
-                setSelectedVillage('');
-            }
-            setMapZoom(13);
-        }
-    }, [selectedSector, selectedCell, selectedVillage]);
+        if ((window as any).L?.heatLayer) {
 
-    useEffect(() => {
-        if (onLocationChange && selectedSector) {
-            onLocationChange({
-                province: 'North',
-                district: 'Musanze',
-                sector: selectedSector,
-                cell: selectedCell,
-                village: selectedVillage
+            const heatData = weatherData.map(point => [
+                point.coordinates[0],
+                point.coordinates[1],
+                Math.max(0.1, Math.min(point.rainfall / 100, 1))
+            ] as [number, number, number]);
+
+            const newHeatLayer = (window as any).L.heatLayer(heatData, {
+                radius: 40,
+                blur: 25,
+                maxZoom: 18,
+                max: 1.0,
+                gradient: {
+                    0.0: '#dbeafe',
+                    0.2: '#93c5fd',
+                    0.4: '#60a5fa',
+                    0.6: '#3b82f6',
+                    0.8: '#2563eb',
+                    1.0: '#1e40af'
+                }
             });
-        }
-    }, [selectedSector, selectedCell, selectedVillage, onLocationChange]);
 
+            newHeatLayer.addTo(map);
+            setHeatLayer(newHeatLayer);
+        } else {
+
+            const fallbackLayer = L.layerGroup();
+
+            weatherData.forEach(point => {
+                const intensity = Math.max(0.1, Math.min(point.rainfall / 100, 1));
+                const radius = Math.max(15, Math.min(35, point.rainfall / 3));
+
+
+                const color = intensity >= 0.8 ? '#1e40af' :
+                    intensity >= 0.6 ? '#2563eb' :
+                        intensity >= 0.4 ? '#3b82f6' :
+                            intensity >= 0.2 ? '#60a5fa' : '#93c5fd';
+
+                const circle = L.circleMarker(point.coordinates, {
+                    radius: radius,
+                    fillColor: color,
+                    color: 'white',
+                    weight: 2,
+                    opacity: 0.8,
+                    fillOpacity: 0.6
+                });
+
+                circle.bindPopup(`
+                    <div class="p-3 min-w-[200px]">
+                        <h3 class="font-bold text-gray-900 mb-2">${point.location}</h3>
+                        <div class="bg-blue-50 p-3 rounded-lg">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-sm font-medium text-blue-800">💧 Rainfall</span>
+                                <span class="text-lg font-bold text-blue-900">${point.rainfall}mm</span>
+                            </div>
+                            <div class="text-xs text-blue-700">${getRainfallIntensity(point.rainfall)}</div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 mt-2">
+                            <div class="bg-red-50 p-2 rounded text-center">
+                                <span class="text-xs font-medium text-red-700">🌡️ ${point.temperature}°C</span>
+                            </div>
+                            <div class="bg-gray-50 p-2 rounded text-center">
+                                <span class="text-xs font-medium text-gray-700">💨 ${point.wind}km/h</span>
+                            </div>
+                        </div>
+                    </div>
+                `);
+
+                fallbackLayer.addLayer(circle);
+            });
+
+            fallbackLayer.addTo(map);
+            setHeatLayer(fallbackLayer);
+        }
+
+        return () => {
+            if (heatLayer) {
+                map.removeLayer(heatLayer);
+            }
+        };
+    }, [map, weatherData]);
+
+    return null;
+};
+
+const getRainfallIntensity = (rainfall: number) => {
+    if (rainfall >= 120) return 'Very Heavy';
+    if (rainfall >= 100) return 'Heavy';
+    if (rainfall >= 80) return 'Moderate-Heavy';
+    if (rainfall >= 60) return 'Moderate';
+    if (rainfall >= 40) return 'Light';
+    if (rainfall >= 20) return 'Very Light';
+    return 'Minimal';
+};
+
+const RainfallHeatmap: React.FC<RainfallHeatmapProps> = ({ className = "" }) => {
+    const { t } = useLanguage();
+    const [isLoading, setIsLoading] = useState(true);
+    const [mapCenter] = useState<[number, number]>([-1.5006, 29.6348]);
+    const [mapZoom] = useState(10);
+
+
+    const [weatherData, setWeatherData] = useState<WeatherDataPoint[]>([]);
     useEffect(() => {
-        if (selectedVillage) {
-            setMapZoom(14);
-        }
-    }, [selectedVillage]);
+        const fetchWeatherData = async () => {
+            try {
+                const response = await api.get('/api/weather/all', {
+                    params: { type: 'daily' }
+                });
 
-    const getTemperatureColor = (temp: number) => {
-        if (temp >= 23) return '#ef4444'; // Hot - red
-        if (temp >= 21) return '#f97316'; // Warm - orange
-        if (temp >= 19) return '#10b981'; // Mild - green
-        return '#0ea5e9'; // Cool - blue
-    };
+                const locations = response.data.locations || [];
 
-    const getRainfallColor = (rainfall: number) => {
-        if (rainfall >= 80) return '#1e40af'; // Heavy - dark blue
-        if (rainfall >= 50) return '#3b82f6'; // Moderate - blue
-        if (rainfall >= 30) return '#93c5fd'; // Light - light blue
-        return '#f0f9ff'; // Minimal - very light blue
-    };
+                const mappedData: WeatherDataPoint[] = locations.map((loc: any) => ({
+                    location: loc.locationName,
+                    coordinates: [loc.coordinates.lat, loc.coordinates.lon],
+                    temperature: loc.weatherSummary.currentTemp,
+                    rainfall: loc.weatherSummary.rainAmount,
+                    humidity: parseInt(loc.weatherOverview.match(/humidity level is (\d+)%/)?.[1] || '0'),
+                    wind: parseInt(loc.weatherOverview.match(/wind.*\((\d+)\s*km\/h\)/)?.[1] || '0'),
+                    weatherCode: loc.weatherSummary.condition || 'unknown',
+                    alerts: [
+                        ...(loc.alert ? [loc.alert.type] : []),
+                        ...(loc.intelligentAlerts?.map((a: any) => a.title) || [])
+                    ],
+                    intensity: Math.min(loc.weatherSummary.rainAmount / 100, 1)
+                }));
 
-    const styleFeature = (feature: any) => {
-        const defaultStyle = {
-            weight: 1.5,
-            opacity: 1,
-            color: 'white',
-            fillOpacity: 0.6,
-            fillColor: '#64748b'
+                setWeatherData(mappedData);
+                console.log("Weather data fetched successfully:", weatherData);
+            } catch (error) {
+                console.error("Error fetching weather data:", error);
+            } finally {
+                setIsLoading(false);
+            }
         };
 
-        const locationName = feature.properties?.ADM3_EN;
-        if (!locationName) return defaultStyle;
+        fetchWeatherData();
+    }, []);
 
-        const data = sampleWeatherData.find(d => d.location === locationName);
-        if (!data) return defaultStyle;
 
-        if (activeTab === 'location') {
 
-            const locationAlerts = alerts?.filter(alert =>
-                alert.sectors?.includes(locationName)
-            );
 
-            if (locationAlerts?.length > 0) {
-                // If there are multiple alerts, prioritize by severity
-                const hasSevere = locationAlerts.some(alert => alert.severity === 'warning');
-                const hasWarning = locationAlerts.some(alert => alert.severity === 'info');
-
-                if (hasSevere) return { ...defaultStyle, fillColor: '#ef4444' }; // Red for severe warnings
-                if (hasWarning) return { ...defaultStyle, fillColor: '#f59e0b' }; // Amber for warnings
-                return { ...defaultStyle, fillColor: '#10b981' }; // Green for positive alerts
-            }
-
-            return { ...defaultStyle, fillColor: '#3b82f6' }; // Default blue if no alerts
-        }
-
-        switch (weatherDataView) {
-            case 'temperature':
-                return {
-                    ...defaultStyle,
-                    fillColor: getTemperatureColor(data.temperature)
-                };
-            case 'rainfall':
-                return {
-                    ...defaultStyle,
-                    fillColor: getRainfallColor(data.rainfall)
-                };
-            case 'alerts':
-                return {
-                    ...defaultStyle,
-                    fillColor: data.alerts.length > 0 ? '#f59e0b' : '#64748b',
-                    fillOpacity: data.alerts.length > 0 ? 0.7 : 0.3
-                };
-            default:
-                return defaultStyle;
-        }
-    };
-
-    const filterFeature = (feature: any) => {
-        if (feature.properties?.ADM3_EN) {
-            return !(selectedSector && feature.properties.ADM3_EN !== selectedSector);
-        }
-
-        if (selectedSector && feature.properties?.shapeNam_1) {
-            return !(selectedCell && feature.properties.shapeNam_1 !== selectedCell);
-        }
-
-        return true;
-    };
-
-    const onEachFeature = (feature: any, layer: any) => {
-        const locationName = feature.properties?.ADM3_EN || feature.properties?.shapeNam_1 || feature.properties?.shapeName;
-        if (!locationName) return;
-
-        const weatherData = sampleWeatherData.find(d => d.location === locationName);
-
-        layer.on('click', () => {
-            if (feature.properties?.ADM3_EN && feature.properties.ADM3_EN !== selectedSector) {
-                setSelectedSector(feature.properties.ADM3_EN);
-                setSelectedCell('');
-                setSelectedVillage('');
-            } else if (feature.properties?.shapeNam_1 && feature.properties.shapeNam_1 !== selectedCell) {
-                setSelectedCell(feature.properties.shapeNam_1);
-                setSelectedVillage('');
-            } else if (feature.properties?.shapeName &&
-                feature.properties.shapeName !== selectedVillage &&
-                feature.properties.shapeName !== feature.properties.ADM3_EN) {
-                setSelectedVillage(feature.properties.shapeName);
-            }
-        });
-
-        layer.bindPopup(() => {
-            const popupElement = document.createElement('div');
-
-            popupElement.innerHTML = `
-        <div class="p-2">
-          <h3 class="font-medium text-base mb-2">${locationName}</h3>
-          
-          ${weatherData ? `
-            <div class="grid grid-cols-2 gap-2 mb-3">
-              <div class="flex items-center">
-                <span class="text-sm">🌡️ ${weatherData.temperature}°C</span>
-              </div>
-              <div class="flex items-center">
-                <span class="text-sm">🌧️ ${weatherData.rainfall}mm</span>
-              </div>
-              <div class="flex items-center">
-                <span class="text-sm">💧 ${weatherData.humidity}%</span>
-              </div>
-              <div class="flex items-center">
-                <span class="text-sm">💨 ${weatherData.wind} km/h</span>
-              </div>
-            </div>
-            
-            ${weatherData.alerts.length > 0 ? `
-              <div class="mt-2">
-                <p class="text-sm font-medium mb-1">Alerts</p>
-                <div class="space-y-1">
-                  ${weatherData.alerts.map(alert => `
-                    <div class="flex items-start gap-1">
-                      <span class="text-amber-500">⚠️</span>
-                      <span class="text-xs">${alert}</span>
+    if (isLoading) {
+        return (
+            <Card className={`w-full border-0 shadow-xl ${className}`}>
+                <CardContent className="p-6">
+                    <div className="h-[500px] flex flex-col items-center justify-center">
+                        <Loader2 className="h-8 w-8 animinate-spin text-blue-600" />
+                        <div className="text-center">
+                            <p className="mt-2 text-slate-600">Loading rainfall heatmap...</p>
+                        </div>
                     </div>
-                  `).join('')}
-                </div>
-              </div>
-            ` : ''}
-          ` : ''}
-          
-          <div class="text-sm text-gray-500 mt-2">
-            ${feature.properties?.ADM3_EN ? `Sector: ${feature.properties.ADM3_EN}<br>` : ''}
-            ${feature.properties?.shapeNam_1 ? `Cell: ${feature.properties.shapeNam_1}<br>` : ''}
-            ${feature.properties?.shapeName &&
-            feature.properties.shapeName !== feature.properties.ADM3_EN &&
-            feature.properties.shapeName !== feature.properties.shapeNam_1 ?
-                `Village: ${feature.properties.shapeName}` : ''}
-          </div>
-        </div>
-      `;
-
-            return popupElement;
-        });
-    };
-
-    const createMarkerIcon = (weatherCode: string) => {
-        let iconUrl = '';
-
-        switch (weatherCode) {
-            case 'sunny':
-                iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-gold.png';
-                break;
-            case 'rainy':
-                iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png';
-                break;
-            case 'cloudy':
-                iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-grey.png';
-                break;
-            default:
-                iconUrl = 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png';
-        }
-
-        return new L.Icon({
-            iconUrl,
-            shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowSize: [41, 41]
-        });
-    };
-
-    const getWeatherIcon = (weatherCode: string) => {
-        switch (weatherCode) {
-            case 'sunny':
-                return <Sun className="h-5 w-5 text-amber-500" />;
-            case 'partlyCloudy':
-                return <CloudDrizzle className="h-5 w-5 text-gray-400" />;
-            case 'cloudy':
-                return <CloudDrizzle className="h-5 w-5 text-gray-600" />;
-            case 'rainy':
-                return <CloudRain className="h-5 w-5 text-blue-500" />;
-            default:
-                return <CloudDrizzle className="h-5 w-5 text-gray-400" />;
-        }
-    };
+                </CardContent>
+            </Card>
+        );
+    }
 
     return (
-        <Card className={`w-full ${className}`}>
-            <CardHeader className="pb-2">
-                <CardTitle className="flex justify-between items-center">
-                    <span>{activeTab === 'weather' ? t('weatherMap') : t('locationSelector')}</span>
-                    {selectedSector && (
-                        <Badge variant="outline" className="ml-2">
-                            {selectedSector}
-                            {selectedCell && ` › ${selectedCell}`}
-                            {selectedVillage && ` › ${selectedVillage}`}
-                        </Badge>
-                    )}
-                </CardTitle>
-                <CardDescription>
-                    {activeTab === 'weather'
-                        ? t('weatherMapDescription')
-                        : t('selectLocationDescription')}
-                </CardDescription>
+        <Card className={`w-full border-0 shadow-md ${className}`}>
+            <CardHeader className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white rounded-t-xl">
+                <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                        <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
+                            <CloudRain className="h-7 w-7" />
+                        </div>
+                        <div>
+                            <CardTitle className="text-2xl font-bold">
+                                {t('rainfallHeatmap') || 'Rainfall Heatmap'}
+                            </CardTitle>
+
+                        </div>
+                    </div>
+                    <Badge variant="outline" className="bg-white/10 text-white border-white/20 px-4 py-2">
+                        <MapPin className="h-4 w-4 mr-2" />
+                        Musanze District
+                    </Badge>
+                </div>
             </CardHeader>
 
-            <CardContent className="p-4 space-y-4">
-                <Tabs defaultValue="weather" onValueChange={(value) => setActiveTab(value as 'weather' | 'location')}>
-                    <TabsList className="w-full grid grid-cols-2">
-                        <TabsTrigger value="weather">
-                            <CloudRain className="h-4 w-4 mr-2" />
-                            {t('weatherMap')}
-                        </TabsTrigger>
-                        <TabsTrigger value="location">
-                            <Thermometer className="h-4 w-4 mr-2" />
-                            {t('locationSelector')}
-                        </TabsTrigger>
-                    </TabsList>
+            <CardContent className="p-6 space-y-6">
 
-                    <TabsContent value="weather" className="pt-4 space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                variant={weatherDataView === 'temperature' ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => setWeatherDataView('temperature')}
-                            >
-                                <Thermometer className="h-4 w-4 mr-2" />
-                                {t('temperature')}
-                            </Button>
-                            <Button
-                                variant={weatherDataView === 'rainfall' ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => setWeatherDataView('rainfall')}
-                            >
-                                <CloudRain className="h-4 w-4 mr-2" />
-                                {t('rainfall')}
-                            </Button>
-                            <Button
-                                variant={weatherDataView === 'alerts' ? 'secondary' : 'outline'}
-                                size="sm"
-                                onClick={() => setWeatherDataView('alerts')}
-                            >
-                                <AlertTriangle className="h-4 w-4 mr-2" />
-                                {t('alerts')}
-                            </Button>
-                        </div>
-                    </TabsContent>
-
-                    <TabsContent value="location" className="pt-4 space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                            <Select value={selectedSector} onValueChange={setSelectedSector}>
-                                <SelectTrigger className="w-[150px]">
-                                    <SelectValue placeholder={t('sector')} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {availableSectors.map(sector => (
-                                        <SelectItem key={sector} value={sector}>
-                                            {sector}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-
-                            {selectedSector && (
-                                <Select
-                                    value={selectedCell}
-                                    onValueChange={setSelectedCell}
-                                    disabled={!selectedSector || availableCells.length === 0}
-                                >
-                                    <SelectTrigger className="w-[150px]">
-                                        <SelectValue placeholder={t('cell')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableCells.map(cell => (
-                                            <SelectItem key={cell} value={cell}>
-                                                {cell}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
-
-                            {selectedCell && availableVillages.length > 0 && (
-                                <Select
-                                    value={selectedVillage}
-                                    onValueChange={setSelectedVillage}
-                                    disabled={!selectedCell}
-                                >
-                                    <SelectTrigger className="w-[150px]">
-                                        <SelectValue placeholder={t('village')} />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableVillages.map(village => (
-                                            <SelectItem key={village} value={village}>
-                                                {village}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
-
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    setSelectedSector('');
-                                    setSelectedCell('');
-                                    setSelectedVillage('');
-                                    setMapCenter([-1.5006, 29.6348]);
-                                    setMapZoom(10);
-                                }}
-                                disabled={!selectedSector}
-                            >
-                                {t('reset')}
-                            </Button>
-                        </div>
-                    </TabsContent>
-                </Tabs>
-
-                <div className="h-[400px] w-full rounded-md overflow-hidden border">
+                
+                <div className="h-[500px] w-full rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner">
                     {typeof window !== 'undefined' && (
                         <MapContainer
                             center={mapCenter}
@@ -559,123 +273,69 @@ const OptimizedMap: React.FC<OptimizedMapProps> = ({
                             />
 
                             <MapViewUpdater center={mapCenter} zoom={mapZoom} />
-
-                            {geoJsonData && (
-                                <GeoJSON
-                                    data={geoJsonData}
-                                    style={styleFeature}
-                                    filter={filterFeature}
-                                    onEachFeature={onEachFeature}
-                                />
-                            )}
-
-                            {/* Show markers for alert locations in alert view */}
-                            {activeTab === 'weather' && weatherDataView === 'alerts' &&
-                                sampleWeatherData
-                                    .filter(location => location.alerts.length > 0)
-                                    .map((location, index) => (
-                                        <Marker
-                                            key={index}
-                                            position={location.coordinates}
-                                            icon={createMarkerIcon(location.weatherCode)}
-                                        >
-                                            <Popup>
-                                                <div className="p-2">
-                                                    <h3 className="font-medium">{location.location}</h3>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        {getWeatherIcon(location.weatherCode)}
-                                                        <span className="text-sm">{t(location.weatherCode)}</span>
-                                                    </div>
-                                                    <div className="text-sm mt-2">
-                                                        <p>{t('alerts')}: {location.alerts.map(a => t(a)).join(', ')}</p>
-                                                    </div>
-                                                </div>
-                                            </Popup>
-                                        </Marker>
-                                    ))
-                            }
+                            <HeatmapController weatherData={weatherData} />
                         </MapContainer>
                     )}
                 </div>
-                <div className="flex flex-wrap gap-3 items-center justify-center text-sm text-muted-foreground">
-                    {activeTab === 'weather' && weatherDataView === 'temperature' && (
-                        <>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
-                                <span>≥ 23°C</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-orange-500 mr-1"></div>
-                                <span>21-22°C</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                                <span>19-20°C</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
-                                <span>≤ 18°C</span>
-                            </div>
-                        </>
-                    )}
 
-                    {activeTab === 'weather' && weatherDataView === 'rainfall' && (
-                        <>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-blue-900 mr-1"></div>
-                                <span>≥ 80mm</span></div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
-                                <span>50-79mm</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-blue-300 mr-1"></div>
-                                <span>30-49mm</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-blue-50 mr-1"></div>
-                                <span>&lt; 30mm</span>
-                            </div>
-                        </>
-                    )}
 
-                    {activeTab === 'weather' && weatherDataView === 'alerts' && (
-                        <>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-amber-500 mr-1"></div>
-                                <span>{t('alertsPresent')}</span>
+                <div className="space-y-4">
+                    <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 p-6 rounded-2xl border border-blue-200">
+                        <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg">
+                            <Droplets className="h-5 w-5 text-blue-600" />
+                            Rainfall Intensity Scale
+                        </h3>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                            <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#dbeafe' }}></div>
+                                <div>
+                                    <div className="font-semibold text-slate-700 text-sm">0-20mm</div>
+                                    <div className="text-xs text-slate-500">Minimal</div>
+                                </div>
                             </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-slate-500 mr-1"></div>
-                                <span>{t('noAlerts')}</span>
+                            <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#93c5fd' }}></div>
+                                <div>
+                                    <div className="font-semibold text-slate-700 text-sm">20-40mm</div>
+                                    <div className="text-xs text-slate-500">Light</div>
+                                </div>
                             </div>
-                        </>
-                    )}
+                            <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#60a5fa' }}></div>
+                                <div>
+                                    <div className="font-semibold text-slate-700 text-sm">40-60mm</div>
+                                    <div className="text-xs text-slate-500">Moderate</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+                                <div>
+                                    <div className="font-semibold text-slate-700 text-sm">60-80mm</div>
+                                    <div className="text-xs text-slate-500">Mod-Heavy</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#2563eb' }}></div>
+                                <div>
+                                    <div className="font-semibold text-slate-700 text-sm">80-120mm</div>
+                                    <div className="text-xs text-slate-500">Heavy</div>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#1e40af' }}></div>
+                                <div>
+                                    <div className="font-semibold text-slate-700 text-sm">120mm+</div>
+                                    <div className="text-xs text-slate-500">Very Heavy</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                    {activeTab === 'location' && (
-                        <>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-red-500 mr-1"></div>
-                                <span>{t('severeAlert')}</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-amber-500 mr-1"></div>
-                                <span>{t('warning')}</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                                <span>{t('favorable')}</span>
-                            </div>
-                            <div className="flex items-center">
-                                <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
-                                <span>{t('normal')}</span>
-                            </div>
-                        </>
-                    )}
                 </div>
+
             </CardContent>
         </Card>
     );
 };
 
-export default OptimizedMap;
+export default RainfallHeatmap;

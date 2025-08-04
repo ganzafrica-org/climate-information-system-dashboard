@@ -77,7 +77,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
 
         setIsLoading(true);
         try {
-            await api.post<ApiResponse<Location>>('/api/admin/locations', formData);
+            await api.post<ApiResponse<Location>>('/api/users/locations', formData);
             toast.success(t('locationCreatedSuccessfully') || 'Location created successfully');
             onSuccess();
             onOpenChange(false);
@@ -238,7 +238,7 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
         setIsLoading(true);
         setError(null);
         try {
-            const response = await api.get<ApiResponse<Location>>(`/api/admin/locations/${id}`);
+            const response = await api.get<ApiResponse<Location>>(`/api/users/locations/${id}`);
             setLocation(response.data);
         } catch (error: any) {
             const message = error.response?.data?.message || error.message || t('failedToLoadLocation');
@@ -418,7 +418,7 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
 
         setIsLoading(true);
         try {
-            await api.put<ApiResponse<Location>>(`/api/admin/locations/${location.id}`, formData);
+            await api.put<ApiResponse<Location>>(`/api/users/locations/${location.id}`, formData);
             toast.success(t('locationUpdatedSuccessfully') || 'Location updated successfully');
             onSuccess();
             onOpenChange(false);

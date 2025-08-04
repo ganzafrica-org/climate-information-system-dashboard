@@ -100,7 +100,7 @@ const Locations: NextPage = () => {
                 filters.search = searchTerm.trim();
             }
 
-            const response = await api.get<ApiResponse<LocationsResponse>>('/api/admin/locations', {
+            const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
                 params: filters
             });
 
@@ -117,7 +117,7 @@ const Locations: NextPage = () => {
         if (!confirm(t('confirmDeleteLocation'))) return;
 
         try {
-            await api.delete(`/api/admin/locations/${locationId}`);
+            await api.delete(`/api/users/locations//${locationId}`);
             toast.success(t('locationDeletedSuccessfully'));
             await fetchLocations();
             if (selectedLocation === locationId) {
@@ -154,7 +154,7 @@ const Locations: NextPage = () => {
                 filters.search = searchTerm.trim();
             }
 
-            const response = await api.get<ApiResponse<LocationsResponse>>('/api/admin/locations', {
+            const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
                 params: filters
             });
 
