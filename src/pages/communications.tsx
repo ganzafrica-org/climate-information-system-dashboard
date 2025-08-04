@@ -1,0 +1,183 @@
+import React, { useState, useEffect } from 'react';
+import { AlertsTable } from '@/components/communications/AlertsTable';
+import { MessagesTable } from '@/components/communications/MessagesTable';
+import { WeatherSchedulerTable } from '@/components/communications/SchedulerTable';
+import { AlertTriangle, MessageSquare, Bell, Plus, Filter, Search, MapPin, ChevronDown, Loader2, Clock } from 'lucide-react';
+import { AppLayout } from '@/components/layout/AppLayout';
+import Head from 'next/head';
+import { useLanguage } from '@/i18n';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { toast } from 'sonner';
+import api from '@/lib/api';
+import { Location, LocationsResponse } from '@/types/farmer';
+import { ApiResponse } from '@/types/weather';
+
+export default function Communications() {
+  const [activeTab, setActiveTab] = useState("alerts");
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
+  const { t } = useLanguage();
+
+  useEffect(() => {
+    fetchLocations();
+  }, []);
+
+  const fetchLocations = async () => {
+    try {
+      const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
+        params: { limit: 100 }
+      });
+      setLocations(response.data.locations);
+
+      // Auto-select first location or set to "all"
+      if (response.data.locations.length > 0) {
+        // Don't auto-select, let user choose or default to "all"
+        setSelectedLocation(null);
+      }
+    } catch (error: any) {
+      console.error('Failed to fetch locations:', error);
+      toast.error(t('failedToLoadLocations'));
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getSelectedLocationName = () => {
+    if (!selectedLocation) return t('allLocations') || 'All Locations';
+    return selectedLocation.name;
+  };
+
+  const getSelectedLocationValue = () => {
+    if (!selectedLocation) return 'all';
+    return selectedLocation.name;
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader2 className="animate-spin h-8 w-8 mx-auto" style={{ color: '#2580f5' }} />
+            <p className="mt-2 text-gray-500">{t('loadingLocations')}</p>
+          </div>
+        </div>
+      </AppLayout>
+    );
+  }
+  
+  return (
+    <AppLayout>
+        <Head>
+            <title> 
+                {t("communications")} | {t("climateInformationSystem")}
+            </title>
+        </Head>
+
+        <div className="space-y-4 md:space-y-6">
+            {/* Header section with white background */}
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                    {/* Left side - Title only */}
+                    <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-medium">{t("Agricultural Alerts & Messages")}</h2>
+                    </div>
+
+                    {/* Right side - All Locations and Search */}
+                    {activeTab !== 'scheduler' && (
+                        <div className="flex flex-wrap w-full lg:w-auto items-center gap-2">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button
+                                        variant="outline"
+                                        style={{ borderColor: '#66a9e3', color: '#66a9e3' }}
+                                        className="hover:bg-blue-50"
+                                    >
+                                        <MapPin className="h-4 w-4 mr-2" />
+                                        <span>{getSelectedLocationName()}</span>
+                                        <ChevronDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    <DropdownMenuItem onClick={() => setSelectedLocation(null)}>
+                                        {t("allLocations") || "All Locations"}
+                                    </DropdownMenuItem>
+                                    <Separator className="my-1" />
+                                    {locations.map((location) => (
+                                        <DropdownMenuItem 
+                                            key={location.id} 
+                                            onClick={() => setSelectedLocation(location)}
+                                        >
+                                            {location.name}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                            
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                                <Input
+                                    type="search"
+                                    placeholder={t("searchMessages") || "Search messages..."}
+                                    className="pl-10 w-[300px] bg-gray-50 border-gray-200"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+            
+            <Tabs defaultValue="alerts" onValueChange={setActiveTab}>
+                <TabsList>
+                    <TabsTrigger 
+                        value="alerts"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      <AlertTriangle className="h-4 w-4 mr-2" />
+                      {t("alerts")}
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="messages"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      <MessageSquare className="h-4 w-4 mr-2" />
+                      {t("customMessages")}
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="scheduler"
+                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Weather Scheduler
+                    </TabsTrigger>
+                </TabsList>
+            </Tabs>
+
+            {/* Tab Content */}
+            <div className="transition-all duration-300 ease-in-out">
+                {activeTab === 'alerts' ? (
+                    <AlertsTable 
+                      selectedSector={getSelectedLocationValue()} 
+                      searchTerm={searchTerm} 
+                    />
+                ) : activeTab === 'messages' ? (
+                    <MessagesTable 
+                      selectedSector={getSelectedLocationValue()} 
+                      searchTerm={searchTerm} 
+                    />
+                ) : activeTab === 'scheduler' ? (
+                    <WeatherSchedulerTable />
+                ) : null}
+            </div>
+        </div>
+    
+    </AppLayout>
+  );
+}

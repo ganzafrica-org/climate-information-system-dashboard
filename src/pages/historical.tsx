@@ -1,13 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NextPage } from 'next';
 import Head from 'next/head';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useLanguage } from '@/i18n';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
     Bar,
@@ -25,81 +24,40 @@ import {
     Calendar,
     ChevronDown,
     CloudRain,
-    Download,
-    Filter,
+    Download, Loader2,
     MapPin,
     RefreshCw,
     Search,
     Thermometer,
-    TrendingDown,
     TrendingUp,
+    Filter,
+    WifiOff,
+    AlertTriangle
 } from 'lucide-react';
-
-const musanzeSectors = [
-    'Busogo', 'Cyuve', 'Gacaca', 'Gashaki', 'Gataraga',
-    'Kimonyi', 'Kinigi', 'Muhoza', 'Muko', 'Musanze',
-    'Nkotsi', 'Nyange', 'Remera', 'Rwaza', 'Shingiro'
-];
-
-const temperatureData = [
-    { year: 2020, avg: 19.8, min: 13.2, max: 26.5 },
-    { year: 2021, avg: 20.1, min: 13.5, max: 26.8 },
-    { year: 2022, avg: 20.3, min: 13.7, max: 27.0 },
-    { year: 2023, avg: 20.5, min: 13.9, max: 27.2 },
-    { year: 2024, avg: 20.8, min: 14.1, max: 27.5 },
-];
-
-// Monthly temperature data for last year
-const monthlyTemperatureData = [
-    { month: 'Jan', avg: 20.4, min: 14.1, max: 26.8, reference: 19.5 },
-    { month: 'Feb', avg: 20.6, min: 14.3, max: 27.0, reference: 19.7 },
-    { month: 'Mar', avg: 20.2, min: 14.0, max: 26.5, reference: 19.5 },
-    { month: 'Apr', avg: 19.8, min: 13.8, max: 25.8, reference: 19.3 },
-    { month: 'May', avg: 19.5, min: 13.5, max: 25.5, reference: 19.1 },
-    { month: 'Jun', avg: 19.0, min: 13.0, max: 25.0, reference: 18.8 },
-    { month: 'Jul', avg: 18.8, min: 12.8, max: 24.8, reference: 18.5 },
-    { month: 'Aug', avg: 19.2, min: 13.2, max: 25.2, reference: 18.9 },
-    { month: 'Sep', avg: 19.8, min: 13.8, max: 25.8, reference: 19.3 },
-    { month: 'Oct', avg: 20.2, min: 14.2, max: 26.2, reference: 19.7 },
-    { month: 'Nov', avg: 20.5, min: 14.5, max: 26.5, reference: 19.9 },
-    { month: 'Dec', avg: 20.6, min: 14.6, max: 26.6, reference: 20.0 },
-];
-
-// Rainfall data with baseline for comparison
-const rainfallData = [
-    { month: 'Jan', current: 60, historical: 55 },
-    { month: 'Feb', current: 40, historical: 50 },
-    { month: 'Mar', current: 120, historical: 100 },
-    { month: 'Apr', current: 150, historical: 130 },
-    { month: 'May', current: 80, historical: 90 },
-    { month: 'Jun', current: 30, historical: 40 },
-    { month: 'Jul', current: 20, historical: 25 },
-    { month: 'Aug', current: 25, historical: 30 },
-    { month: 'Sep', current: 40, historical: 45 },
-    { month: 'Oct', current: 70, historical: 65 },
-    { month: 'Nov', current: 90, historical: 85 },
-    { month: 'Dec', current: 70, historical: 75 },
-];
-
-// Season comparison data (Season A, B, C in Rwanda)
-const seasonData = [
-    { name: 'Season A', rainfall: 330, normalRainfall: 325, variance: '+1.5%' },
-    { name: 'Season B', rainfall: 380, normalRainfall: 360, variance: '+5.6%' },
-    { name: 'Season C', rainfall: 45, normalRainfall: 55, variance: '-18.2%' },
-];
+import { toast } from 'sonner';
+import api from '@/lib/api';
+import {
+    HistoricalWeatherResponse, HistoricalWeatherRecord, ApiResponse,
+    HistoricalWeatherFilters
+} from '@/types/weather';
+import { Location, LocationsResponse } from '@/types/farmer';
 
 const chartConfig = {
     temperature: {
         label: 'Temperature (°C)',
         color: 'hsl(var(--primary))',
     },
-    min: {
+    tempMin: {
         label: 'Min Temperature (°C)',
         color: '#3b82f6',
     },
-    max: {
+    tempMax: {
         label: 'Max Temperature (°C)',
         color: '#ef4444',
+    },
+    tempAvg: {
+        label: 'Avg Temperature (°C)',
+        color: '#10b981',
     },
     rainfall: {
         label: 'Rainfall (mm)',
@@ -111,479 +69,1134 @@ const chartConfig = {
     },
 };
 
+type WeeklyData = {
+    week: string;
+    tempMin: number;
+    tempMax: number;
+    tempAvg: number;
+    rainfall: number;
+};
+
+type MonthlyData = {
+    month: string;
+    tempMin: number;
+    tempMax: number;
+    tempAvg: number;
+    rainfall: number;
+};
+
+type SeasonalData = {
+    name: string;
+    temperature: number;
+    rainfall: number;
+    days: number;
+};
+
+type ComparisonData = WeeklyData | MonthlyData | SeasonalData;
+
+const handleApiError = (error: any, t: any) => {
+    console.error('API Error:', error);
+
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        toast.error(t('requestTimeout') || 'Request timed out. Please try again.');
+        return 'timeout';
+    } else if (error.response?.status === 404) {
+        toast.error(t('dataNotFound') || 'Data not found for this location.');
+        return 'not_found';
+    } else if (error.response?.status >= 500) {
+        toast.error(t('serverError') || 'Server error. Please try again later.');
+        return 'server_error';
+    } else if (error.code === 'ERR_NETWORK' || !navigator.onLine) {
+        toast.error(t('networkError') || 'Network error. Please check your connection.');
+        return 'network_error';
+    } else {
+        toast.error(t('failedToLoadHistoricalData') || 'Failed to load historical data.');
+        return 'unknown_error';
+    }
+};
+
+const processMonthlyData = (records: HistoricalWeatherRecord[]) => {
+    if (!records || records.length === 0) return [];
+
+    const monthlyData: { [key: string]: {
+            month: string;
+            tempMin: number[];
+            tempMax: number[];
+            tempAvg: number[];
+            rainfall: number[]
+        } } = {};
+
+    records.forEach(record => {
+        const date = new Date(record.date);
+        const monthKey = date.toLocaleString('default', { month: 'short' });
+
+        if (!monthlyData[monthKey]) {
+            monthlyData[monthKey] = {
+                month: monthKey,
+                tempMin: [],
+                tempMax: [],
+                tempAvg: [],
+                rainfall: []
+            };
+        }
+
+        const tempMin = record.weatherSummary.temperature.min;
+        const tempMax = record.weatherSummary.temperature.max;
+        const tempAvg = record.weatherSummary.temperature.current;
+        const rainfall = record.weatherSummary.precipitation.rainAmount;
+
+        monthlyData[monthKey].tempMin.push(tempMin);
+        monthlyData[monthKey].tempMax.push(tempMax);
+        monthlyData[monthKey].tempAvg.push(tempAvg);
+        monthlyData[monthKey].rainfall.push(rainfall);
+    });
+
+    const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    return monthOrder.map(month => {
+        if (monthlyData[month]) {
+            return {
+                month,
+                tempMin: monthlyData[month].tempMin.reduce((a, b) => a + b, 0) / monthlyData[month].tempMin.length,
+                tempMax: monthlyData[month].tempMax.reduce((a, b) => a + b, 0) / monthlyData[month].tempMax.length,
+                tempAvg: monthlyData[month].tempAvg.reduce((a, b) => a + b, 0) / monthlyData[month].tempAvg.length,
+                rainfall: monthlyData[month].rainfall.reduce((a, b) => a + b, 0),
+            };
+        }
+        return {
+            month,
+            tempMin: 0,
+            tempMax: 0,
+            tempAvg: 0,
+            rainfall: 0,
+        };
+    }).filter(item => item.tempAvg > 0);
+};
+
+const processWeeklyData = (records: HistoricalWeatherRecord[]) => {
+    if (!records || records.length === 0) return [];
+
+    const weeklyData: { [key: string]: {
+            week: string;
+            tempMin: number[];
+            tempMax: number[];
+            tempAvg: number[];
+            rainfall: number[]
+        } } = {};
+
+    records.forEach(record => {
+        const date = new Date(record.date);
+        const startOfWeek = new Date(date);
+        startOfWeek.setDate(date.getDate() - date.getDay());
+        const weekKey = `Week ${Math.ceil(date.getDate() / 7)} - ${date.toLocaleString('default', { month: 'short' })}`;
+
+        if (!weeklyData[weekKey]) {
+            weeklyData[weekKey] = {
+                week: weekKey,
+                tempMin: [],
+                tempMax: [],
+                tempAvg: [],
+                rainfall: []
+            };
+        }
+
+        const tempMin = record.weatherSummary.temperature.min;
+        const tempMax = record.weatherSummary.temperature.max;
+        const tempAvg = record.weatherSummary.temperature.current;
+        const rainfall = record.weatherSummary.precipitation.rainAmount;
+
+        weeklyData[weekKey].tempMin.push(tempMin);
+        weeklyData[weekKey].tempMax.push(tempMax);
+        weeklyData[weekKey].tempAvg.push(tempAvg);
+        weeklyData[weekKey].rainfall.push(rainfall);
+    });
+
+    return Object.values(weeklyData).map(week => ({
+        week: week.week,
+        tempMin: week.tempMin.reduce((a, b) => a + b, 0) / week.tempMin.length,
+        tempMax: week.tempMax.reduce((a, b) => a + b, 0) / week.tempMax.length,
+        tempAvg: week.tempAvg.reduce((a, b) => a + b, 0) / week.tempAvg.length,
+        rainfall: week.rainfall.reduce((a, b) => a + b, 0),
+    })).sort((a, b) => a.week.localeCompare(b.week));
+};
+
+const processSeasonalData = (records: HistoricalWeatherRecord[]) => {
+    if (!records || records.length === 0) return [];
+
+    const seasonA = records.filter(record => {
+        const month = new Date(record.date).getMonth() + 1;
+        return month >= 9 || month <= 1;
+    });
+
+    const seasonB = records.filter(record => {
+        const month = new Date(record.date).getMonth() + 1;
+        return month >= 2 && month <= 5;
+    });
+
+    const seasonC = records.filter(record => {
+        const month = new Date(record.date).getMonth() + 1;
+        return month >= 6 && month <= 8;
+    });
+
+    const calculateSeasonStats = (seasonData: HistoricalWeatherRecord[], name: string) => {
+        if (seasonData.length === 0) return { name, rainfall: 0, temperature: 0, days: 0 };
+
+        const totalRainfall = seasonData.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0);
+        const avgTemp = seasonData.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / seasonData.length;
+
+        return {
+            name,
+            rainfall: totalRainfall,
+            temperature: avgTemp,
+            days: seasonData.length
+        };
+    };
+
+    return [
+        calculateSeasonStats(seasonA, 'Season A'),
+        calculateSeasonStats(seasonB, 'Season B'),
+        calculateSeasonStats(seasonC, 'Season C')
+    ];
+};
+
 const Historical: NextPage = () => {
     const { t } = useLanguage();
-    const [selectedSector, setSelectedSector] = useState('all');
-    const [selectedYear, setSelectedYear] = useState(2024);
-    const [selectedTimePeriod, setSelectedTimePeriod] = useState('monthly');
 
+    const [locations, setLocations] = useState<Location[]>([]);
+    const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+    const [historicalData, setHistoricalData] = useState<HistoricalWeatherRecord[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [hasError, setHasError] = useState(false);
+    const [errorType, setErrorType] = useState<string>('');
 
-    const temperatureTrend = temperatureData[temperatureData.length-1].avg - temperatureData[0].avg;
-    const rainfallTrend = rainfallData.reduce((sum, curr) => sum + (curr.current - curr.historical), 0) / rainfallData.length;
+    const [viewType, setViewType] = useState<'monthly' | 'weekly' | 'seasonal'>('monthly');
+    const [dateRange, setDateRange] = useState({
+        startDate: `${new Date().getFullYear()}-01-01`,
+        endDate: `${new Date().getFullYear()}-12-31`
+    });
+    const [customFilters, setCustomFilters] = useState({
+        specificMonths: [] as string[],
+        temperatureRange: { min: '', max: '' },
+        rainfallRange: { min: '', max: '' }
+    });
+
+    const [comparisonLocation1, setComparisonLocation1] = useState<Location | null>(null);
+    const [comparisonLocation2, setComparisonLocation2] = useState<Location | null>(null);
+    const [comparisonData1, setComparisonData1] = useState<HistoricalWeatherRecord[]>([]);
+    const [comparisonData2, setComparisonData2] = useState<HistoricalWeatherRecord[]>([]);
+    const [comparisonDataType, setComparisonDataType] = useState<'temperature' | 'rainfall'>('temperature');
+
+    useEffect(() => {
+        fetchLocations();
+    }, []);
+
+    useEffect(() => {
+        if (selectedLocation) {
+            fetchHistoricalData();
+        }
+    }, [selectedLocation, dateRange, viewType]);
+
+    const fetchLocations = async () => {
+        try {
+            setHasError(false);
+            const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
+                params: { limit: 100 }
+            });
+
+            if (response?.data?.locations) {
+                setLocations(response.data.locations);
+                if (response.data.locations.length > 0) {
+                    setSelectedLocation(response.data.locations[0]);
+                    setComparisonLocation1(response.data.locations[0]);
+                    if (response.data.locations.length > 1) {
+                        setComparisonLocation2(response.data.locations[1]);
+                    }
+                }
+            } else {
+                setLocations([]);
+                setHasError(true);
+                setErrorType('no_locations');
+                toast.error(t('noLocationsFound') || 'No locations found.');
+            }
+        } catch (error: any) {
+            const errorType = handleApiError(error, t);
+            setLocations([]);
+            setHasError(true);
+            setErrorType(errorType);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchHistoricalData = async () => {
+        if (!selectedLocation) return;
+
+        try {
+            setIsLoading(true);
+            setHasError(false);
+            setErrorType('');
+
+            const filters: HistoricalWeatherFilters = {
+                startDate: dateRange.startDate,
+                endDate: dateRange.endDate,
+                limit: 1000,
+                sortBy: 'date',
+                sortOrder: 'ASC'
+            };
+
+            const response = await api.get<ApiResponse<HistoricalWeatherResponse>>(
+                `/api/weather/historical/location/${selectedLocation.id}`,
+                { params: filters }
+            );
+
+            if (response?.data?.records && response.data.records.length > 0) {
+                setHistoricalData(response.data.records);
+            } else {
+                setHistoricalData([]);
+                setHasError(true);
+                setErrorType('no_data');
+                toast.error(t('noHistoricalDataAvailable') || 'No historical data available for this period.');
+            }
+        } catch (error: any) {
+            const errorType = handleApiError(error, t);
+            setHistoricalData([]);
+            setHasError(true);
+            setErrorType(errorType);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const fetchComparisonData = async () => {
+        if (!comparisonLocation1 || !comparisonLocation2) return;
+
+        try {
+            const filters: HistoricalWeatherFilters = {
+                startDate: dateRange.startDate,
+                endDate: dateRange.endDate,
+                limit: 1000,
+                sortBy: 'date',
+                sortOrder: 'ASC'
+            };
+
+            const [response1, response2] = await Promise.all([
+                api.get<ApiResponse<HistoricalWeatherResponse>>(
+                    `/api/weather/historical/location/${comparisonLocation1.id}`,
+                    { params: filters }
+                ),
+                api.get<ApiResponse<HistoricalWeatherResponse>>(
+                    `/api/weather/historical/location/${comparisonLocation2.id}`,
+                    { params: filters }
+                )
+            ]);
+
+            setComparisonData1(response1?.data?.records || []);
+            setComparisonData2(response2?.data?.records || []);
+            toast.success(t('comparisonDataLoaded') || 'Comparison data loaded successfully.');
+        } catch (error: any) {
+            handleApiError(error, t);
+            setComparisonData1([]);
+            setComparisonData2([]);
+        }
+    };
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        try {
+            await fetchHistoricalData();
+            if (!hasError) {
+                toast.success(t('historicalDataRefreshed') || 'Historical data updated successfully.');
+            }
+        } catch (error) {
+
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
+    const handleExportData = () => {
+        if (historicalData.length === 0) {
+            toast.error(t('noDataToExport') || 'No data available to export.');
+            return;
+        }
+
+        try {
+            const exportData = historicalData.map(record => ({
+                [t('date') || 'Date']: record.date,
+                [t('location') || 'Location']: selectedLocation?.name || '',
+                [t('tempMin') || 'Min Temp']: `${record.weatherSummary.temperature.min}°C`,
+                [t('tempMax') || 'Max Temp']: `${record.weatherSummary.temperature.max}°C`,
+                [t('tempCurrent') || 'Current Temp']: `${record.weatherSummary.temperature.current}°C`,
+                [t('humidity') || 'Humidity']: `${record.weatherSummary.atmospheric.humidity}%`,
+                [t('rainfall') || 'Rainfall']: `${record.weatherSummary.precipitation.rainAmount}mm`,
+                [t('rainChance') || 'Rain Chance']: `${record.weatherSummary.precipitation.rainChance}%`,
+                [t('windSpeed') || 'Wind Speed']: `${record.weatherSummary.wind.speed} km/h`,
+                [t('windDirection') || 'Wind Direction']: record.weatherSummary.wind.direction,
+                [t('condition') || 'Condition']: record.weatherSummary.conditions.description,
+                [t('soilCondition') || 'Soil Condition']: record.weatherSummary.farming.soilCondition,
+                [t('farmingRecommendation') || 'Farming Recommendation']: record.weatherSummary.farming.farmingRecommendation,
+            }));
+
+            const filename = `historical_weather_${selectedLocation?.name || 'location'}_${new Date().toISOString().split('T')[0]}.csv`;
+            api.exportAsCSV(exportData, filename);
+
+            toast.success(t('dataExportedSuccessfully') || 'Data exported successfully.');
+        } catch (error) {
+            console.error('Export error:', error);
+            toast.error(t('failedToExportData') || 'Failed to export data.');
+        }
+    };
+
+    const getProcessedData = () => {
+        switch (viewType) {
+            case 'weekly':
+                return processWeeklyData(historicalData);
+            case 'seasonal':
+                return processSeasonalData(historicalData);
+            default:
+                return processMonthlyData(historicalData);
+        }
+    };
+
+    const processComparisonData = () => {
+        if (comparisonData1.length === 0 || comparisonData2.length === 0) return [];
+
+        let comparison1Data: ComparisonData[], comparison2Data: ComparisonData[];
+
+        switch (viewType) {
+            case 'weekly':
+                comparison1Data = processWeeklyData(comparisonData1);
+                comparison2Data = processWeeklyData(comparisonData2);
+                break;
+            case 'seasonal':
+                comparison1Data = processSeasonalData(comparisonData1);
+                comparison2Data = processSeasonalData(comparisonData2);
+                break;
+            default:
+                comparison1Data = processMonthlyData(comparisonData1);
+                comparison2Data = processMonthlyData(comparisonData2);
+        }
+
+        return comparison1Data.map((item, index) => {
+            let key: string;
+            let location1: number;
+            let location2: number;
+
+            if (viewType === 'seasonal') {
+                const seasonalItem = item as SeasonalData;
+                const seasonalItem2 = comparison2Data[index] as SeasonalData;
+                key = seasonalItem.name;
+                location1 = comparisonDataType === 'temperature' ? seasonalItem.temperature : seasonalItem.rainfall;
+                location2 = comparisonDataType === 'temperature'
+                    ? (seasonalItem2?.temperature || 0)
+                    : (seasonalItem2?.rainfall || 0);
+            } else if (viewType === 'weekly') {
+                const weeklyItem = item as WeeklyData;
+                const weeklyItem2 = comparison2Data[index] as WeeklyData;
+                key = weeklyItem.week;
+                location1 = comparisonDataType === 'temperature' ? weeklyItem.tempAvg : weeklyItem.rainfall;
+                location2 = comparisonDataType === 'temperature'
+                    ? (weeklyItem2?.tempAvg || 0)
+                    : (weeklyItem2?.rainfall || 0);
+            } else {
+                const monthlyItem = item as MonthlyData;
+                const monthlyItem2 = comparison2Data[index] as MonthlyData;
+                key = monthlyItem.month;
+                location1 = comparisonDataType === 'temperature' ? monthlyItem.tempAvg : monthlyItem.rainfall;
+                location2 = comparisonDataType === 'temperature'
+                    ? (monthlyItem2?.tempAvg || 0)
+                    : (monthlyItem2?.rainfall || 0);
+            }
+
+            return {
+                [viewType === 'seasonal' ? 'name' : viewType === 'weekly' ? 'week' : 'month']: key,
+                location1,
+                location2
+            };
+        });
+    };
+
+    const renderEmptyState = () => {
+        let icon = <CloudRain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+        let title = t('noHistoricalData') || 'No Historical Data';
+        let description = t('noDataForSelectedPeriod') || 'No data available for the selected period.';
+
+        switch (errorType) {
+            case 'timeout':
+                icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                title = t('requestTimeout') || 'Request Timed Out';
+                description = t('timeoutDescription') || 'The request took too long to complete. Please check your connection and try again.';
+                break;
+            case 'network_error':
+                icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                title = t('networkError') || 'Network Error';
+                description = t('networkErrorDescription') || 'Please check your internet connection and try again.';
+                break;
+            case 'server_error':
+                icon = <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                title = t('serverError') || 'Server Error';
+                description = t('serverErrorDescription') || 'Our servers are experiencing issues. Please try again later.';
+                break;
+            case 'not_found':
+                icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                title = t('dataNotFound') || 'Data Not Found';
+                description = t('dataNotFoundDescription') || 'No historical data available for the selected location and period.';
+                break;
+            case 'no_locations':
+                icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                title = t('noLocations') || 'No Locations';
+                description = t('noLocationsDescription') || 'No locations available. Please add a location first.';
+                break;
+            default:
+                break;
+        }
+
+        return (
+            <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                    <div className="text-center max-w-md">
+                        {icon}
+                        <h3 className="text-lg font-medium mb-2">{title}</h3>
+                        <p className="text-muted-foreground mb-4">
+                            {description}
+                        </p>
+                        <Button
+                            variant="outline"
+                            onClick={errorType === 'no_locations' ? fetchLocations : handleRefresh}
+                            disabled={isRefreshing || isLoading}
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${(isRefreshing || isLoading) ? 'animate-spin' : ''}`} />
+                            {(isRefreshing || isLoading) ? (t('loading') || 'Loading...') : (t('tryAgain') || 'Try Again')}
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
+
+    const processedData = getProcessedData();
+    const comparisonChartData = processComparisonData();
+
+    const avgTemp = historicalData.length > 0
+        ? historicalData.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / historicalData.length
+        : 0;
+    const totalRainfall = historicalData.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0);
+    const rainyDays = historicalData.filter(record => record.weatherSummary.precipitation.rainAmount > 0.1).length;
+    const extremeEvents = historicalData.filter(record =>
+        record.weatherSummary.temperature.max > 30 ||
+        record.weatherSummary.temperature.min < 5 ||
+        record.weatherSummary.precipitation.rainAmount > 50
+    ).length;
+
+    if (isLoading && !historicalData.length && !hasError) {
+        return (
+            <AppLayout>
+                <div className="flex items-center justify-center min-h-[400px]">
+                    <div className="text-center">
+                        <Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" />
+                        <p className="text-muted-foreground">{t('loadingHistoricalData') || 'Loading historical data...'}</p>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
 
     return (
         <AppLayout>
             <Head>
-                <title>{t('historical')} | {t('climateInformationSystem')}</title>
+                <title>{t('historical') || 'Historical'} | {t('climateInformationSystem') || 'Climate Information System'}</title>
             </Head>
 
             <div className="space-y-4 md:space-y-6">
-
+                
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
                     <div className="flex items-center gap-2">
                         <MapPin className="h-5 w-5 text-ganz-primary" />
-                        <h2 className="text-lg font-medium">{t('musanzeRegion')}</h2>
+                        <h2 className="text-lg font-medium">{t('historicalWeatherData') || 'Historical Weather Data'}</h2>
 
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" size="sm" className="ml-2">
-                                    <span>{selectedSector === 'all' ? t('selectRegion') : selectedSector}</span>
-                                    <ChevronDown className="ml-2 h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                <DropdownMenuItem onClick={() => setSelectedSector('all')}>
-                                    {t('all')}
-                                </DropdownMenuItem>
-                                <Separator className="my-1" />
-                                {musanzeSectors.map((sector) => (
-                                    <DropdownMenuItem key={sector} onClick={() => setSelectedSector(sector)}>
-                                        {sector}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        {locations.length > 0 && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="sm" className="ml-2 h-9">
+                                        <span>{selectedLocation?.name || t('selectLocation') || 'Select Location'}</span>
+                                        <ChevronDown className="ml-2 h-4 w-4" />
+                                    </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent>
+                                    {locations.map((location) => (
+                                        <DropdownMenuItem
+                                            key={location.id}
+                                            onClick={() => setSelectedLocation(location)}
+                                        >
+                                            {location.name}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
                     </div>
 
+                    
                     <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
-                        <div className="relative w-full sm:w-auto">
-                            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                type="search"
-                                placeholder={t('search')}
-                                className="pl-8 w-full sm:w-[180px] h-9"
-                            />
-                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={handleRefresh}
+                            disabled={isRefreshing || isLoading || !selectedLocation}
+                            className="h-9"
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
+                        </Button>
 
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className='h-9'>
-                                    <Calendar className="h-4 w-4" />
-                                    <span>{selectedYear}</span>
-                                    <ChevronDown className=" h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent>
-                                {[2020, 2021, 2022, 2023, 2024].map((year) => (
-                                    <DropdownMenuItem key={year} onClick={() => setSelectedYear(year)}>
-                                        {year}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
-                        <Button variant="primary" className='h-9'>
-                            <Filter className="h-4 w-4" />
-                            {t('filterBy')}
+                        <Button
+                            variant="primary"
+                            className="h-9"
+                            onClick={handleExportData}
+                            disabled={!historicalData.length}
+                        >
+                            <Download className="h-4 w-4 mr-2" />
+                            {t('exportData') || 'Export Data'}
                         </Button>
                     </div>
                 </div>
 
-                <Tabs defaultValue="monthly" onValueChange={setSelectedTimePeriod}>
-                    <TabsList className="w-full flex justify-start overflow-x-auto">
-                        <TabsTrigger value="monthly">{t('monthly')}</TabsTrigger>
-                        <TabsTrigger value="seasonal">{t('seasonal')}</TabsTrigger>
-                        <TabsTrigger value="annual">{t('annual')}</TabsTrigger>
-                    </TabsList>
-                </Tabs>
-
-                <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">{t('avgTemperature')}</CardTitle>
-                            <CardDescription>{t('for')} {selectedYear}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-3xl font-bold mb-1">20.8°C</div>
-                            <div className="flex items-center text-sm">
-                                <TrendingUp className="h-4 w-4 mr-1 text-green-500" />
-                                <span className="text-green-500 font-medium">+0.3°C</span>
-                                <span className="text-muted-foreground ml-1">{t('vsLastYear')}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">{t('totalRainfall')}</CardTitle>
-                            <CardDescription>{t('for')} {selectedYear}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-3xl font-bold mb-1">795mm</div>
-                            <div className="flex items-center text-sm">
-                                <TrendingUp className="h-4 w-4 mr-1 text-green-500" />
-                                <span className="text-green-500 font-medium">+5.2%</span>
-                                <span className="text-muted-foreground ml-1">{t('vsHistoricalAvg')}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">{t('rainyDays')}</CardTitle>
-                            <CardDescription>{t('for')} {selectedYear}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-3xl font-bold mb-1">115</div>
-                            <div className="flex items-center text-sm">
-                                <TrendingDown className="h-4 w-4 mr-1 text-red-500" />
-                                <span className="text-red-500 font-medium">-8</span>
-                                <span className="text-muted-foreground ml-1">{t('vsLastYear')}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">{t('extremeWeatherEvents')}</CardTitle>
-                            <CardDescription>{t('for')} {selectedYear}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-3xl font-bold mb-1">14</div>
-                            <div className="flex items-center text-sm">
-                                <TrendingUp className="h-4 w-4 mr-1 text-amber-500" />
-                                <span className="text-amber-500 font-medium">+3</span>
-                                <span className="text-muted-foreground ml-1">{t('vsLastYear')}</span>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
                 
-                {/* Different time period views */}
-                {selectedTimePeriod === 'monthly' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>{t('monthlyTemperature')}</CardTitle>
-                            <CardDescription>
-                                {selectedYear} {t('comparedTo10YearAvg')}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                                <LineChart data={monthlyTemperatureData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="month" />
-                                    <YAxis domain={[12, 28]} />
-                                    <Tooltip content={<ChartTooltipContent />} />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="avg"
-                                        stroke="var(--color-temperature)"
-                                        name={t('avgTemperature')}
-                                        strokeWidth={2}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="min"
-                                        stroke="var(--color-min)"
-                                        name={t('minTemperature')}
-                                        strokeWidth={1.5}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="max"
-                                        stroke="var(--color-max)"
-                                        name={t('maxTemperature')}
-                                        strokeWidth={1.5}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="reference"
-                                        stroke="var(--color-historical)"
-                                        name={t('historicalAvg')}
-                                        strokeDasharray="3 3"
-                                    />
-                                </LineChart>
-                            </ChartContainer>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {selectedTimePeriod === 'seasonal' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('seasonalRainfall')}</CardTitle>
-                                <CardDescription>
-                                    {selectedYear} {t('comparedToNormal')}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                                    <BarChart data={seasonData}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="name" />
-                                        <YAxis />
-                                        <Tooltip content={<ChartTooltipContent />} />
-                                        <Legend />
-                                        <Bar
-                                            dataKey="rainfall"
-                                            fill="#004b23"
-                                            name={t('rainfall')}
-                                        />
-                                        <Bar
-                                            dataKey="normalRainfall"
-                                            fill="#ecf39e"
-                                            name={t('normalRainfall')}
-                                        />
-                                    </BarChart>
-                                </ChartContainer>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('seasonalComparison')}</CardTitle>
-                                <CardDescription>
-                                    {t('rainfallVarianceFromNormal')}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="flex flex-col justify-center h-[350px]">
-                                <div className="space-y-4 ">
-                                    {seasonData.map(season => (
-                                        <div key={season.name} className="space-y-2">
-                                            <div className="flex justify-between">
-                                                <div>
-                                                    <span className="font-medium">{season.name}</span>
-                                                    <span className="text-sm text-muted-foreground ml-2">
-                            ({season.rainfall}mm vs {season.normalRainfall}mm)
-                          </span>
-                                                </div>
-                                                <div className={
-                                                    season.variance.startsWith('+')
-                                                        ? 'text-[#088d41] font-medium'
-                                                        : 'text-[#bc6c25] font-medium'
-                                                }>
-                                                    {season.variance}
-                                                </div>
-                                            </div>
-                                            <div className="w-full bg-muted rounded-full h-2.5">
-                                                <div
-                                                    className={`h-2.5 rounded-full ${
-                                                        season.variance.startsWith('+') ? 'bg-[#088d41]' : 'bg-[#bc6c25]'
-                                                    }`}
-                                                    style={{
-                                                        width: `${Math.min(100, Math.abs(parseInt(season.variance) * 4))}%`
-                                                    }}
-                                                ></div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-6 pt-6 border-t">
-                                    <h3 className="font-medium mb-2">{t('seasonalImpact')}</h3>
-                                    <ul className="space-y-1 text-sm">
-                                        <li className="flex items-start gap-2">
-                                            <div className="rounded-full bg-[#004b23] h-2 w-2 mt-1.5" />
-                                            <span>{t('seasonAImpact')}</span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <div className="rounded-full bg-[#004b23] h-2 w-2 mt-1.5" />
-                                            <span>{t('seasonBImpact')}</span>
-                                        </li>
-                                        <li className="flex items-start gap-2">
-                                            <div className="rounded-full bg-[#bc6c25] h-2 w-2 mt-1.5" />
-                                            <span>{t('seasonCImpact')}</span>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-                
-                {selectedTimePeriod === 'annual' && (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('annualTemperatureTrend')}</CardTitle>
-                                <CardDescription>
-                                    {t('temperatureLast5Years')}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                                    <LineChart data={temperatureData}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="year" />
-                                        <YAxis domain={[12, 28]} />
-                                        <Tooltip content={<ChartTooltipContent />} />
-                                        <Legend />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="avg"
-                                            stroke="var(--color-temperature)"
-                                            name={t('avgTemperature')}
-                                            strokeWidth={2}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="min"
-                                            stroke="var(--color-min)"
-                                            name={t('minTemperature')}
-                                            strokeWidth={1.5}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="max"
-                                            stroke="var(--color-max)"
-                                            name={t('maxTemperature')}
-                                            strokeWidth={1.5}
-                                        />
-                                    </LineChart>
-                                </ChartContainer>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('annualRainfallComparison')}</CardTitle>
-                                <CardDescription>
-                                    {t('currentVsHistorical')}
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                                    <BarChart data={rainfallData}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="month" />
-                                        <YAxis />
-                                        <Tooltip content={<ChartTooltipContent />} />
-                                        <Legend />
-                                        <Bar
-                                            dataKey="current"
-                                            fill="#3e8914"
-                                            name={t('currentYear')}
-                                        />
-                                        <Bar
-                                            dataKey="historical"
-                                            fill="#9ca3af"
-                                            name={t('historicalAvg')}
-                                        />
-                                    </BarChart>
-                                </ChartContainer>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
                 <Card>
                     <CardHeader>
-                        <CardTitle>{t('compareSections')}</CardTitle>
-                        <CardDescription>{t('compareSectorsDesc')}</CardDescription>
+                        <CardTitle className="flex items-center gap-2">
+                            <Filter className="h-5 w-5" />
+                            {t('dataFilters') || 'Data Filters'}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="flex flex-wrap gap-4">
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">{t('selectSector1')}</label>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            
+                            <div className="space-y-2">
+                                <Label>{t('viewType') || 'View Type'}</Label>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="outline">
-                                            <span>Kinigi</span>
-                                            <ChevronDown className="ml-2 h-4 w-4" />
+                                        <Button variant="outline" className="w-full justify-between">
+                                            <span>{t(viewType) || viewType}</span>
+                                            <ChevronDown className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        {musanzeSectors.map((sector) => (
-                                            <DropdownMenuItem key={sector}>
-                                                {sector}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">{t('selectSector2')}</label>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline">
-                                            <span>Muhoza</span>
-                                            <ChevronDown className="ml-2 h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        {musanzeSectors.map((sector) => (
-                                            <DropdownMenuItem key={sector}>
-                                                {sector}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
-
-                            <div className="flex flex-col gap-2">
-                                <label className="text-sm font-medium">{t('dataType')}</label>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline">
-                                            <Thermometer className="mr-2 h-4 w-4" />
-                                            <span>{t('temperature')}</span>
-                                            <ChevronDown className="ml-2 h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        <DropdownMenuItem>
-                                            <Thermometer className="mr-2 h-4 w-4" />
-                                            <span>{t('temperature')}</span>
+                                    <DropdownMenuContent className="w-full">
+                                        <DropdownMenuItem onClick={() => setViewType('monthly')}>
+                                            {t('monthly') || 'Monthly'}
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem>
-                                            <CloudRain className="mr-2 h-4 w-4" />
-                                            <span>{t('rainfall')}</span>
+                                        <DropdownMenuItem onClick={() => setViewType('weekly')}>
+                                            {t('weekly') || 'Weekly'}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setViewType('seasonal')}>
+                                            {t('seasonal') || 'Seasonal'}
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
 
-                            <div className="flex items-end">
-                                <Button variant="primary" className="h-9">
-                                    <RefreshCw className="mr-2 h-4 w-4" />
-                                    {t('compare')}
-                                </Button>
+                            
+                            <div className="space-y-2">
+                                <Label>{t('startDate') || 'Start Date'}</Label>
+                                <Input
+                                    type="date"
+                                    value={dateRange.startDate}
+                                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                                />
                             </div>
-                        </div>
 
-                        <div className="mt-6">
-                            <ChartContainer config={chartConfig} className="h-[350px] w-full">
-                                <LineChart data={monthlyTemperatureData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="month" />
-                                    <YAxis domain={[12, 28]} />
-                                    <Tooltip content={<ChartTooltipContent />} />
-                                    <Legend />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="avg"
-                                        stroke="#0D6C44"
-                                        name="Kinigi"
-                                        strokeWidth={2}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="reference"
-                                        stroke="#0B3C88"
-                                        name="Muhoza"
-                                        strokeWidth={2}
-                                    />
-                                </LineChart>
-                            </ChartContainer>
+                            
+                            <div className="space-y-2">
+                                <Label>{t('endDate') || 'End Date'}</Label>
+                                <Input
+                                    type="date"
+                                    value={dateRange.endDate}
+                                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                                />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
 
+                
+                {historicalData.length > 0 && (
+                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">{t('avgTemperature') || 'Avg Temperature'}</CardTitle>
+                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-3xl font-bold mb-1">{avgTemp.toFixed(1)}°C</div>
+                                <div className="flex items-center text-sm">
+                                    <Thermometer className="h-4 w-4 mr-1 text-blue-500" />
+                                    <span className="text-muted-foreground">{t('averageForPeriod') || 'Average for period'}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">{t('totalRainfall') || 'Total Rainfall'}</CardTitle>
+                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-3xl font-bold mb-1">{totalRainfall.toFixed(0)}mm</div>
+                                <div className="flex items-center text-sm">
+                                    <CloudRain className="h-4 w-4 mr-1 text-blue-500" />
+                                    <span className="text-muted-foreground">{rainyDays} {t('rainyDays') || 'rainy days'}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">{t('rainyDays') || 'Rainy Days'}</CardTitle>
+                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-3xl font-bold mb-1">{rainyDays}</div>
+                                <div className="flex items-center text-sm">
+                                    <span className="text-muted-foreground">{t('daysWithRain') || 'days with rain'}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-base">{t('extremeWeatherEvents') || 'Extreme Weather Events'}</CardTitle>
+                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-3xl font-bold mb-1">{extremeEvents}</div>
+                                <div className="flex items-center text-sm">
+                                    <span className="text-muted-foreground">{t('recordedEvents') || 'recorded events'}</span>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
+
+                
+                {historicalData.length > 0 ? (
+                    <>
+                        
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>
+                                        {viewType === 'seasonal' ? (t('seasonalTemperature') || 'Seasonal Temperature') :
+                                            viewType === 'weekly' ? (t('weeklyTemperature') || 'Weekly Temperature') :
+                                                (t('monthlyTemperature') || 'Monthly Temperature')}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {selectedLocation?.name} - {new Date(dateRange.startDate).getFullYear()} to {new Date(dateRange.endDate).getFullYear()}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                                        {viewType === 'seasonal' ? (
+                                            <BarChart data={processedData}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey="name" />
+                                                <YAxis />
+                                                <Tooltip content={<ChartTooltipContent />} />
+                                                <Legend />
+                                                <Bar
+                                                    dataKey="temperature"
+                                                    fill="var(--color-tempAvg)"
+                                                    name={t('avgTemperature') || 'Avg Temperature'}
+                                                />
+                                            </BarChart>
+                                        ) : (
+                                            <LineChart data={processedData}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey={viewType === 'weekly' ? 'week' : 'month'} />
+                                                <YAxis />
+                                                <Tooltip content={<ChartTooltipContent />} />
+                                                <Legend />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="tempAvg"
+                                                    stroke="var(--color-tempAvg)"
+                                                    name={t('avgTemperature') || 'Avg Temperature'}
+                                                    strokeWidth={2}
+                                                />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="tempMin"
+                                                    stroke="var(--color-tempMin)"
+                                                    name={t('minTemperature') || 'Min Temperature'}
+                                                    strokeWidth={1.5}
+                                                />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="tempMax"
+                                                    stroke="var(--color-tempMax)"
+                                                    name={t('maxTemperature') || 'Max Temperature'}
+                                                    strokeWidth={1.5}
+                                                />
+                                            </LineChart>
+                                        )}
+                                    </ChartContainer>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle>
+                                        {viewType === 'seasonal' ? (t('seasonalRainfall') || 'Seasonal Rainfall') :
+                                            viewType === 'weekly' ? (t('weeklyRainfall') || 'Weekly Rainfall') :
+                                                (t('monthlyRainfall') || 'Monthly Rainfall')}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {selectedLocation?.name} - {new Date(dateRange.startDate).getFullYear()} to {new Date(dateRange.endDate).getFullYear()}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                                        <BarChart data={processedData}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey={viewType === 'seasonal' ? 'name' : viewType === 'weekly' ? 'week' : 'month'} />
+                                            <YAxis />
+                                            <Tooltip content={<ChartTooltipContent />} />
+                                            <Legend />
+                                            <Bar
+                                                dataKey="rainfall"
+                                                fill="var(--color-rainfall)"
+                                                name={t('rainfall') || 'Rainfall'}
+                                            />
+                                        </BarChart>
+                                    </ChartContainer>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('compareLocations') || 'Compare Locations'}</CardTitle>
+                                <CardDescription>{t('compareLocationWeatherData') || 'Compare weather data between different locations'}</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="flex flex-wrap gap-4 mb-6">
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm font-medium">{t('selectLocation1') || 'Select Location 1'}</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline">
+                                                    <span>{comparisonLocation1?.name || t('selectLocation') || 'Select Location'}</span>
+                                                    <ChevronDown className="ml-2 h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                {locations.map((location) => (
+                                                    <DropdownMenuItem
+                                                        key={location.id}
+                                                        onClick={() => setComparisonLocation1(location)}
+                                                    >
+                                                        {location.name}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm font-medium">{t('selectLocation2') || 'Select Location 2'}</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline">
+                                                    <span>{comparisonLocation2?.name || t('selectLocation') || 'Select Location'}</span>
+                                                    <ChevronDown className="ml-2 h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                {locations.map((location) => (
+                                                    <DropdownMenuItem
+                                                        key={location.id}
+                                                        onClick={() => setComparisonLocation2(location)}
+                                                    >
+                                                        {location.name}
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="flex flex-col gap-2">
+                                        <label className="text-sm font-medium">{t('dataType') || 'Data Type'}</label>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="outline">
+                                                    {comparisonDataType === 'temperature' ? (
+                                                        <>
+                                                            <Thermometer className="mr-2 h-4 w-4" />
+                                                            <span>{t('temperature') || 'Temperature'}</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <CloudRain className="mr-2 h-4 w-4" />
+                                                            <span>{t('rainfall') || 'Rainfall'}</span>
+                                                        </>
+                                                    )}
+                                                    <ChevronDown className="ml-2 h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent>
+                                                <DropdownMenuItem onClick={() => setComparisonDataType('temperature')}>
+                                                    <Thermometer className="mr-2 h-4 w-4" />
+                                                    <span>{t('temperature') || 'Temperature'}</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem onClick={() => setComparisonDataType('rainfall')}>
+                                                    <CloudRain className="mr-2 h-4 w-4" />
+                                                    <span>{t('rainfall') || 'Rainfall'}</span>
+                                                </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
+
+                                    <div className="flex items-end">
+                                        <Button
+                                            variant="primary"
+                                            className="h-9"
+                                            onClick={fetchComparisonData}
+                                            disabled={!comparisonLocation1 || !comparisonLocation2}
+                                        >
+                                            <RefreshCw className="mr-2 h-4 w-4" />
+                                            {t('compare') || 'Compare'}
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                {comparisonChartData.length > 0 && (
+                                    <div className="mt-6">
+                                        <ChartContainer config={chartConfig} className="h-[350px] w-full">
+                                            <LineChart data={comparisonChartData}>
+                                                <CartesianGrid strokeDasharray="3 3" />
+                                                <XAxis dataKey={viewType === 'seasonal' ? 'name' : viewType === 'weekly' ? 'week' : 'month'} />
+                                                <YAxis />
+                                                <Tooltip content={<ChartTooltipContent />} />
+                                                <Legend />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="location1"
+                                                    stroke="#0D6C44"
+                                                    name={comparisonLocation1?.name || 'Location 1'}
+                                                    strokeWidth={2}
+                                                />
+                                                <Line
+                                                    type="monotone"
+                                                    dataKey="location2"
+                                                    stroke="#0B3C88"
+                                                    name={comparisonLocation2?.name || 'Location 2'}
+                                                    strokeWidth={2}
+                                                />
+                                            </LineChart>
+                                        </ChartContainer>
+                                    </div>
+                                )}
+
+                                {comparisonData1.length > 0 && comparisonData2.length > 0 && (
+                                    <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-base">{comparisonLocation1?.name}</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-2 text-sm">
+                                                    <div className="flex justify-between">
+                                                        <span>{t('avgTemperature') || 'Avg Temperature'}:</span>
+                                                        <span className="font-medium">
+                                                            {comparisonData1.length > 0 ? (comparisonData1.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / comparisonData1.length).toFixed(1) : '0'}°C
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>{t('totalRainfall') || 'Total Rainfall'}:</span>
+                                                        <span className="font-medium">
+                                                            {comparisonData1.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0).toFixed(0)}mm
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>{t('rainyDays') || 'Rainy Days'}:</span>
+                                                        <span className="font-medium">
+                                                            {comparisonData1.filter(record => record.weatherSummary.precipitation.rainAmount > 0.1).length}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-base">{comparisonLocation2?.name}</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-2 text-sm">
+                                                    <div className="flex justify-between">
+                                                        <span>{t('avgTemperature') || 'Avg Temperature'}:</span>
+                                                        <span className="font-medium">
+                                                            {comparisonData2.length > 0 ? (comparisonData2.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / comparisonData2.length).toFixed(1) : '0'}°C
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>{t('totalRainfall') || 'Total Rainfall'}:</span>
+                                                        <span className="font-medium">
+                                                            {comparisonData2.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0).toFixed(0)}mm
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex justify-between">
+                                                        <span>{t('rainyDays') || 'Rainy Days'}:</span>
+                                                        <span className="font-medium">
+                                                            {comparisonData2.filter(record => record.weatherSummary.precipitation.rainAmount > 0.1).length}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{t('weatherInsights') || 'Weather Insights'}</CardTitle>
+                                <CardDescription>
+                                    {t('keyTrendsAndPatterns') || 'Key trends and patterns'} - {selectedLocation?.name}
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium flex items-center gap-2">
+                                            <Thermometer className="h-4 w-4" />
+                                            {t('temperatureTrend') || 'Temperature Trend'}
+                                        </h4>
+                                        <div className="text-sm space-y-1">
+                                            <div className="flex justify-between">
+                                                <span>{t('highest') || 'Highest'}:</span>
+                                                <span className="font-medium text-red-600">
+                                                    {historicalData.length > 0 ? Math.max(...historicalData.map(r => r.weatherSummary.temperature.max)).toFixed(1) : '0'}°C
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>{t('lowest') || 'Lowest'}:</span>
+                                                <span className="font-medium text-blue-600">
+                                                    {historicalData.length > 0 ? Math.min(...historicalData.map(r => r.weatherSummary.temperature.min)).toFixed(1) : '0'}°C
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>{t('average') || 'Average'}:</span>
+                                                <span className="font-medium">
+                                                    {avgTemp.toFixed(1)}°C
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium flex items-center gap-2">
+                                            <CloudRain className="h-4 w-4" />
+                                            {t('rainfallPattern') || 'Rainfall Pattern'}
+                                        </h4>
+                                        <div className="text-sm space-y-1">
+                                            <div className="flex justify-between">
+                                                <span>{t('totalRainfall') || 'Total Rainfall'}:</span>
+                                                <span className="font-medium text-blue-600">
+                                                    {totalRainfall.toFixed(0)}mm
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>{t('rainyDays') || 'Rainy Days'}:</span>
+                                                <span className="font-medium">
+                                                    {rainyDays}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>{t('maxDailyRain') || 'Max Daily Rain'}:</span>
+                                                <span className="font-medium">
+                                                    {historicalData.length > 0 ? Math.max(...historicalData.map(r => r.weatherSummary.precipitation.rainAmount)).toFixed(1) : '0'}mm
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <h4 className="font-medium flex items-center gap-2">
+                                            <TrendingUp className="h-4 w-4" />
+                                            {t('extremeEvents') || 'Extreme Events'}
+                                        </h4>
+                                        <div className="text-sm space-y-1">
+                                            <div className="flex justify-between">
+                                                <span>{t('totalEvents') || 'Total Events'}:</span>
+                                                <span className="font-medium text-amber-600">
+                                                    {extremeEvents}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>{t('hotDays') || 'Hot Days'} (&gt;30°C):</span>
+                                                <span className="font-medium">
+                                                    {historicalData.filter(r => r.weatherSummary.temperature.max > 30).length}
+                                                </span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span>{t('heavyRain') || 'Heavy Rain'} (&gt;50mm):</span>
+                                                <span className="font-medium">
+                                                    {historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="mt-6 pt-6 border-t">
+                                    <h4 className="font-medium mb-3">{t('farmingInsights') || 'Farming Insights'}</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <h5 className="text-sm font-medium text-green-600">{t('favorableConditions') || 'Favorable Conditions'}</h5>
+                                            <ul className="text-sm space-y-1">
+                                                <li className="flex items-start gap-2">
+                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
+                                                    <span>
+                                                        {historicalData.filter(r => r.weatherSummary.temperature.current >= 18 && r.weatherSummary.temperature.current <= 25).length} {t('daysOptimalTemp') || 'days with optimal temperature'}
+                                                    </span>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
+                                                    <span>
+                                                        {historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 1 && r.weatherSummary.precipitation.rainAmount < 30).length} {t('daysModerateRain') || 'days with moderate rain'}
+                                                    </span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <h5 className="text-sm font-medium text-amber-600">{t('challengingConditions') || 'Challenging Conditions'}</h5>
+                                            <ul className="text-sm space-y-1">
+                                                <li className="flex items-start gap-2">
+                                                    <div className="rounded-full bg-amber-500 h-2 w-2 mt-1.5" />
+                                                    <span>
+                                                        {historicalData.filter(r => r.weatherSummary.temperature.max > 30 || r.weatherSummary.temperature.min < 10).length} {t('daysExtremeTemp') || 'days with extreme temperature'}
+                                                    </span>
+                                                </li>
+                                                <li className="flex items-start gap-2">
+                                                    <div className="rounded-full bg-amber-500 h-2 w-2 mt-1.5" />
+                                                    <span>
+                                                        {historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length} {t('daysHeavyRain') || 'days with heavy rain'}
+                                                    </span>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </>
+                ) : (
+                    /* Empty state for no data or errors */
+                    renderEmptyState()
+                )}
+
                 <div className="text-xs text-muted-foreground text-center mt-4">
-                    {t('dataLastUpdated')}: {new Date().toLocaleString()}
+                    {t("dataLastUpdated") || "Data last updated"}: {new Date().toLocaleString()}
                 </div>
             </div>
         </AppLayout>

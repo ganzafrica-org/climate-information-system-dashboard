@@ -17,8 +17,8 @@ export default function MyApp({ Component, pageProps }: AppProps) {
                 <AuthProvider>
                     <ThemeProvider
                         attribute="class"
-                        defaultTheme="system"
-                        enableSystem
+                        defaultTheme="light"
+                        forcedTheme="light"
                         disableTransitionOnChange
                     >
                         <Component {...pageProps} />
