@@ -52,6 +52,8 @@
   "selectRegion": "Select Region",
   "selectLocation": "Select Location",
   "locationSelector": "Location Selector",
+  "searchLocations": "Search Locations...",
+  "joinedDate": "Joined Date",
 
   "heavyRainAlert": "Heavy Rainfall Alert",
   "heavyRainWarning": "Heavy rainfall expected (>25mm). Protect seedlings, delay fertilizer application, ensure proper drainage in fields.",
@@ -507,6 +509,11 @@
   "createdAt": "Created At",
   "locationsManagement": "Locations Management",
   "farmers": "Farmers",
+  "locationDetails": "Location Details",
+  "viewLocationInfo": "View Location Information",
+  "totalAlerts": "Total Alerts",
+  "editLocation": "Edit Location",
+  "close": "Close",
   
 
   "morning": "Morning",
@@ -689,6 +696,7 @@
   "goodTimeForHarvesting": "Good conditions for harvesting",
   "provideShadeForLivestock": "Provide shade for livestock",
   "monitorCropsRegularly": "Monitor crops regularly for any changes",
+  "viewLocation": "View Location",
 
    "communications": "Communications",
   "customMessages": "Custom Messages",

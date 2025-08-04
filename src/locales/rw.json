@@ -25,6 +25,12 @@
   "locationsManagement": "Gucunga Ahantu",
   "farmers": "Abahinzi",
   "locations": "Ahantu",
+  "locationDetails" : "Ibisobanuro by'Ahantu",
+  "viewLocationInfo": "Reba Amakuru y'Ahantu",
+  "totalAlerts": "Imburizi zose",
+  "editLocation": "Hindura Ahantu",
+  "close": "Funga",
+  
 
   "todayForecast": "Iteganyagihe ry'uyu munsi",
   "weeklyOverview": "Incamake y'icyumweru",
@@ -254,9 +260,15 @@
   "location": "Ahantu",
   "farmSize": "Ingano y'Umurima",
   "actions": "Ibikorwa",
+  "viewLocation": "Reba Ahantu",
+  "coordinates": "Ibipimo Ndangahantu",
+  "latitude": "Ubuhagarike",
+  "longitude": "Ubugari",
+  "searchLocations": "Shakisha Ahantu...",
+  "joinedDate": "Itariki Yiyandikishije",
 
   "viewProfile": "Reba Umwirondoro",
-  "editFarmer": "Hindura Umuhinzi",
+  "editFarmer": "Hindura Imyirondoro Y'umuhinzi",
   "delete": "Gusiba",
 
   "farmerProfile": "Umwirondoro w'Umuhinzi",
