@@ -77,7 +77,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
 
         setIsLoading(true);
         try {
-            await api.post<ApiResponse<Location>>('/api/admin/locations', formData);
+            await api.post<ApiResponse<Location>>('/api/users/locations', formData);
             toast.success(t('locationCreatedSuccessfully') || 'Location created successfully');
             onSuccess();
             onOpenChange(false);
@@ -97,7 +97,6 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
     };
 
     const handleCoordinateChange = (field: 'lat' | 'lon', value: string) => {
-
         if (value === '') {
             setFormData(prev => ({ ...prev, [field]: undefined }));
             return;
@@ -121,7 +120,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="name">
                             {t('locationName') || 'Location Name'} <span className="text-red-500">*</span>
@@ -200,7 +199,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
                             {t('cancel') || 'Cancel'}
                         </Button>
                         <Button 
-                            type="submit" 
+                            onClick={handleSubmit}
                             disabled={isLoading}
                             style={{ backgroundColor: '#3a93f2', borderColor: '#3a93f2' }}
                             className="hover:opacity-90 text-white"
@@ -208,7 +207,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
                             {isLoading ? (t('creating') || 'Creating...') : (t('createLocation') || 'Create Location')}
                         </Button>
                     </DialogFooter>
-                </form>
+                </div>
             </DialogContent>
         </Dialog>
     );
@@ -238,8 +237,22 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
         setIsLoading(true);
         setError(null);
         try {
-            const response = await api.get<ApiResponse<Location>>(`/api/admin/locations/${id}`);
-            setLocation(response.data);
+            const response = await api.get(`/api/admin/locations/${id}`);
+            console.log('API Response:', response.data); // Debug log
+            
+            // Handle different possible response structures
+            let locationData = null;
+            if (response.data?.data?.location) {
+                locationData = response.data.data.location;
+            } else if (response.data?.location) {
+                locationData = response.data.location;
+            } else if (response.data?.data && !response.data.data.location) {
+                locationData = response.data.data;
+            } else {
+                locationData = response.data;
+            }
+            
+            setLocation(locationData);
         } catch (error: any) {
             const message = error.response?.data?.message || error.message || t('failedToLoadLocation');
             setError(message);
@@ -302,30 +315,33 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
                         <Separator />
 
                         <div className="grid grid-cols-1 gap-6">
-
-                            <div>
-                                <h4 className="font-medium mb-3">{t('additionalInfo') || 'Additional Info'}</h4>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">{t('locationId') || 'Location ID'}:</span>
-                                        <span>#{location.id}</span>
+                            {/* Display alerts with scroll after 3 items */}
+                            {(location as any).alerts && (location as any).alerts.length > 0 && (
+                                <div>
+                                    <h4 className="font-medium mb-3">{t('weatherAlerts') || 'Weather Alerts'}</h4>
+                                    <div className="max-h-[240px] overflow-y-auto space-y-2 pr-2">
+                                        {(location as any).alerts.map((alert: any) => (
+                                            <div key={alert.id} className="p-3 border rounded-lg">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <Badge variant="outline" className="text-xs">
+                                                        {alert.type}
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {new Date(alert.createdAt).toLocaleDateString()}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-muted-foreground">{alert.message}</p>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">{t('createdAt') || 'Created At'}:</span>
-                                        <span>{location.createdAt ? new Date(location.createdAt).toLocaleDateString() : '-'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">{t('lastUpdated') || 'Last Updated'}:</span>
-                                        <span>{location.updatedAt ? new Date(location.updatedAt).toLocaleDateString() : '-'}</span>
-                                    </div>
-                                    {location.userId && (
-                                        <div className="flex justify-between">
-                                            <span className="text-muted-foreground">{t('createdBy') || 'Created By'}:</span>
-                                            <span>{location.user?.username || `User #${location.userId}`}</span>
-                                        </div>
+                                    {(location as any).alerts.length > 0 && (
+                                        <p className="text-xs text-muted-foreground mt-2">
+                                            {t('totalAlerts', { count: (location as any).alerts.length }) || 
+                                             `${(location as any).alerts.length} total alert${(location as any).alerts.length > 1 ? 's' : ''}`}
+                                        </p>
                                     )}
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 ) : null}
@@ -336,7 +352,7 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
                     </Button>
                     {location && (
                         <Button 
-                            variant="primary" 
+                            variant="default" 
                             onClick={() => onEdit(location)}
                             style={{ backgroundColor: '#3a93f2', borderColor: '#3a93f2' }}
                             className="hover:opacity-90 text-white"
@@ -418,7 +434,7 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
 
         setIsLoading(true);
         try {
-            await api.put<ApiResponse<Location>>(`/api/admin/locations/${location.id}`, formData);
+            await api.put<ApiResponse<Location>>(`/api/users/locations/${location.id}`, formData);
             toast.success(t('locationUpdatedSuccessfully') || 'Location updated successfully');
             onSuccess();
             onOpenChange(false);
@@ -431,7 +447,6 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
     };
 
     const handleCoordinateChange = (field: 'lat' | 'lon', value: string) => {
-
         if (value === '') {
             setFormData(prev => ({ ...prev, [field]: null }));
             return;
@@ -458,7 +473,7 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
                     </DialogDescription>
                 </DialogHeader>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-4">
                     <div className="space-y-2">
                         <Label htmlFor="edit-name">
                             {t('locationName') || 'Location Name'} <span className="text-red-500">*</span>
@@ -537,8 +552,7 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
                             {t('cancel') || 'Cancel'}
                         </Button>
                         <Button 
-                            variant="primary" 
-                            type="submit" 
+                            onClick={handleSubmit}
                             disabled={isLoading}
                             style={{ backgroundColor: '#3a93f2', borderColor: '#3a93f2' }}
                             className="hover:opacity-90 text-white"
@@ -546,7 +560,7 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
                             {isLoading ? (t('updating') || 'Updating...') : (t('updateLocation') || 'Update Location')}
                         </Button>
                     </DialogFooter>
-                </form>
+                </div>
             </DialogContent>
         </Dialog>
     );

@@ -5,14 +5,11 @@ import {
     LayoutDashboard,
     Cloud,
     History,
-    Bell,
     Users,
     MessageSquare,
     Settings,
     Globe,
     Menu,
-    ChevronLeft,
-    ChevronRight,
     LogOut,
     BookOpen,
     HelpCircle, MapPin, Loader2,
@@ -66,7 +63,6 @@ export function AppLayout({ children }: AppLayoutProps) {
         { href: '/farmers', icon: <Users size={20} />, label: t('farmers') },
         { href: '/locations', icon: <MapPin size={20} />, label: t('locations') },
         { href: '/training', icon: <BookOpen size={20} />, label: t('training') },
-        { href: '/settings', icon: <Settings size={20} />, label: t('settings') }
     ];
 
     const getUserInitials = (username: string) => {
@@ -106,7 +102,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                         <Link href={item.href}>
                                             <Button
                                                 variant="ghost"
-                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#f3f4f6] hover:text-black ${isActive ? 'bg-blue-600 text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-blue-100 hover:text-black ${isActive ? 'bg-blue-600 text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
                                             >
                                                 {item.icon}
                                                 {(sidebarOpen || isMobile) && <span className="ml-3">{item.label}</span>}
@@ -213,7 +209,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
     return (
         <div className="flex h-screen overflow-hidden bg-[#f9fafb]">
-            {/* Fixed full-width header */}
+            
             <header className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white border-b h-16 flex items-center justify-between px-4 md:px-6">
                 <div className="flex items-center">
                     {isMobile && <MobileSidebar />}
@@ -300,10 +296,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                 </div>
             </header>
 
-            {/* Sidebar below the header */}
+            
             {!isMobile && <DesktopSidebar />}
 
-            {/* Main content area */}
+            
             <div className="flex flex-col flex-1 overflow-hidden pt-16">
                 <main className="flex-1 overflow-auto bg-[#f9fafb]">
                     <div className="container mx-auto p-3 md:p-6">

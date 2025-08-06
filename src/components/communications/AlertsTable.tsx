@@ -97,6 +97,59 @@ const PriorityBadge = ({ priority }: { priority: string }) => {
     }
 };
 
+// Delete Confirmation Dialog Component
+const DeleteConfirmationDialog = ({ 
+    isOpen, 
+    onClose, 
+    onConfirm, 
+    alertCount 
+}: { 
+    isOpen: boolean; 
+    onClose: () => void; 
+    onConfirm: () => void; 
+    alertCount: number; 
+}) => {
+    const { t } = useLanguage();
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-lg">
+                <div className="text-center">
+                    <div className="mb-4">
+                        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
+                            <Trash className="h-6 w-6 text-red-600" />
+                        </div>
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                            {t('confirmDelete') || 'Confirm Delete'}
+                        </h3>
+                        <p className="text-sm text-gray-500">
+                            {t('confirmDeleteMessage') || `Are you sure you want to delete the ${alertCount} selected alert${alertCount > 1 ? 's' : ''}?`}
+                        </p>
+                    </div>
+                    <div className="flex gap-3 justify-center">
+                        <Button
+                            variant="outline"
+                            onClick={onClose}
+                            className="px-6"
+                        >
+                            {t('cancel') || 'Cancel'}
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={onConfirm}
+                            className="px-6"
+                        >
+                            {t('delete') || 'Delete'}
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface Alert {
   id: number;
   type: string;
@@ -152,6 +205,11 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
     const [totalPages, setTotalPages] = useState(0);
     const [sortField, setSortField] = useState<string>('createdAt');
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+    
+    // Multi-select state
+    const [selectedAlerts, setSelectedAlerts] = useState<Set<number>>(new Set());
+    const [selectAll, setSelectAll] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     // Fetch alerts from API
     const fetchAlerts = async (page: number = currentPage, refresh: boolean = false) => {
@@ -235,6 +293,10 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             setTotalCount(paginationData.total || transformedAlerts.length);
             setTotalPages(paginationData.totalPages || Math.ceil((paginationData.total || transformedAlerts.length) / limit));
             setCurrentPage(paginationData.page || page);
+            
+            // Clear selections on new data
+            setSelectedAlerts(new Set());
+            setSelectAll(false);
             
             if (refresh) {
                 toast.success(t('alertsRefreshed') || 'Alerts refreshed');
@@ -346,6 +408,49 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
         fetchAlerts(currentPage, true);
     };
 
+    // Multi-select handlers
+    const handleSelectAlert = (alertId: number) => {
+        const newSelected = new Set(selectedAlerts);
+        if (newSelected.has(alertId)) {
+            newSelected.delete(alertId);
+        } else {
+            newSelected.add(alertId);
+        }
+        setSelectedAlerts(newSelected);
+        setSelectAll(newSelected.size === alerts.length);
+    };
+
+    const handleSelectAll = () => {
+        if (selectAll) {
+            setSelectedAlerts(new Set());
+            setSelectAll(false);
+        } else {
+            const allIds = new Set(alerts.map(alert => alert.id));
+            setSelectedAlerts(allIds);
+            setSelectAll(true);
+        }
+    };
+
+    const handleBulkDelete = async () => {
+        try {
+            const alertIds = Array.from(selectedAlerts);
+            
+            // Delete alerts (assuming API supports bulk delete or individual deletes)
+            await Promise.all(
+                alertIds.map(id => api.delete(`/api/weather/alerts/${id}`))
+            );
+            
+            toast.success(t('alertsDeleted') || `${alertIds.length} alert(s) deleted successfully`);
+            setSelectedAlerts(new Set());
+            setSelectAll(false);
+            setShowDeleteConfirm(false);
+            fetchAlerts(currentPage, true);
+        } catch (error: any) {
+            console.error('Failed to delete alerts:', error);
+            toast.error(t('failedToDeleteAlerts') || 'Failed to delete some alerts');
+        }
+    };
+
     // Fallback data for development/testing
     const getFallbackAlerts = (): Alert[] => {
         return [
@@ -397,8 +502,6 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
         ];
     };
 
-    // Remove unused functions - replaced by custom badge components
-
     if (isLoading && alerts.length === 0) {
         return (
             <Card>
@@ -411,6 +514,10 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             </Card>
         );
     }
+
+    // Calculate the actual range being displayed
+    const startIndex = (currentPage - 1) * limit + 1;
+    const endIndex = Math.min(currentPage * limit, totalCount);
 
     return (
         <>
@@ -426,24 +533,41 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                 {totalCount} {t("alertsFound")}
                             </CardDescription>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={handleRefresh}
-                            disabled={isRefreshing}
-                        >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                            {isRefreshing ? t('refreshing') : t('refresh')}
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            {selectedAlerts.size > 0 && (
+                                <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => setShowDeleteConfirm(true)}
+                                >
+                                    <Trash className="h-4 w-4 mr-2" />
+                                    {t('delete')} ({selectedAlerts.size})
+                                </Button>
+                            )}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRefresh}
+                                disabled={isRefreshing}
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {isRefreshing ? t('refreshing') : t('refresh')}
+                            </Button>
+                        </div>
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-blue-600 text-white">
+                            <thead className="bg-[#f2f5fa] text-black">
                                 <tr>
                                     <th className="py-4 px-6 text-left font-semibold text-sm w-12">
-                                        <span>#</span>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectAll}
+                                            onChange={handleSelectAll}
+                                            className="rounded border-gray-300"
+                                        />
                                     </th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">
                                         <button
@@ -501,7 +625,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                             <tbody>
                                 {alerts.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                                        <td colSpan={9} className="py-8 text-center text-muted-foreground">
                                             {isLoading ? (
                                                 <div className="flex items-center justify-center gap-2">
                                                     <Loader2 className="animate-spin h-4 w-4" />
@@ -516,13 +640,22 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                     alerts.map((alert, index) => (
                                         <tr
                                             key={alert.id}
-                                            className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
-                                            onClick={() => handleViewDetails(alert)}
+                                            className={`border-b hover:bg-muted/50 transition-colors ${
+                                                selectedAlerts.has(alert.id) ? 'bg-blue-50' : ''
+                                            }`}
                                         >
-                                            <td className="py-3 px-4 text-sm font-medium">
-                                                {index + 1}
+                                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedAlerts.has(alert.id)}
+                                                    onChange={() => handleSelectAlert(alert.id)}
+                                                    className="rounded border-gray-300"
+                                                />
                                             </td>
-                                            <td className="py-3 px-4">
+                                            <td 
+                                                className="py-3 px-4 cursor-pointer"
+                                                onClick={() => handleViewDetails(alert)}
+                                            >
                                                 <div className="font-medium capitalize">{alert.type}</div>
                                                 {alert.category && (
                                                     <div className="text-xs text-muted-foreground">
@@ -531,7 +664,10 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                                 )}
                                             </td>
 
-                                            <td className="py-3 px-4">
+                                            <td 
+                                                className="py-3 px-4 cursor-pointer"
+                                                onClick={() => handleViewDetails(alert)}
+                                            >
                                                 <div className="text-sm line-clamp-2 max-w-[300px]">
                                                     {typeof alert.message === 'string' ? alert.message : 'No message'}
                                                 </div>
@@ -540,7 +676,10 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                                 </div>
                                             </td>
 
-                                            <td className="py-3 px-4">
+                                            <td 
+                                                className="py-3 px-4 cursor-pointer"
+                                                onClick={() => handleViewDetails(alert)}
+                                            >
                                                 <div className="flex flex-wrap gap-1">
                                                     <Badge variant="outline" className="text-xs">
                                                         <MapPin className="h-3 w-3 mr-1" />
@@ -554,11 +693,17 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                                 )}
                                             </td>
 
-                                            <td className="py-3 px-4">
+                                            <td 
+                                                className="py-3 px-4 cursor-pointer"
+                                                onClick={() => handleViewDetails(alert)}
+                                            >
                                                 <PriorityBadge priority={alert.priority || 'medium'} />
                                             </td>
 
-                                            <td className="py-3 px-4">
+                                            <td 
+                                                className="py-3 px-4 cursor-pointer"
+                                                onClick={() => handleViewDetails(alert)}
+                                            >
                                                 <StatusBadge status={alert.status || (alert.isSent ? 'sent' : 'draft')} />
                                                 {alert.sentAt && (
                                                     <div className="text-xs text-muted-foreground mt-1">
@@ -568,7 +713,10 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                                 )}
                                             </td>
 
-                                            <td className="py-3 px-4">
+                                            <td 
+                                                className="py-3 px-4 cursor-pointer"
+                                                onClick={() => handleViewDetails(alert)}
+                                            >
                                                 <div className="text-xs text-muted-foreground">
                                                     <Calendar className="h-3 w-3 inline mr-1" />
                                                     {new Date(alert.createdAt).toLocaleDateString()}
@@ -622,7 +770,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 {alerts.length > 0 && (
                     <CardFooter className="p-4 flex flex-col sm:flex-row justify-between gap-4">
                         <div className="text-sm text-muted-foreground">
-                            {t("showing")} {Math.min((currentPage - 1) * limit + 1, totalCount)} - {Math.min(currentPage * limit, totalCount)} {t("of")} {totalCount} {t("alerts")}
+                            {t("showing")} {startIndex} - {endIndex} {t("of")} {totalCount} {t("alerts")}
                         </div>
                         <div className="flex items-center gap-2">
                             <select
@@ -679,6 +827,13 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 onOpenChange={setIsEditDialogOpen}
                 alert={selectedAlert}
                 onSuccess={handleEditSuccess}
+            />
+
+            <DeleteConfirmationDialog
+                isOpen={showDeleteConfirm}
+                onClose={() => setShowDeleteConfirm(false)}
+                onConfirm={handleBulkDelete}
+                alertCount={selectedAlerts.size}
             />
         </>
     );

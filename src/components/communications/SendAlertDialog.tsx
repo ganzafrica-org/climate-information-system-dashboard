@@ -422,7 +422,7 @@ export function SendAlertDialog({
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
+            <MessageSquare className="h-5 w-5 text-blue-600" />
             {t('sendAlert')} #{alert.id}
           </DialogTitle>
           <DialogDescription>
@@ -445,7 +445,7 @@ export function SendAlertDialog({
                 </h3>
               </div>
 
-              <div className="bg-muted rounded-lg p-4">
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
                 <p className="text-sm mb-3">{sendResult.message}</p>
                 
                 {sendResult.results && (
@@ -486,7 +486,10 @@ export function SendAlertDialog({
               </div>
 
               <div className="flex gap-2">
-                <Button onClick={() => onOpenChange(false)}>
+                <Button 
+                  onClick={() => onOpenChange(false)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
                   {t('close')}
                 </Button>
               </div>
@@ -498,7 +501,7 @@ export function SendAlertDialog({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5" />
+                  <Users className="h-5 w-5 text-blue-600" />
                   {t('selectFarmers')} ({filteredFarmers.length})
                 </h3>
                 <Button
@@ -506,6 +509,7 @@ export function SendAlertDialog({
                   size="sm"
                   onClick={handleSelectAllFarmers}
                   disabled={isLoadingFarmers || filteredFarmers.length === 0}
+                  className="border-blue-600 text-blue-600 hover:bg-blue-50"
                 >
                   {selectedFarmers.length === filteredFarmers.length ? t('unselectAll') : t('selectAll')}
                 </Button>
@@ -513,18 +517,18 @@ export function SendAlertDialog({
 
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-blue-600" />
                 <Input
                   placeholder={t('searchFarmers') || 'Search farmers...'}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8"
+                  className="pl-8 border-blue-300 focus:border-blue-600"
                 />
               </div>
 
               {/* Selected count */}
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span>{selectedFarmers.length} {t('farmersSelected')}</span>
+                <span className="text-blue-600 font-medium">{selectedFarmers.length} {t('farmersSelected')}</span>
                 <span>
                   {t('location')}: {
                     typeof alert.location === 'object' && alert.location !== null 
@@ -535,15 +539,15 @@ export function SendAlertDialog({
               </div>
 
               {/* Debug info */}
-              <div className="text-xs text-muted-foreground">
+              <div className="text-xs text-blue-600">
                 Debug: {farmers.length} total farmers, {filteredFarmers.length} filtered, loading: {isLoadingFarmers.toString()}
               </div>
 
               {/* Farmers list */}
-              <div className="border rounded-lg max-h-60 overflow-y-auto">
+              <div className="border border-blue-200 rounded-lg max-h-60 overflow-y-auto">
                 {isLoadingFarmers ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="animate-spin h-6 w-6 mr-2" />
+                    <Loader2 className="animate-spin h-6 w-6 mr-2 text-blue-600" />
                     <span>{t('loadingFarmers')}</span>
                   </div>
                 ) : filteredFarmers.length === 0 ? (
@@ -552,12 +556,16 @@ export function SendAlertDialog({
                     <p className="text-xs mt-2">Total farmers in state: {farmers.length}</p>
                   </div>
                 ) : (
-                  <div className="divide-y">
+                  <div className="divide-y divide-blue-100">
                     {filteredFarmers.map((farmer) => (
-                      <div key={farmer.id} className="flex items-center space-x-3 p-3 hover:bg-muted/50">
+                      <div key={farmer.id} className="flex items-center space-x-3 p-3 hover:bg-blue-50">
                         <Checkbox
                           checked={selectedFarmers.includes(farmer.id)}
                           onCheckedChange={() => handleSelectFarmer(farmer.id)}
+                          style={{ 
+                            backgroundColor: selectedFarmers.includes(farmer.id) ? '#2563eb' : 'transparent',
+                            borderColor: '#2563eb'
+                          }}
                         />
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate">{farmer.name}</div>
@@ -572,10 +580,10 @@ export function SendAlertDialog({
               </div>
 
               {/* Message preview */}
-              <div className="bg-muted/50 p-3 rounded-lg">
-                <h4 className="font-medium mb-2">{t('messagePreview')}</h4>
+              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
+                <h4 className="font-medium mb-2 text-blue-600">{t('messagePreview')}</h4>
                 <p className="text-sm">{alert.message}</p>
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-blue-600 mt-1">
                   {alert.messageLength} characters • {alert.messageSegments} SMS segments
                 </p>
               </div>
@@ -585,7 +593,7 @@ export function SendAlertDialog({
                 <Button
                   onClick={handleSendAlert}
                   disabled={isActionLoading || selectedFarmers.length === 0}
-                  className="flex-1"
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Send className="h-4 w-4 mr-2" />
                   {isActionLoading ? (
@@ -601,6 +609,7 @@ export function SendAlertDialog({
                   variant="outline"
                   onClick={() => onOpenChange(false)}
                   disabled={isActionLoading}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   <X className="h-4 w-4 mr-2" />
                   {t('cancel')}

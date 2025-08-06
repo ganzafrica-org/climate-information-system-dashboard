@@ -87,50 +87,6 @@ export default function Communications() {
                     <div className="flex items-center gap-2">
                         <h2 className="text-lg font-medium">{t("Agricultural Alerts & Messages")}</h2>
                     </div>
-
-                    {/* Right side - All Locations and Search */}
-                    {activeTab !== 'scheduler' && (
-                        <div className="flex flex-wrap w-full lg:w-auto items-center gap-2">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button
-                                        variant="outline"
-                                        style={{ borderColor: '#66a9e3', color: '#66a9e3' }}
-                                        className="hover:bg-blue-50"
-                                    >
-                                        <MapPin className="h-4 w-4 mr-2" />
-                                        <span>{getSelectedLocationName()}</span>
-                                        <ChevronDown className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    <DropdownMenuItem onClick={() => setSelectedLocation(null)}>
-                                        {t("allLocations") || "All Locations"}
-                                    </DropdownMenuItem>
-                                    <Separator className="my-1" />
-                                    {locations.map((location) => (
-                                        <DropdownMenuItem 
-                                            key={location.id} 
-                                            onClick={() => setSelectedLocation(location)}
-                                        >
-                                            {location.name}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                            
-                            <div className="relative">
-                                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                                <Input
-                                    type="search"
-                                    placeholder={t("searchMessages") || "Search messages..."}
-                                    className="pl-10 w-[300px] bg-gray-50 border-gray-200"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
             
