@@ -235,7 +235,7 @@ const RainfallHeatmap: React.FC<RainfallHeatmapProps> = ({ className = "" }) => 
 
     return (
         <Card className={`w-full border-0 shadow-md ${className}`}>
-            <CardHeader className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 text-white rounded-t-xl">
+            <CardHeader className="bg-gradient-to-br bg-[#f2f5fa] text-blue-600 rounded-t-xl">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
                         <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
@@ -248,7 +248,7 @@ const RainfallHeatmap: React.FC<RainfallHeatmapProps> = ({ className = "" }) => 
 
                         </div>
                     </div>
-                    <Badge variant="outline" className="bg-white/10 text-white border-white/20 px-4 py-2">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-600 border-white/20 px-4 py-2">
                         <MapPin className="h-4 w-4 mr-2" />
                         Musanze District
                     </Badge>

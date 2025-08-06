@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLanguage } from '@/i18n';
 import {
     User,
@@ -17,7 +18,11 @@ import {
     Loader2,
     AlertCircle,
     Upload,
-    CheckCircle, X, FileText, Download
+    CheckCircle, 
+    X, 
+    FileText, 
+    Download,
+    Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -30,6 +35,69 @@ interface CreateFarmerDialogProps {
     onOpenChange: (open: boolean) => void;
     locations: Location[];
     onSuccess: () => void;
+}
+
+interface FarmerFilterProps {
+    locations: Location[];
+    selectedLocationId: number | null;
+    onLocationChange: (locationId: number | null) => void;
+    farmers: Farmer[];
+}
+
+// New component for location filtering
+export function FarmerLocationFilter({ locations, selectedLocationId, onLocationChange, farmers }: FarmerFilterProps) {
+    const { t } = useLanguage();
+    
+    // Get count of farmers per location
+    const getLocationCount = (locationId: number | null) => {
+        if (locationId === null) {
+            return farmers.length; // All farmers
+        }
+        
+        return farmers.filter(farmer => {
+            const farmerLocationIds = farmer.locationIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            return farmerLocationIds.includes(locationId);
+        }).length;
+    };
+
+    return (
+        <div className="flex items-center gap-2 mb-4">
+            <Filter className="h-4 w-4" style={{ color: '#2580f5' }} />
+            <Label htmlFor="location-filter" className="text-sm font-medium">
+                {t('filterByLocation')}:
+            </Label>
+            <Select
+                value={selectedLocationId?.toString() || 'all'}
+                onValueChange={(value) => onLocationChange(value === 'all' ? null : parseInt(value))}
+            >
+                <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder={t('selectLocation')} />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="all">
+                        {t('allLocations')} ({getLocationCount(null)})
+                    </SelectItem>
+                    {locations.map((location) => (
+                        <SelectItem key={location.id} value={location.id.toString()}>
+                            {location.name} ({getLocationCount(location.id)})
+                        </SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
+    );
+}
+
+// Function to filter farmers by location
+export function filterFarmersByLocation(farmers: Farmer[], selectedLocationId: number | null): Farmer[] {
+    if (selectedLocationId === null) {
+        return farmers; // Return all farmers if no location is selected
+    }
+    
+    return farmers.filter(farmer => {
+        const farmerLocationIds = farmer.locationIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+        return farmerLocationIds.includes(selectedLocationId);
+    });
 }
 
 export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }: CreateFarmerDialogProps) {
@@ -272,7 +340,7 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
                     <div className="space-y-6">
                         <div className="flex items-start gap-4">
                             <div className="rounded-full h-16 w-16 flex items-center justify-center" style={{ backgroundColor: '#3a93f2' }}>
-                                <User className="h-8 w-8" style={{ color: '#2580f5' }} />
+                                <User className="h-8 w-8 text-white"/>
                             </div>
                             <div className="flex-1">
                                 <h3 className="text-xl font-semibold">{farmer.name}</h3>
@@ -659,7 +727,7 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
         }
         onOpenChange(false);
     };
-//TODO: use this function instead of uploading locationIds directly
+
     const getLocationName = (locationId: number) => {
         return locations.find(loc => loc.id === locationId)?.name || `ID: ${locationId}`;
     };
@@ -678,7 +746,7 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                 </DialogHeader>
 
                 <div className="space-y-6">
-                    <div className="p-4 rounded-lg" style={{ backgroundColor: '#3a93f2' }}>
+                    <div className="p-4 rounded-lg bg-gray-200" >
                         <div className="flex items-start gap-3">
                             <FileText className="h-5 w-5 mt-0.5" style={{ color: '#2580f5' }} />
                             <div className="flex-1">

@@ -95,6 +95,13 @@ type Alert = {
     icon: React.ReactNode;
 };
 
+type DashboardStats = {
+    totalFarmers: number;
+    messagesSent: number;
+    activeAlerts: number;
+    activeLocations: number;
+};
+
 const Dashboard: NextPage = () => {
     const { t } = useLanguage();
     const router = useRouter();
@@ -106,9 +113,16 @@ const Dashboard: NextPage = () => {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [, setIsLoadingAllWeather] = useState(false);
     const [todayWeather, setTodayWeather] = useState<any>(null);
+    const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
+        totalFarmers: 0,
+        messagesSent: 0,
+        activeAlerts: 0,
+        activeLocations: 0
+    });
 
     useEffect(() => {
         fetchLocations();
+        fetchDashboardStats();
     }, []);
 
     useEffect(() => {
@@ -122,6 +136,50 @@ const Dashboard: NextPage = () => {
             fetchAllLocationsWeather();
         }
     }, [locations]);
+
+    const fetchDashboardStats = async () => {
+        try {
+            // Fetch total farmers
+            const farmersResponse = await api.get('/api/admin/farmers');
+            const farmersData = farmersResponse.data?.data?.farmers || farmersResponse.data?.farmers || [];
+            const totalFarmers = Array.isArray(farmersData) ? farmersData.length : 0;
+
+            // Fetch alerts data
+            const alertsResponse = await api.get('/api/weather/alerts');
+            const alertsData = alertsResponse.data?.data?.alerts || alertsResponse.data?.alerts || [];
+            
+            const messagesSent = Array.isArray(alertsData) ? alertsData.filter((alert: any) => alert.status === 'sent').length : 0;
+            const activeAlerts = Array.isArray(alertsData) ? alertsData.filter((alert: any) => alert.isActive === true).length : 0;
+
+            // Fetch active locations
+            const locationsResponse = await api.get('/api/admin/locations');
+            const locationsData = locationsResponse.data?.data?.locations || locationsResponse.data?.locations || [];
+            const activeLocations = Array.isArray(locationsData) ? locationsData.length : 0;
+
+            setDashboardStats({
+                totalFarmers,
+                messagesSent,
+                activeAlerts,
+                activeLocations
+            });
+
+            console.log('Dashboard stats updated:', {
+                totalFarmers,
+                messagesSent,
+                activeAlerts,
+                activeLocations
+            });
+        } catch (error: any) {
+            console.error('Failed to fetch dashboard stats:', error);
+            // Set default values or use mock data for development
+            setDashboardStats({
+                totalFarmers: 1247,
+                messagesSent: 234,
+                activeAlerts: 3,
+                activeLocations: locations.length || 6
+            });
+        }
+    };
 
     const fetchLocations = async () => {
         try {
@@ -208,6 +266,7 @@ const Dashboard: NextPage = () => {
         try {
             await fetchWeatherData(selectedLocation.id);
             await fetchAllLocationsWeather();
+            await fetchDashboardStats();
             toast.success(t('weatherDataRefreshed'));
         } catch (error) {
             toast.error(t('failedToRefreshWeather'));
@@ -330,7 +389,7 @@ const Dashboard: NextPage = () => {
             </Head>
 
             <div className="space-y-6">
-                
+                {/* Header Section */}
                 <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="flex items-center gap-4">
@@ -344,25 +403,10 @@ const Dashboard: NextPage = () => {
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm">
-                                        <MapPin className="h-4 w-4 mr-2" />
-                                        {selectedLocation?.name || t('selectLocation')}
-                                        <ChevronDown className="ml-2 h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent>
-                                    {locations.map((location) => (
-                                        <DropdownMenuItem
-                                            key={location.id}
-                                            onClick={() => setSelectedLocation(location)}
-                                        >
-                                            {location.name}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/20">
+                                <Calendar className="h-4 w-4" />
+                                <span className="text-sm font-medium">{t(getCurrentSeason())}</span>
+                            </div>
 
                             <Button
                                 variant="outline"
@@ -377,123 +421,113 @@ const Dashboard: NextPage = () => {
                     </div>
                 </div>
 
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <Card className="border-0 shadow-md bg-gradient-to-br from-amber-50 to-orange-50 border-l-4 border-l-amber-500">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-amber-100 p-2 rounded-lg">
-                                    <Calendar className="h-5 w-5 text-amber-600" />
-                                </div>
+                {/* Stats Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <Card className="border border-gray-200 shadow-md bg-white">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm font-medium text-amber-600">Current Season</p>
-                                    <p className="font-bold text-amber-900">{t(getCurrentSeason())}</p>
+                                    <p className="text-gray-600 text-sm font-medium">Farmers Reached</p>
+                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.totalFarmers.toLocaleString()}</p>
+                                    <div className="flex items-center gap-1 mt-2">
+                                        <TrendingUp className="h-4 w-4 text-green-500" />
+                                        <span className="text-xs text-green-600">+12% this month</span>
+                                    </div>
+                                </div>
+                                <div className="bg-blue-500/10 backdrop-blur-sm p-3 rounded-2xl">
+                                    <Users className="h-6 w-6 text-blue-500" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-green-100 p-2 rounded-lg">
-                                    <Target className="h-5 w-5 text-green-600" />
-                                </div>
+                    <Card className="border border-gray-200 shadow-md bg-white">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm font-medium text-green-600">System Status</p>
-                                    <p className="font-bold text-green-900">Operational</p>
+                                    <p className="text-gray-600 text-sm font-medium">Messages Sent</p>
+                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.messagesSent.toLocaleString()}</p>
+                                    <div className="flex items-center gap-1 mt-2">
+                                        <TrendingUp className="h-4 w-4 text-green-500" />
+                                        <span className="text-xs text-green-600">+24% this month</span>
+                                    </div>
+                                </div>
+                                <div className="bg-green-500/10 backdrop-blur-sm p-3 rounded-2xl">
+                                    <MessageSquare className="h-6 w-6 text-green-500" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-l-blue-500">
-                        <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-blue-100 p-2 rounded-lg">
-                                    <Zap className="h-5 w-5 text-blue-600" />
-                                </div>
+                    <Card className="border border-gray-200 shadow-md bg-white">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm font-medium text-blue-600">Active Locations</p>
-                                    <p className="font-bold text-blue-900">{locations.length} Sectors</p>
+                                    <p className="text-gray-600 text-sm font-medium">Active Alerts</p>
+                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.activeAlerts.toLocaleString()}</p>
+                                    <div className="flex items-center gap-1 mt-2">
+                                        <TrendingDown className="h-4 w-4 text-green-500" />
+                                        <span className="text-xs text-green-600">-5% from last week</span>
+                                    </div>
+                                </div>
+                                <div className="bg-orange-500/10 backdrop-blur-sm p-3 rounded-2xl">
+                                    <AlertTriangle className="h-6 w-6 text-orange-500" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border border-gray-200 shadow-md bg-white">
+                        <CardContent className="p-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-gray-600 text-sm font-medium">Active Locations</p>
+                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.activeLocations.toLocaleString()}</p>
+                                    <div className="flex items-center gap-1 mt-2">
+                                        <TrendingUp className="h-4 w-4 text-green-500" />
+                                        <span className="text-xs text-green-600">+8% this month</span>
+                                    </div>
+                                </div>
+                                <div className="bg-purple-500/10 backdrop-blur-sm p-3 rounded-2xl">
+                                    <MapPin className="h-6 w-6 text-purple-500" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                
-                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                    <Card className="border-0 shadow-md bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-blue-100 text-sm font-medium">Farmers Reached</p>
-                                    <p className="text-3xl font-bold">1,245</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <TrendingUp className="h-4 w-4 text-green-300" />
-                                        <span className="text-xs text-green-300">+12% this month</span>
-                                    </div>
-                                </div>
-                                <div className="bg-white/20 p-3 rounded-lg">
-                                    <Users className="h-6 w-6" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-0 shadow-md bg-gradient-to-br from-green-500 to-green-600 text-white">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-green-100 text-sm font-medium">Messages Sent</p>
-                                    <p className="text-3xl font-bold">5,832</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <TrendingUp className="h-4 w-4 text-blue-300" />
-                                        <span className="text-xs text-blue-300">+24% this month</span>
-                                    </div>
-                                </div>
-                                <div className="bg-white/20 p-3 rounded-lg">
-                                    <MessageSquare className="h-6 w-6" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border-0 shadow-md bg-gradient-to-br from-amber-500 to-orange-500 text-white">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-amber-100 text-sm font-medium">Active Alerts</p>
-                                    <p className="text-3xl font-bold">18</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <TrendingDown className="h-4 w-4 text-green-300" />
-                                        <span className="text-xs text-green-300">-5% from last week</span>
-                                    </div>
-                                </div>
-                                <div className="bg-white/20 p-3 rounded-lg">
-                                    <AlertTriangle className="h-6 w-6" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                </div>
-
-                
+                {/* Map Section */}
                 <RainfallHeatmap />
 
-                
+                {/* Main Content Grid */}
                 <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-                    
+                    {/* Today's Weather */}
                     <Card className="border-0 shadow-md bg-white lg:col-span-1">
                         <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100 pb-4">
                             <CardTitle className="flex items-center gap-2 text-blue-900">
                                 <Sun className="h-5 w-5 text-yellow-500" />
                                 {t('todayForecast')}
                             </CardTitle>
-                            <CardDescription className="text-blue-700">
-                                {selectedLocation ? selectedLocation.name : t('selectLocation')}
+                            <CardDescription className="text-blue-700 flex items-center gap-2">
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="sm" className="text-blue-700 hover:text-blue-900 p-0 h-auto">
+                                            <MapPin className="h-4 w-4 mr-1" />
+                                            {selectedLocation?.name || t('selectLocation')}
+                                            <ChevronDown className="ml-1 h-3 w-3" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent>
+                                        {locations.map((location) => (
+                                            <DropdownMenuItem
+                                                key={location.id}
+                                                onClick={() => setSelectedLocation(location)}
+                                            >
+                                                {location.name}
+                                            </DropdownMenuItem>
+                                        ))}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="p-6 space-y-4">
@@ -556,86 +590,10 @@ const Dashboard: NextPage = () => {
                         </CardFooter>
                     </Card>
 
-                    
+                    {/* Right Column */}
                     <div className="lg:col-span-2 space-y-6">
-                        
-                        <Card className="border-0 shadow-md bg-white">
-                            <CardHeader className="bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100 pb-4">
-                                <CardTitle className="flex items-center gap-2 text-amber-900">
-                                    <AlertTriangle className="h-5 w-5 text-amber-600" />
-                                    {t('alerts')} & Advisories
-                                </CardTitle>
-                                <CardDescription className="text-amber-700">{t('farmingActionAdvisories')}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="p-6 max-h-[300px] overflow-y-auto space-y-3">
-                                {alerts.length > 0 ? (
-                                    alerts.map(function(alert: Alert, index: number) {
-                                        return (
-                                            <div
-                                                key={index}
-                                                className={`rounded-xl p-4 border-l-4 transition-all hover:shadow-md ${
-                                                    alert.color === 'amber' ? 'bg-gradient-to-r from-amber-50 to-yellow-50 border-l-amber-500' :
-                                                        alert.color === 'red' ? 'bg-gradient-to-r from-red-50 to-pink-50 border-l-red-500' :
-                                                            alert.color === 'blue' ? 'bg-gradient-to-r from-blue-50 to-cyan-50 border-l-blue-500' :
-                                                                'bg-gradient-to-r from-green-50 to-emerald-50 border-l-green-500'
-                                                }`}
-                                            >
-                                                <div className="flex items-start gap-3">
-                                                    <div className={`mt-0.5 flex-shrink-0 ${
-                                                        alert.color === 'amber' ? 'text-amber-600' :
-                                                            alert.color === 'red' ? 'text-red-600' :
-                                                                alert.color === 'blue' ? 'text-blue-600' :
-                                                                    'text-green-600'
-                                                    }`}>
-                                                        {alert.icon}
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <p className={`font-semibold ${
-                                                            alert.color === 'amber' ? 'text-amber-900' :
-                                                                alert.color === 'red' ? 'text-red-900' :
-                                                                    alert.color === 'blue' ? 'text-blue-900' :
-                                                                        'text-green-900'
-                                                        }`}>{alert.type}</p>
-                                                        <p className={`text-sm mt-1 ${
-                                                            alert.color === 'amber' ? 'text-amber-800' :
-                                                                alert.color === 'red' ? 'text-red-800' :
-                                                                    alert.color === 'blue' ? 'text-blue-800' :
-                                                                        'text-green-800'
-                                                        }`}>{alert.message}</p>
-                                                        {alert.sectors && (
-                                                            <p className={`text-sm mt-1 font-medium ${
-                                                                alert.color === 'amber' ? 'text-amber-700' :
-                                                                    alert.color === 'red' ? 'text-red-700' :
-                                                                        alert.color === 'blue' ? 'text-blue-700' :
-                                                                            'text-green-700'
-                                                            }`}>
-                                                                {t('affectedAreas')}: {alert.sectors.join(', ')}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div className="text-center p-8 text-slate-500">
-                                        <div className="bg-green-100 rounded-full p-4 w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                                            <AlertCircle className="h-8 w-8 text-green-600" />
-                                        </div>
-                                        <p className="font-medium text-slate-600">{t('noAlertsForRegion')}</p>
-                                        <p className="text-sm mt-1 text-slate-500">All conditions are normal</p>
-                                    </div>
-                                )}
-                            </CardContent>
-                            <CardFooter className="bg-slate-50 border-t border-slate-100">
-                                <Button className="w-full bg-amber-600 hover:bg-amber-700 h-11" variant="outline" onClick={() => router.push('/communications')}>
-                                    {t('viewAllAlerts')}
-                                    <ArrowRight className="ml-2 h-4 w-4" />
-                                </Button>
-                            </CardFooter>
-                        </Card>
-
-                        
+                    
+                        {/* Farming Conditions */}
                         <Card className="border-0 shadow-md bg-white">
                             <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 pb-4">
                                 <CardTitle className="flex items-center gap-2 text-green-900">
@@ -713,7 +671,7 @@ const Dashboard: NextPage = () => {
                     </div>
                 </div>
 
-                
+                {/* Footer */}
                 <div className="text-center p-6 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
                     <p className="text-xs text-slate-500">
                         {t('dataLastUpdated')}: {new Date().toLocaleString()}

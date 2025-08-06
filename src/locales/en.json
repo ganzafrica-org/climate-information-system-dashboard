@@ -107,6 +107,8 @@
   "selectRegion": "Select Region",
   "selectLocation": "Select Location",
   "locationSelector": "Location Selector",
+  "searchLocations": "Search Locations...",
+  "joinedDate": "Joined Date",
 
   "heavyRainAlert": "Heavy Rainfall Alert",
   "heavyRainWarning": "Heavy rainfall expected (>25mm). Protect seedlings, delay fertilizer application, ensure proper drainage in fields.",
@@ -275,6 +277,11 @@
   "manageNotifications": "Manage Notifications",
   "deleteFromHistory": "Delete from History",
   "resendAlert": "Resend Alert",
+  "messagePreview": "Message Preview",
+  "selectAll": "Select All",
+  "selectFarmers": "Select Farmers",
+  "selectFarmersToSend": "Select farmers to send this alert",
+  "farmersSelected":" Farmers selected",
 
   "individualFarmers": "Individual Farmers",
   "addFarmer": "Add Farmer",
@@ -295,6 +302,10 @@
   "viewProfile": "View Profile",
   "editFarmer": "Edit Farmer",
   "delete": "Delete",
+  "confirmDelete":"Confirm Delete",
+  "confirmDeleteMessage": "Are you sure you want to delete this messege?",
+  "menyasystem":"Menyasystem",
+
 
   "farmerProfile": "Farmer Profile",
   "farmerDetails": "Details and subscription information",
@@ -554,6 +565,11 @@
   "createdAt": "Created At",
   "locationsManagement": "Locations Management",
   "farmers": "Farmers",
+  "locationDetails": "Location Details",
+  "viewLocationInfo": "View Location Information",
+  "totalAlerts": "Total Alerts",
+  "editLocation": "Edit Location",
+  "close": "Close",
   
 
   "morning": "Morning",
@@ -946,6 +962,16 @@
   "goodTimeForHarvesting": "Good conditions for harvesting",
   "provideShadeForLivestock": "Provide shade for livestock",
   "monitorCropsRegularly": "Monitor crops regularly for any changes",
+  "viewLocation": "View Location",
+  "sendEmergencyMessage": "Send Emergency Message",
+  "sendingMessageTo": "Sending message to",
+  "selectedLocations": "Selected Locations",
+  "enterYourMessage": "Enter your message",
+  "sendCustomMessage": "Send Custom Message",
+  "sendingCustomMessage": "Sending custom message...",
+  "willSendToAllFarmers":"Will Send To All Farmers",
+  "willSendToAllFarmersInLocation": "Will send to all farmers in the selected locations",
+  "customMessageSentSuccessfully": "Custom message sent successfully",
 
   "communications": "Communications",
   "customMessages": "Custom Messages",
@@ -987,4 +1013,5 @@
   "type": "Type",
   "priority": "Priority",
   "draft": "Draft"
+
 }

@@ -25,6 +25,12 @@
   "locationsManagement": "Gucunga Ahantu",
   "farmers": "Abahinzi",
   "locations": "Ahantu",
+  "locationDetails" : "Ibisobanuro by'Ahantu",
+  "viewLocationInfo": "Reba Amakuru y'Ahantu",
+  "totalAlerts": "Imburizi zose",
+  "editLocation": "Hindura Ahantu",
+  "close": "Funga",
+  
 
   "todayForecast": "Iteganyagihe ry'uyu munsi",
   "weeklyOverview": "Incamake y'icyumweru",
@@ -311,9 +317,15 @@
   "location": "Ahantu",
   "farmSize": "Ingano y'Umurima",
   "actions": "Ibikorwa",
+  "viewLocation": "Reba Ahantu",
+  "coordinates": "Ibipimo Ndangahantu",
+  "latitude": "Ubuhagarike",
+  "longitude": "Ubugari",
+  "searchLocations": "Shakisha Ahantu...",
+  "joinedDate": "Itariki Yiyandikishije",
 
   "viewProfile": "Reba Umwirondoro",
-  "editFarmer": "Hindura Umuhinzi",
+  "editFarmer": "Hindura Imyirondoro Y'umuhinzi",
   "delete": "Gusiba",
 
   "farmerProfile": "Umwirondoro w'Umuhinzi",
@@ -760,10 +772,6 @@
   "failedToUpdateLocation": "Byanze kuvugurura ahantu",
   "failedToLoadLocation": "Byanze gukuramo amakuru y'ahantu",
 
-  "farmersManagement": "Gucunga Abahinzi",
-
-  "locations": "Ahantu",
-  "joinedDate": "Itariki Yinjiriye",
   "noFarmersFound": "Nta bahinzi babonetse",
 
   "adminAccessRequired": "Kwinjira kwa mutegetsi byifuzwa",
@@ -1012,6 +1020,7 @@
   "confirmSave": "Emeza Kubika",
   "confirmCancel": "Emeza Gufunga",
   "confirmLogout": "Emeza Gusohoka",
+  "confirmDeleteMessage": "Uremeza neza ko ushaka gusiba ubu butumwa?",
 
   "pleaseWait": "Nyamuneka tegereza",
   "processing": "Urimo gutunganya",
@@ -1049,7 +1058,20 @@
   "goodTimeForHarvesting": "Ibihe byiza byo kweza",
   "provideShadeForLivestock": "Tanga igicucu cy'amatungo",
   "monitorCropsRegularly": "Kora igenzura ry'ibihingwa buri gihe",
-
+  "sendEmergencyMessage":"Ohereza Ubutumwa bw'Ubwoba",
+  "sendingMessageTo": "Urimo kohereza ubutumwa ku",
+  "selectedLocations": "Ahantu Wahisemo",
+  "enterYourMessage": "Andika ubutumwa bwawe hano...",
+  "sendCustomMessage":"Ohereza Ubutumwa Bwihariye",
+  "sendingCustomMessage": "Urimo kohereza ubutumwa bwihariye...",
+  "willSendToAllFarmers": "Bizoherezwa ku bahinzi bose bo muri aka gace",
+  "willSendToAllFarmersInLocation": "Bizoherezwa ku bahinzi bose bo muri akagace",
+  "customMessageSentSuccessfully": "Ubutumwa bwihariye bwoherejwe neza",
+  "messagePreview":"Reba cy'Ubutumwa",
+   "selectAll": "Hitamo Byose",
+   "selectFarmers": "Hitamo Abahinzi",
+   "selectFarmersToSend": "Hitamo abahinzi wohereze ubutumwa",
+   "farmersSelected":"Abahinzi Bahisemo",
 
   "communications": "Itumanaho",
   "customMessages": "Ubutumwa Bwihariye",

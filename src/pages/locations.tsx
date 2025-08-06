@@ -280,6 +280,7 @@ const Locations: NextPage = () => {
                                 variant="outline"
                                 onClick={handleExportLocations}
                                 disabled={isExporting}
+                                className="bg-green-600 hover:bg-green-700 text-white hover:text-white"
                             >
                                 <Download className="h-4 w-4 mr-2" />
                                 {isExporting ? (t("exporting") || "Exporting...") : (t("exportData") || "Export Data")}
@@ -315,7 +316,7 @@ const Locations: NextPage = () => {
                         </div>
 
                         {isLoading ? (
-                            <div className="flex items-center justify-center py-16">
+                            <div className="flex items-center justify-center py-16 ">
                                 <div className="flex flex-col items-center space-y-3">
                                     <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
                                     <span className="text-gray-500">{t("loading") || "Loading..."}</span>
@@ -324,7 +325,7 @@ const Locations: NextPage = () => {
                         ) : (
                             <div className="overflow-x-auto">
                                 <table className="w-full">
-                                    <thead style={{ backgroundColor: '#2580f5' }} className="text-white">
+                                    <thead className="text-black bg-[#f2f5fa]">
                                     <tr>
                                         <th className="py-4 px-6 text-left font-semibold text-sm">
                                             #
@@ -334,9 +335,6 @@ const Locations: NextPage = () => {
                                         </th>
                                         <th className="py-4 px-6 text-left font-semibold text-sm">
                                             {t("coordinates") || "Coordinates"}
-                                        </th>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            {t("type") || "Type"}
                                         </th>
                                         <th className="py-4 px-6 text-left font-semibold text-sm">
                                             {t("createdAt") || "Created Date"}
@@ -380,9 +378,6 @@ const Locations: NextPage = () => {
                                                             <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>
                                                         )}
                                                     </div>
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <DefaultBadge isDefault={location.isDefault ?? false} />
                                                 </td>
                                                 <td className="py-4 px-6">
                                                     <div className="text-sm text-gray-600">
