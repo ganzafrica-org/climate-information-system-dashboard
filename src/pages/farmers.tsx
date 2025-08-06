@@ -267,6 +267,7 @@ const Farmers: NextPage = () => {
                 <Button
                     variant="outline"
                     onClick={handleImportFarmers}
+                    className="bg-amber-600 hover:bg-amber-700 text-white hover:text-white border-amber-600"
                 >
                   <Upload className="h-4 w-4 mr-2" />
                   {t("importData")}
@@ -276,6 +277,7 @@ const Farmers: NextPage = () => {
                     variant="outline"
                     onClick={handleExportFarmers}
                     disabled={isExporting}
+                    className="bg-green-600 hover:bg-green-700 text-white hover:text-white"
                 >
                   <Download className="h-4 w-4 mr-2" />
                   {isExporting ? t("exporting") : t("exportData")}
@@ -341,7 +343,7 @@ const Farmers: NextPage = () => {
               ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
-                      <thead  className="bg-blue-600 text-white">
+                      <thead  className="bg-[#f2f5fa] text-black">
                       <tr>
                         <th className="py-4 px-6 text-left font-semibold text-sm">
                           #

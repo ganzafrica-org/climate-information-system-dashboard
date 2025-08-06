@@ -27,7 +27,6 @@ import {
     Download, Loader2,
     MapPin,
     RefreshCw,
-    Search,
     Thermometer,
     TrendingUp,
     Filter,
@@ -45,11 +44,11 @@ import { Location, LocationsResponse } from '@/types/farmer';
 const chartConfig = {
     temperature: {
         label: 'Temperature (°C)',
-        color: 'hsl(var(--primary))',
+        color: '#2563eb',
     },
     tempMin: {
         label: 'Min Temperature (°C)',
-        color: '#3b82f6',
+        color: '#0ea5e9',
     },
     tempMax: {
         label: 'Max Temperature (°C)',
@@ -61,11 +60,11 @@ const chartConfig = {
     },
     rainfall: {
         label: 'Rainfall (mm)',
-        color: '#3b82f6',
+        color: '#2563eb',
     },
     historical: {
         label: 'Historical Average',
-        color: '#9ca3af',
+        color: '#64748b',
     },
 };
 
@@ -275,11 +274,7 @@ const Historical: NextPage = () => {
         startDate: `${new Date().getFullYear()}-01-01`,
         endDate: `${new Date().getFullYear()}-12-31`
     });
-    const [customFilters, setCustomFilters] = useState({
-        specificMonths: [] as string[],
-        temperatureRange: { min: '', max: '' },
-        rainfallRange: { min: '', max: '' }
-    });
+
 
     const [comparisonLocation1, setComparisonLocation1] = useState<Location | null>(null);
     const [comparisonLocation2, setComparisonLocation2] = useState<Location | null>(null);
@@ -475,7 +470,7 @@ const Historical: NextPage = () => {
                 break;
             default:
                 comparison1Data = processMonthlyData(comparisonData1);
-                comparison2Data = processMonthlyData(comparisonData2);
+                comparison2Data = processWeeklyData(comparisonData2);
         }
 
         return comparison1Data.map((item, index) => {
@@ -518,33 +513,33 @@ const Historical: NextPage = () => {
     };
 
     const renderEmptyState = () => {
-        let icon = <CloudRain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+        let icon = <CloudRain className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
         let title = t('noHistoricalData') || 'No Historical Data';
         let description = t('noDataForSelectedPeriod') || 'No data available for the selected period.';
 
         switch (errorType) {
             case 'timeout':
-                icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                icon = <WifiOff className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
                 title = t('requestTimeout') || 'Request Timed Out';
                 description = t('timeoutDescription') || 'The request took too long to complete. Please check your connection and try again.';
                 break;
             case 'network_error':
-                icon = <WifiOff className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                icon = <WifiOff className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
                 title = t('networkError') || 'Network Error';
                 description = t('networkErrorDescription') || 'Please check your internet connection and try again.';
                 break;
             case 'server_error':
-                icon = <AlertTriangle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                icon = <AlertTriangle className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
                 title = t('serverError') || 'Server Error';
                 description = t('serverErrorDescription') || 'Our servers are experiencing issues. Please try again later.';
                 break;
             case 'not_found':
-                icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                icon = <MapPin className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
                 title = t('dataNotFound') || 'Data Not Found';
                 description = t('dataNotFoundDescription') || 'No historical data available for the selected location and period.';
                 break;
             case 'no_locations':
-                icon = <MapPin className="h-12 w-12 text-muted-foreground mx-auto mb-4" />;
+                icon = <MapPin className="h-12 w-12 text-slate-400 mx-auto mb-4" />;
                 title = t('noLocations') || 'No Locations';
                 description = t('noLocationsDescription') || 'No locations available. Please add a location first.';
                 break;
@@ -553,18 +548,19 @@ const Historical: NextPage = () => {
         }
 
         return (
-            <Card>
+            <Card className="border-0 shadow-md">
                 <CardContent className="flex items-center justify-center py-12">
                     <div className="text-center max-w-md">
                         {icon}
-                        <h3 className="text-lg font-medium mb-2">{title}</h3>
-                        <p className="text-muted-foreground mb-4">
+                        <h3 className="text-lg font-medium mb-2 text-slate-700">{title}</h3>
+                        <p className="text-slate-500 mb-4">
                             {description}
                         </p>
                         <Button
                             variant="outline"
                             onClick={errorType === 'no_locations' ? fetchLocations : handleRefresh}
                             disabled={isRefreshing || isLoading}
+                            className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
                         >
                             <RefreshCw className={`h-4 w-4 mr-2 ${(isRefreshing || isLoading) ? 'animate-spin' : ''}`} />
                             {(isRefreshing || isLoading) ? (t('loading') || 'Loading...') : (t('tryAgain') || 'Try Again')}
@@ -594,8 +590,8 @@ const Historical: NextPage = () => {
             <AppLayout>
                 <div className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                        <Loader2 className="animate-spin h-8 w-8 mx-auto mb-2" />
-                        <p className="text-muted-foreground">{t('loadingHistoricalData') || 'Loading historical data...'}</p>
+                        <Loader2 className="animate-spin h-8 w-8 mx-auto mb-2 text-blue-600" />
+                        <p className="text-slate-600">{t('loadingHistoricalData') || 'Loading historical data...'}</p>
                     </div>
                 </div>
             </AppLayout>
@@ -610,15 +606,22 @@ const Historical: NextPage = () => {
 
             <div className="space-y-4 md:space-y-6">
                 
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-2 md:pb-4">
-                    <div className="flex items-center gap-2">
-                        <MapPin className="h-5 w-5 text-ganz-primary" />
-                        <h2 className="text-lg font-medium">{t('historicalWeatherData') || 'Historical Weather Data'}</h2>
+                <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
+                                <Calendar className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold">{t('historicalWeatherData') || 'Historical Weather Data'}</h2>
+                            </div>
+                        </div>
 
                         {locations.length > 0 && (
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="sm" className="ml-2 h-9">
+                                    <Button variant="outline" className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm">
+                                        <MapPin className="h-4 w-4 mr-2" />
                                         <span>{selectedLocation?.name || t('selectLocation') || 'Select Location'}</span>
                                         <ChevronDown className="ml-2 h-4 w-4" />
                                     </Button>
@@ -636,48 +639,46 @@ const Historical: NextPage = () => {
                             </DropdownMenu>
                         )}
                     </div>
-
-                    
-                    <div className="flex flex-wrap w-full sm:w-auto items-center gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={handleRefresh}
-                            disabled={isRefreshing || isLoading || !selectedLocation}
-                            className="h-9"
-                        >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                            {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
-                        </Button>
-
-                        <Button
-                            variant="primary"
-                            className="h-9"
-                            onClick={handleExportData}
-                            disabled={!historicalData.length}
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            {t('exportData') || 'Export Data'}
-                        </Button>
-                    </div>
                 </div>
 
                 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Filter className="h-5 w-5" />
+                <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                        variant="outline"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing || isLoading || !selectedLocation}
+                        className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                    >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
+                    </Button>
+
+                    <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        onClick={handleExportData}
+                        disabled={!historicalData.length}
+                    >
+                        <Download className="h-4 w-4 mr-2" />
+                        {t('exportData') || 'Export Data'}
+                    </Button>
+                </div>
+
+                
+                <Card className="border-0 shadow-md">
+                    <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200">
+                        <CardTitle className="flex items-center gap-2 text-slate-800">
+                            <Filter className="h-5 w-5 text-blue-600" />
                             {t('dataFilters') || 'Data Filters'}
                         </CardTitle>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            
                             <div className="space-y-2">
-                                <Label>{t('viewType') || 'View Type'}</Label>
+                                <Label className="text-slate-700 font-medium">{t('viewType') || 'View Type'}</Label>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between">
-                                            <span>{t(viewType) || viewType}</span>
+                                        <Button variant="outline" className="w-full justify-between border-slate-300 hover:border-blue-500">
+                                            <span className="capitalize">{t(viewType) || viewType}</span>
                                             <ChevronDown className="h-4 w-4" />
                                         </Button>
                                     </DropdownMenuTrigger>
@@ -695,23 +696,23 @@ const Historical: NextPage = () => {
                                 </DropdownMenu>
                             </div>
 
-                            
                             <div className="space-y-2">
-                                <Label>{t('startDate') || 'Start Date'}</Label>
+                                <Label className="text-slate-700 font-medium">{t('startDate') || 'Start Date'}</Label>
                                 <Input
                                     type="date"
                                     value={dateRange.startDate}
                                     onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                                    className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                 />
                             </div>
 
-                            
                             <div className="space-y-2">
-                                <Label>{t('endDate') || 'End Date'}</Label>
+                                <Label className="text-slate-700 font-medium">{t('endDate') || 'End Date'}</Label>
                                 <Input
                                     type="date"
                                     value={dateRange.endDate}
                                     onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                                    className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
                                 />
                             </div>
                         </div>
@@ -721,56 +722,66 @@ const Historical: NextPage = () => {
                 
                 {historicalData.length > 0 && (
                     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
+                        <Card className="border-0 shadow-md bg-gradient-to-br from-red-500 to-red-600 text-white">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{t('avgTemperature') || 'Avg Temperature'}</CardTitle>
-                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Thermometer className="h-5 w-5" />
+                                    {t('avgTemperature') || 'Avg Temperature'}
+                                </CardTitle>
+                                <CardDescription className="text-red-100">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold mb-1">{avgTemp.toFixed(1)}°C</div>
-                                <div className="flex items-center text-sm">
-                                    <Thermometer className="h-4 w-4 mr-1 text-blue-500" />
-                                    <span className="text-muted-foreground">{t('averageForPeriod') || 'Average for period'}</span>
+                                <div className="flex items-center text-sm text-red-100">
+                                    <span>{t('averageForPeriod') || 'Average for period'}</span>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card className="border-0 shadow-md bg-gradient-to-br from-blue-500 to-blue-600 text-white">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{t('totalRainfall') || 'Total Rainfall'}</CardTitle>
-                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <CloudRain className="h-5 w-5" />
+                                    {t('totalRainfall') || 'Total Rainfall'}
+                                </CardTitle>
+                                <CardDescription className="text-blue-100">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold mb-1">{totalRainfall.toFixed(0)}mm</div>
-                                <div className="flex items-center text-sm">
-                                    <CloudRain className="h-4 w-4 mr-1 text-blue-500" />
-                                    <span className="text-muted-foreground">{rainyDays} {t('rainyDays') || 'rainy days'}</span>
+                                <div className="flex items-center text-sm text-blue-100">
+                                    <span>{rainyDays} {t('rainyDays') || 'rainy days'}</span>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card className="border-0 shadow-md bg-gradient-to-br from-green-500 to-green-600 text-white">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{t('rainyDays') || 'Rainy Days'}</CardTitle>
-                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Calendar className="h-5 w-5" />
+                                    {t('rainyDays') || 'Rainy Days'}
+                                </CardTitle>
+                                <CardDescription className="text-green-100">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold mb-1">{rainyDays}</div>
-                                <div className="flex items-center text-sm">
-                                    <span className="text-muted-foreground">{t('daysWithRain') || 'days with rain'}</span>
+                                <div className="flex items-center text-sm text-green-100">
+                                    <span>{t('daysWithRain') || 'days with rain'}</span>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        <Card>
+                        <Card className="border-0 shadow-md bg-gradient-to-br from-amber-500 to-orange-500 text-white">
                             <CardHeader className="pb-2">
-                                <CardTitle className="text-base">{t('extremeWeatherEvents') || 'Extreme Weather Events'}</CardTitle>
-                                <CardDescription>{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <AlertTriangle className="h-5 w-5" />
+                                    {t('extremeWeatherEvents') || 'Extreme Weather Events'}
+                                </CardTitle>
+                                <CardDescription className="text-amber-100">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold mb-1">{extremeEvents}</div>
-                                <div className="flex items-center text-sm">
-                                    <span className="text-muted-foreground">{t('recordedEvents') || 'recorded events'}</span>
+                                <div className="flex items-center text-sm text-amber-100">
+                                    <span>{t('recordedEvents') || 'recorded events'}</span>
                                 </div>
                             </CardContent>
                         </Card>
@@ -780,61 +791,64 @@ const Historical: NextPage = () => {
                 
                 {historicalData.length > 0 ? (
                     <>
-                        
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                            <Card className="border-0 shadow-xl">
+                                <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100">
+                                    <CardTitle className="text-red-900">
                                         {viewType === 'seasonal' ? (t('seasonalTemperature') || 'Seasonal Temperature') :
                                             viewType === 'weekly' ? (t('weeklyTemperature') || 'Weekly Temperature') :
                                                 (t('monthlyTemperature') || 'Monthly Temperature')}
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="text-red-700">
                                         {selectedLocation?.name} - {new Date(dateRange.startDate).getFullYear()} to {new Date(dateRange.endDate).getFullYear()}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="p-6">
                                     <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                         {viewType === 'seasonal' ? (
                                             <BarChart data={processedData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey="name" />
-                                                <YAxis />
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                                <XAxis dataKey="name" tick={{ fill: '#64748b' }} />
+                                                <YAxis tick={{ fill: '#64748b' }} />
                                                 <Tooltip content={<ChartTooltipContent />} />
                                                 <Legend />
                                                 <Bar
                                                     dataKey="temperature"
-                                                    fill="var(--color-tempAvg)"
+                                                    fill="#10b981"
                                                     name={t('avgTemperature') || 'Avg Temperature'}
+                                                    radius={4}
                                                 />
                                             </BarChart>
                                         ) : (
                                             <LineChart data={processedData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey={viewType === 'weekly' ? 'week' : 'month'} />
-                                                <YAxis />
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                                <XAxis dataKey={viewType === 'weekly' ? 'week' : 'month'} tick={{ fill: '#64748b' }} />
+                                                <YAxis tick={{ fill: '#64748b' }} />
                                                 <Tooltip content={<ChartTooltipContent />} />
                                                 <Legend />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="tempAvg"
-                                                    stroke="var(--color-tempAvg)"
+                                                    stroke="#10b981"
                                                     name={t('avgTemperature') || 'Avg Temperature'}
-                                                    strokeWidth={2}
+                                                    strokeWidth={3}
+                                                    dot={{ fill: '#10b981', strokeWidth: 2 }}
                                                 />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="tempMin"
-                                                    stroke="var(--color-tempMin)"
+                                                    stroke="#0ea5e9"
                                                     name={t('minTemperature') || 'Min Temperature'}
-                                                    strokeWidth={1.5}
+                                                    strokeWidth={2}
+                                                    dot={{ fill: '#0ea5e9', strokeWidth: 2 }}
                                                 />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="tempMax"
-                                                    stroke="var(--color-tempMax)"
+                                                    stroke="#ef4444"
                                                     name={t('maxTemperature') || 'Max Temperature'}
-                                                    strokeWidth={1.5}
+                                                    strokeWidth={2}
+                                                    dot={{ fill: '#ef4444', strokeWidth: 2 }}
                                                 />
                                             </LineChart>
                                         )}
@@ -842,29 +856,30 @@ const Historical: NextPage = () => {
                                 </CardContent>
                             </Card>
 
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>
+                            <Card className="border-0 shadow-xl">
+                                <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+                                    <CardTitle className="text-blue-900">
                                         {viewType === 'seasonal' ? (t('seasonalRainfall') || 'Seasonal Rainfall') :
                                             viewType === 'weekly' ? (t('weeklyRainfall') || 'Weekly Rainfall') :
                                                 (t('monthlyRainfall') || 'Monthly Rainfall')}
                                     </CardTitle>
-                                    <CardDescription>
+                                    <CardDescription className="text-blue-700">
                                         {selectedLocation?.name} - {new Date(dateRange.startDate).getFullYear()} to {new Date(dateRange.endDate).getFullYear()}
                                     </CardDescription>
                                 </CardHeader>
-                                <CardContent>
+                                <CardContent className="p-6">
                                     <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                         <BarChart data={processedData}>
-                                            <CartesianGrid strokeDasharray="3 3" />
-                                            <XAxis dataKey={viewType === 'seasonal' ? 'name' : viewType === 'weekly' ? 'week' : 'month'} />
-                                            <YAxis />
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                            <XAxis dataKey={viewType === 'seasonal' ? 'name' : viewType === 'weekly' ? 'week' : 'month'} tick={{ fill: '#64748b' }} />
+                                            <YAxis tick={{ fill: '#64748b' }} />
                                             <Tooltip content={<ChartTooltipContent />} />
                                             <Legend />
                                             <Bar
                                                 dataKey="rainfall"
-                                                fill="var(--color-rainfall)"
+                                                fill="#2563eb"
                                                 name={t('rainfall') || 'Rainfall'}
+                                                radius={4}
                                             />
                                         </BarChart>
                                     </ChartContainer>
@@ -873,18 +888,18 @@ const Historical: NextPage = () => {
                         </div>
 
                         
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('compareLocations') || 'Compare Locations'}</CardTitle>
-                                <CardDescription>{t('compareLocationWeatherData') || 'Compare weather data between different locations'}</CardDescription>
+                        <Card className="border-0 shadow-xl">
+                            <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-100">
+                                <CardTitle className="text-purple-900">{t('compareLocations') || 'Compare Locations'}</CardTitle>
+                                <CardDescription className="text-purple-700">{t('compareLocationWeatherData') || 'Compare weather data between different locations'}</CardDescription>
                             </CardHeader>
-                            <CardContent>
+                            <CardContent className="p-6">
                                 <div className="flex flex-wrap gap-4 mb-6">
                                     <div className="flex flex-col gap-2">
-                                        <label className="text-sm font-medium">{t('selectLocation1') || 'Select Location 1'}</label>
+                                        <label className="text-sm font-medium text-slate-700">{t('selectLocation1') || 'Select Location 1'}</label>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="outline">
+                                                <Button variant="outline" className="border-slate-300 hover:border-blue-500">
                                                     <span>{comparisonLocation1?.name || t('selectLocation') || 'Select Location'}</span>
                                                     <ChevronDown className="ml-2 h-4 w-4" />
                                                 </Button>
@@ -903,10 +918,10 @@ const Historical: NextPage = () => {
                                     </div>
 
                                     <div className="flex flex-col gap-2">
-                                        <label className="text-sm font-medium">{t('selectLocation2') || 'Select Location 2'}</label>
+                                        <label className="text-sm font-medium text-slate-700">{t('selectLocation2') || 'Select Location 2'}</label>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="outline">
+                                                <Button variant="outline" className="border-slate-300 hover:border-blue-500">
                                                     <span>{comparisonLocation2?.name || t('selectLocation') || 'Select Location'}</span>
                                                     <ChevronDown className="ml-2 h-4 w-4" />
                                                 </Button>
@@ -925,18 +940,18 @@ const Historical: NextPage = () => {
                                     </div>
 
                                     <div className="flex flex-col gap-2">
-                                        <label className="text-sm font-medium">{t('dataType') || 'Data Type'}</label>
+                                        <label className="text-sm font-medium text-slate-700">{t('dataType') || 'Data Type'}</label>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="outline">
+                                                <Button variant="outline" className="border-slate-300 hover:border-blue-500">
                                                     {comparisonDataType === 'temperature' ? (
                                                         <>
-                                                            <Thermometer className="mr-2 h-4 w-4" />
+                                                            <Thermometer className="mr-2 h-4 w-4 text-red-500" />
                                                             <span>{t('temperature') || 'Temperature'}</span>
                                                         </>
                                                     ) : (
                                                         <>
-                                                            <CloudRain className="mr-2 h-4 w-4" />
+                                                            <CloudRain className="mr-2 h-4 w-4 text-blue-500" />
                                                             <span>{t('rainfall') || 'Rainfall'}</span>
                                                         </>
                                                     )}
@@ -945,11 +960,11 @@ const Historical: NextPage = () => {
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent>
                                                 <DropdownMenuItem onClick={() => setComparisonDataType('temperature')}>
-                                                    <Thermometer className="mr-2 h-4 w-4" />
+                                                    <Thermometer className="mr-2 h-4 w-4 text-red-500" />
                                                     <span>{t('temperature') || 'Temperature'}</span>
                                                 </DropdownMenuItem>
                                                 <DropdownMenuItem onClick={() => setComparisonDataType('rainfall')}>
-                                                    <CloudRain className="mr-2 h-4 w-4" />
+                                                    <CloudRain className="mr-2 h-4 w-4 text-blue-500" />
                                                     <span>{t('rainfall') || 'Rainfall'}</span>
                                                 </DropdownMenuItem>
                                             </DropdownMenuContent>
@@ -958,8 +973,7 @@ const Historical: NextPage = () => {
 
                                     <div className="flex items-end">
                                         <Button
-                                            variant="primary"
-                                            className="h-9"
+                                            className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white"
                                             onClick={fetchComparisonData}
                                             disabled={!comparisonLocation1 || !comparisonLocation2}
                                         >
@@ -973,24 +987,26 @@ const Historical: NextPage = () => {
                                     <div className="mt-6">
                                         <ChartContainer config={chartConfig} className="h-[350px] w-full">
                                             <LineChart data={comparisonChartData}>
-                                                <CartesianGrid strokeDasharray="3 3" />
-                                                <XAxis dataKey={viewType === 'seasonal' ? 'name' : viewType === 'weekly' ? 'week' : 'month'} />
-                                                <YAxis />
+                                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                                <XAxis dataKey={viewType === 'seasonal' ? 'name' : viewType === 'weekly' ? 'week' : 'month'} tick={{ fill: '#64748b' }} />
+                                                <YAxis tick={{ fill: '#64748b' }} />
                                                 <Tooltip content={<ChartTooltipContent />} />
                                                 <Legend />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="location1"
-                                                    stroke="#0D6C44"
+                                                    stroke="#10b981"
                                                     name={comparisonLocation1?.name || 'Location 1'}
-                                                    strokeWidth={2}
+                                                    strokeWidth={3}
+                                                    dot={{ fill: '#10b981', strokeWidth: 2 }}
                                                 />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="location2"
-                                                    stroke="#0B3C88"
+                                                    stroke="#2563eb"
                                                     name={comparisonLocation2?.name || 'Location 2'}
-                                                    strokeWidth={2}
+                                                    strokeWidth={3}
+                                                    dot={{ fill: '#2563eb', strokeWidth: 2 }}
                                                 />
                                             </LineChart>
                                         </ChartContainer>
@@ -999,27 +1015,27 @@ const Historical: NextPage = () => {
 
                                 {comparisonData1.length > 0 && comparisonData2.length > 0 && (
                                     <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <Card>
+                                        <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500">
                                             <CardHeader className="pb-2">
-                                                <CardTitle className="text-base">{comparisonLocation1?.name}</CardTitle>
+                                                <CardTitle className="text-base text-green-900">{comparisonLocation1?.name}</CardTitle>
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="space-y-2 text-sm">
                                                     <div className="flex justify-between">
-                                                        <span>{t('avgTemperature') || 'Avg Temperature'}:</span>
-                                                        <span className="font-medium">
+                                                        <span className="text-slate-600">{t('avgTemperature') || 'Avg Temperature'}:</span>
+                                                        <span className="font-medium text-green-700">
                                                             {comparisonData1.length > 0 ? (comparisonData1.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / comparisonData1.length).toFixed(1) : '0'}°C
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span>{t('totalRainfall') || 'Total Rainfall'}:</span>
-                                                        <span className="font-medium">
+                                                        <span className="text-slate-600">{t('totalRainfall') || 'Total Rainfall'}:</span>
+                                                        <span className="font-medium text-green-700">
                                                             {comparisonData1.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0).toFixed(0)}mm
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span>{t('rainyDays') || 'Rainy Days'}:</span>
-                                                        <span className="font-medium">
+                                                        <span className="text-slate-600">{t('rainyDays') || 'Rainy Days'}:</span>
+                                                        <span className="font-medium text-green-700">
                                                             {comparisonData1.filter(record => record.weatherSummary.precipitation.rainAmount > 0.1).length}
                                                         </span>
                                                     </div>
@@ -1027,27 +1043,27 @@ const Historical: NextPage = () => {
                                             </CardContent>
                                         </Card>
 
-                                        <Card>
+                                        <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-l-blue-500">
                                             <CardHeader className="pb-2">
-                                                <CardTitle className="text-base">{comparisonLocation2?.name}</CardTitle>
+                                                <CardTitle className="text-base text-blue-900">{comparisonLocation2?.name}</CardTitle>
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="space-y-2 text-sm">
                                                     <div className="flex justify-between">
-                                                        <span>{t('avgTemperature') || 'Avg Temperature'}:</span>
-                                                        <span className="font-medium">
+                                                        <span className="text-slate-600">{t('avgTemperature') || 'Avg Temperature'}:</span>
+                                                        <span className="font-medium text-blue-700">
                                                             {comparisonData2.length > 0 ? (comparisonData2.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / comparisonData2.length).toFixed(1) : '0'}°C
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span>{t('totalRainfall') || 'Total Rainfall'}:</span>
-                                                        <span className="font-medium">
+                                                        <span className="text-slate-600">{t('totalRainfall') || 'Total Rainfall'}:</span>
+                                                        <span className="font-medium text-blue-700">
                                                             {comparisonData2.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0).toFixed(0)}mm
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
-                                                        <span>{t('rainyDays') || 'Rainy Days'}:</span>
-                                                        <span className="font-medium">
+                                                        <span className="text-slate-600">{t('rainyDays') || 'Rainy Days'}:</span>
+                                                        <span className="font-medium text-blue-700">
                                                             {comparisonData2.filter(record => record.weatherSummary.precipitation.rainAmount > 0.1).length}
                                                         </span>
                                                     </div>
@@ -1060,127 +1076,127 @@ const Historical: NextPage = () => {
                         </Card>
 
                         
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{t('weatherInsights') || 'Weather Insights'}</CardTitle>
-                                <CardDescription>
+                        <Card className="border-0 shadow-xl">
+                            <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 border-b border-slate-200">
+                                <CardTitle className="text-slate-800">{t('weatherInsights') || 'Weather Insights'}</CardTitle>
+                                <CardDescription className="text-slate-600">
                                     {t('keyTrendsAndPatterns') || 'Key trends and patterns'} - {selectedLocation?.name}
                                 </CardDescription>
                             </CardHeader>
-                            <CardContent>
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium flex items-center gap-2">
-                                            <Thermometer className="h-4 w-4" />
+                            <CardContent className="p-6">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <div className="space-y-3">
+                                        <h4 className="font-medium flex items-center gap-2 text-slate-800">
+                                            <Thermometer className="h-4 w-4 text-red-500" />
                                             {t('temperatureTrend') || 'Temperature Trend'}
                                         </h4>
-                                        <div className="text-sm space-y-1">
-                                            <div className="flex justify-between">
-                                                <span>{t('highest') || 'Highest'}:</span>
+                                        <div className="text-sm space-y-2">
+                                            <div className="flex justify-between p-2 bg-red-50 rounded-lg">
+                                                <span className="text-slate-600">{t('highest') || 'Highest'}:</span>
                                                 <span className="font-medium text-red-600">
                                                     {historicalData.length > 0 ? Math.max(...historicalData.map(r => r.weatherSummary.temperature.max)).toFixed(1) : '0'}°C
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('lowest') || 'Lowest'}:</span>
+                                            <div className="flex justify-between p-2 bg-blue-50 rounded-lg">
+                                                <span className="text-slate-600">{t('lowest') || 'Lowest'}:</span>
                                                 <span className="font-medium text-blue-600">
                                                     {historicalData.length > 0 ? Math.min(...historicalData.map(r => r.weatherSummary.temperature.min)).toFixed(1) : '0'}°C
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('average') || 'Average'}:</span>
-                                                <span className="font-medium">
+                                            <div className="flex justify-between p-2 bg-green-50 rounded-lg">
+                                                <span className="text-slate-600">{t('average') || 'Average'}:</span>
+                                                <span className="font-medium text-green-600">
                                                     {avgTemp.toFixed(1)}°C
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium flex items-center gap-2">
-                                            <CloudRain className="h-4 w-4" />
+                                    <div className="space-y-3">
+                                        <h4 className="font-medium flex items-center gap-2 text-slate-800">
+                                            <CloudRain className="h-4 w-4 text-blue-500" />
                                             {t('rainfallPattern') || 'Rainfall Pattern'}
                                         </h4>
-                                        <div className="text-sm space-y-1">
-                                            <div className="flex justify-between">
-                                                <span>{t('totalRainfall') || 'Total Rainfall'}:</span>
+                                        <div className="text-sm space-y-2">
+                                            <div className="flex justify-between p-2 bg-blue-50 rounded-lg">
+                                                <span className="text-slate-600">{t('totalRainfall') || 'Total Rainfall'}:</span>
                                                 <span className="font-medium text-blue-600">
                                                     {totalRainfall.toFixed(0)}mm
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('rainyDays') || 'Rainy Days'}:</span>
-                                                <span className="font-medium">
+                                            <div className="flex justify-between p-2 bg-cyan-50 rounded-lg">
+                                                <span className="text-slate-600">{t('rainyDays') || 'Rainy Days'}:</span>
+                                                <span className="font-medium text-cyan-600">
                                                     {rainyDays}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('maxDailyRain') || 'Max Daily Rain'}:</span>
-                                                <span className="font-medium">
+                                            <div className="flex justify-between p-2 bg-indigo-50 rounded-lg">
+                                                <span className="text-slate-600">{t('maxDailyRain') || 'Max Daily Rain'}:</span>
+                                                <span className="font-medium text-indigo-600">
                                                     {historicalData.length > 0 ? Math.max(...historicalData.map(r => r.weatherSummary.precipitation.rainAmount)).toFixed(1) : '0'}mm
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <h4 className="font-medium flex items-center gap-2">
-                                            <TrendingUp className="h-4 w-4" />
+                                    <div className="space-y-3">
+                                        <h4 className="font-medium flex items-center gap-2 text-slate-800">
+                                            <TrendingUp className="h-4 w-4 text-amber-500" />
                                             {t('extremeEvents') || 'Extreme Events'}
                                         </h4>
-                                        <div className="text-sm space-y-1">
-                                            <div className="flex justify-between">
-                                                <span>{t('totalEvents') || 'Total Events'}:</span>
+                                        <div className="text-sm space-y-2">
+                                            <div className="flex justify-between p-2 bg-amber-50 rounded-lg">
+                                                <span className="text-slate-600">{t('totalEvents') || 'Total Events'}:</span>
                                                 <span className="font-medium text-amber-600">
                                                     {extremeEvents}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('hotDays') || 'Hot Days'} (&gt;30°C):</span>
-                                                <span className="font-medium">
+                                            <div className="flex justify-between p-2 bg-orange-50 rounded-lg">
+                                                <span className="text-slate-600">{t('hotDays') || 'Hot Days'} (&gt;30°C):</span>
+                                                <span className="font-medium text-orange-600">
                                                     {historicalData.filter(r => r.weatherSummary.temperature.max > 30).length}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between">
-                                                <span>{t('heavyRain') || 'Heavy Rain'} (&gt;50mm):</span>
-                                                <span className="font-medium">
+                                            <div className="flex justify-between p-2 bg-red-50 rounded-lg">
+                                                <span className="text-slate-600">{t('heavyRain') || 'Heavy Rain'} (&gt;50mm):</span>
+                                                <span className="font-medium text-red-600">
                                                     {historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
-                                <div className="mt-6 pt-6 border-t">
-                                    <h4 className="font-medium mb-3">{t('farmingInsights') || 'Farming Insights'}</h4>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <h5 className="text-sm font-medium text-green-600">{t('favorableConditions') || 'Favorable Conditions'}</h5>
-                                            <ul className="text-sm space-y-1">
-                                                <li className="flex items-start gap-2">
-                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                    <span>
-                                                        {historicalData.filter(r => r.weatherSummary.temperature.current >= 18 && r.weatherSummary.temperature.current <= 25).length} {t('daysOptimalTemp') || 'days with optimal temperature'}
+                                <div className="mt-6 pt-6 border-t border-slate-200">
+                                    <h4 className="font-medium mb-4 text-slate-800">{t('farmingInsights') || 'Farming Insights'}</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-3">
+                                            <h5 className="text-sm font-medium text-green-600 bg-green-50 px-3 py-2 rounded-lg">{t('favorableConditions') || 'Favorable Conditions'}</h5>
+                                            <ul className="text-sm space-y-2">
+                                                <li className="flex items-start gap-3 p-2 bg-green-50 rounded-lg">
+                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-2 flex-shrink-0" />
+                                                    <span className="text-slate-700">
+                                                        <span className="font-medium text-green-700">{historicalData.filter(r => r.weatherSummary.temperature.current >= 18 && r.weatherSummary.temperature.current <= 25).length}</span> {t('daysOptimalTemp') || 'days with optimal temperature'}
                                                     </span>
                                                 </li>
-                                                <li className="flex items-start gap-2">
-                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-1.5" />
-                                                    <span>
-                                                        {historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 1 && r.weatherSummary.precipitation.rainAmount < 30).length} {t('daysModerateRain') || 'days with moderate rain'}
+                                                <li className="flex items-start gap-3 p-2 bg-green-50 rounded-lg">
+                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-2 flex-shrink-0" />
+                                                    <span className="text-slate-700">
+                                                        <span className="font-medium text-green-700">{historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 1 && r.weatherSummary.precipitation.rainAmount < 30).length}</span> {t('daysModerateRain') || 'days with moderate rain'}
                                                     </span>
                                                 </li>
                                             </ul>
                                         </div>
-                                        <div className="space-y-2">
-                                            <h5 className="text-sm font-medium text-amber-600">{t('challengingConditions') || 'Challenging Conditions'}</h5>
-                                            <ul className="text-sm space-y-1">
-                                                <li className="flex items-start gap-2">
-                                                    <div className="rounded-full bg-amber-500 h-2 w-2 mt-1.5" />
-                                                    <span>
-                                                        {historicalData.filter(r => r.weatherSummary.temperature.max > 30 || r.weatherSummary.temperature.min < 10).length} {t('daysExtremeTemp') || 'days with extreme temperature'}
+                                        <div className="space-y-3">
+                                            <h5 className="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">{t('challengingConditions') || 'Challenging Conditions'}</h5>
+                                            <ul className="text-sm space-y-2">
+                                                <li className="flex items-start gap-3 p-2 bg-amber-50 rounded-lg">
+                                                    <div className="rounded-full bg-amber-500 h-2 w-2 mt-2 flex-shrink-0" />
+                                                    <span className="text-slate-700">
+                                                        <span className="font-medium text-amber-700">{historicalData.filter(r => r.weatherSummary.temperature.max > 30 || r.weatherSummary.temperature.min < 10).length}</span> {t('daysExtremeTemp') || 'days with extreme temperature'}
                                                     </span>
                                                 </li>
-                                                <li className="flex items-start gap-2">
-                                                    <div className="rounded-full bg-amber-500 h-2 w-2 mt-1.5" />
-                                                    <span>
-                                                        {historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length} {t('daysHeavyRain') || 'days with heavy rain'}
+                                                <li className="flex items-start gap-3 p-2 bg-amber-50 rounded-lg">
+                                                    <div className="rounded-full bg-amber-500 h-2 w-2 mt-2 flex-shrink-0" />
+                                                    <span className="text-slate-700">
+                                                        <span className="font-medium text-amber-700">{historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length}</span> {t('daysHeavyRain') || 'days with heavy rain'}
                                                     </span>
                                                 </li>
                                             </ul>
@@ -1195,8 +1211,15 @@ const Historical: NextPage = () => {
                     renderEmptyState()
                 )}
 
-                <div className="text-xs text-muted-foreground text-center mt-4">
-                    {t("dataLastUpdated") || "Data last updated"}: {new Date().toLocaleString()}
+                
+                <div className="text-center p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                        <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
+                        <p className="text-sm font-medium text-slate-600">Historical Data Analysis</p>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                        {t("dataLastUpdated") || "Data last updated"}: {new Date().toLocaleString()}
+                    </p>
                 </div>
             </div>
         </AppLayout>

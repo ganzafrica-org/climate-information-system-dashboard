@@ -77,7 +77,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
 
         setIsLoading(true);
         try {
-            await api.post<ApiResponse<Location>>('/api/admin/locations', formData);
+            await api.post<ApiResponse<Location>>('/api/users/locations', formData);
             toast.success(t('locationCreatedSuccessfully') || 'Location created successfully');
             onSuccess();
             onOpenChange(false);
@@ -434,7 +434,7 @@ export function EditLocationDialog({ open, onOpenChange, location, onSuccess }: 
 
         setIsLoading(true);
         try {
-            await api.put<ApiResponse<Location>>(`/api/admin/locations/${location.id}`, formData);
+            await api.put<ApiResponse<Location>>(`/api/users/locations/${location.id}`, formData);
             toast.success(t('locationUpdatedSuccessfully') || 'Location updated successfully');
             onSuccess();
             onOpenChange(false);
