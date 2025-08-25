@@ -139,44 +139,111 @@ const Dashboard: NextPage = () => {
 
     const fetchDashboardStats = async () => {
         try {
-            // Fetch total farmers
-            const farmersResponse = await api.get('/api/admin/farmers');
-            const farmersData = farmersResponse.data?.data?.farmers || farmersResponse.data?.farmers || [];
-            const totalFarmers = Array.isArray(farmersData) ? farmersData.length : 0;
+            const [farmersRes, alertsStatsRes, alertsListRes, messagesStatsRes, locsRes] = await Promise.all([
+                // Farmers
+                api.get('/api/admin/farmers').catch((e: any) => e),
+                // Try a dedicated alerts stats endpoint first
+                api.get('/api/weather/alerts/stats').catch(() => null),
+                // Fallback to listing alerts (with a large limit to approximate totals)
+                api.get('/api/weather/alerts', { params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc' } }).catch((e: any) => e),
+                // Try messaging stats endpoints for custom/emergency messages
+                (async () => {
+                    const candidates = ['/api/messaging/stats', '/api/messages/stats', '/api/weather/messaging/stats'];
+                    for (const url of candidates) {
+                        try {
+                            const res = await api.get(url);
+                            return res;
+                        } catch (e: any) {
+                            if (e?.response?.status === 404) continue;
+                        }
+                    }
+                    return null;
+                })(),
+                // Locations
+                api.get('/api/admin/locations').catch((e: any) => e),
+            ]);
 
-            // Fetch alerts data
-            const alertsResponse = await api.get('/api/weather/alerts');
-            const alertsData = alertsResponse.data?.data?.alerts || alertsResponse.data?.alerts || [];
-            
-            const messagesSent = Array.isArray(alertsData) ? alertsData.filter((alert: any) => alert.status === 'sent').length : 0;
-            const activeAlerts = Array.isArray(alertsData) ? alertsData.filter((alert: any) => alert.isActive === true).length : 0;
+            // Farmers total
+            const farmersData = farmersRes?.data?.data?.farmers || farmersRes?.data?.farmers || farmersRes?.farmers || [];
+            const totalFarmers = Array.isArray(farmersData)
+                ? farmersData.length
+                : (farmersRes?.data?.count || farmersRes?.count || 0);
 
-            // Fetch active locations
-            const locationsResponse = await api.get('/api/admin/locations');
-            const locationsData = locationsResponse.data?.data?.locations || locationsResponse.data?.locations || [];
-            const activeLocations = Array.isArray(locationsData) ? locationsData.length : 0;
+            // Alerts sent/active counts
+            let sentAlerts = 0;
+            let activeAlerts = 0;
+
+            // Prefer stats endpoint shape if present
+            const alertsStats = alertsStatsRes?.data?.data || alertsStatsRes?.data || alertsStatsRes;
+            if (alertsStats && (alertsStats.sent !== undefined || alertsStats.sentCount !== undefined)) {
+                sentAlerts = alertsStats.sent ?? alertsStats.sentCount ?? 0;
+                // Active may be provided, else fallback to list parsing below
+                activeAlerts = alertsStats.active ?? alertsStats.activeCount ?? 0;
+            }
+
+            // Parse list response for alerts to compute counts when stats not available or incomplete
+            const alertsPayload = alertsListRes?.data || alertsListRes;
+            let alertsArray: any[] = [];
+            if (Array.isArray(alertsPayload)) {
+                alertsArray = alertsPayload;
+            } else if (alertsPayload?.data?.alerts) {
+                alertsArray = alertsPayload.data.alerts;
+            } else if (alertsPayload?.alerts) {
+                alertsArray = alertsPayload.alerts;
+            }
+
+            if (alertsArray.length > 0) {
+                const now = Date.now();
+                const parsed = alertsArray.map((a: any) => ({
+                    status: a.status || (a.isSent ? 'sent' : 'draft'),
+                    isSent: Boolean(a.isSent || a.status === 'sent' || a.sentAt),
+                    isActive: a.isActive,
+                    validUntil: a.validUntil ? Date.parse(a.validUntil) : null,
+                }));
+
+                if (!sentAlerts) {
+                    sentAlerts = parsed.filter(p => p.isSent).length;
+                }
+                if (!activeAlerts) {
+                    activeAlerts = parsed.filter(p => {
+                        if (p.isActive === true) return true;
+                        if (p.isSent && p.validUntil && p.validUntil > now) return true;
+                        return false;
+                    }).length;
+                }
+            }
+
+            // Messages (custom/emergency) sent
+            let otherMessagesSent = 0;
+            if (messagesStatsRes) {
+                const ms = messagesStatsRes.data?.data || messagesStatsRes.data || messagesStatsRes;
+                // Try common keys
+                otherMessagesSent = ms?.sent ?? ms?.sentCount ?? ms?.delivered ?? ms?.deliveredCount ?? 0;
+            }
+
+            const messagesSent = sentAlerts + otherMessagesSent;
+
+            // Active locations
+            const locationsData = locsRes?.data?.data?.locations || locsRes?.data?.locations || locsRes?.locations || [];
+            const activeLocations = Array.isArray(locationsData)
+                ? locationsData.length
+                : (locsRes?.data?.count || locsRes?.count || (locations?.length || 0));
 
             setDashboardStats({
                 totalFarmers,
                 messagesSent,
                 activeAlerts,
-                activeLocations
+                activeLocations,
             });
 
-            console.log('Dashboard stats updated:', {
-                totalFarmers,
-                messagesSent,
-                activeAlerts,
-                activeLocations
-            });
+            console.log('Dashboard stats updated:', { totalFarmers, messagesSent, activeAlerts, activeLocations });
         } catch (error: any) {
             console.error('Failed to fetch dashboard stats:', error);
-            // Set default values or use mock data for development
             setDashboardStats({
-                totalFarmers: 1247,
-                messagesSent: 234,
-                activeAlerts: 3,
-                activeLocations: locations.length || 6
+                totalFarmers: 0,
+                messagesSent: 0,
+                activeAlerts: 0,
+                activeLocations: locations.length || 0,
             });
         }
     };

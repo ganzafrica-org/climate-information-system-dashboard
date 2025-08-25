@@ -120,6 +120,34 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </TooltipProvider>
                 </nav>
                 <div className="mt-auto px-2 py-4">
+                    {/* Admin section */}
+                    {user?.role === 'admin' && (
+                        <div className="mb-4">
+                            <Separator className="mb-3" />
+                            <TooltipProvider delayDuration={300}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Link href="/admin/users">
+                                            <Button
+                                                variant="ghost"
+                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-blue-100 hover:text-black ${router.pathname === '/admin/users' ? 'bg-blue-600 text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                            >
+                                                <Users size={20} />
+                                                {(sidebarOpen || isMobile) && <span className="ml-3">Admin</span>}
+                                            </Button>
+                                        </Link>
+                                    </TooltipTrigger>
+                                    {!sidebarOpen && !isMobile && (
+                                        <TooltipContent side="right">
+                                            Admin
+                                        </TooltipContent>
+                                    )}
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                    )}
+                    
+                    {/* Logout section */}
                     <TooltipProvider delayDuration={300}>
                         <Tooltip>
                             <TooltipTrigger asChild>
@@ -191,6 +219,23 @@ export function AppLayout({ children }: AppLayoutProps) {
                             })}
                         </nav>
                         <div className="mt-auto px-2 py-4">
+                            {/* Admin section for mobile */}
+                            {user?.role === 'admin' && (
+                                <div className="mb-4">
+                                    <Separator className="mb-3" />
+                                    <Link href="/admin/users">
+                                        <Button
+                                            variant={router.pathname === '/admin/users' ? "secondary" : "ghost"}
+                                            className="w-full justify-start"
+                                            onClick={() => setSidebarOpen(false)}
+                                        >
+                                            <Users size={20} />
+                                            <span className="ml-3">Admin</span>
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
+                            
                             <Separator className="my-2" />
                             <Button
                                 variant="ghost"
