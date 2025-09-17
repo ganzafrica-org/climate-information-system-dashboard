@@ -49,19 +49,16 @@ const Locations: NextPage = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
+    // Allow all authenticated users to view locations; admin will still control mutations
     useEffect(() => {
-        if (isAuthenticated && user?.role !== 'admin') {
-            toast.error(t('adminAccessRequired'));
-            router.push('/dashboard');
-            return;
-        }
+        // no-op: viewing is allowed for all authenticated users
     }, [isAuthenticated, user, router, t]);
 
     useEffect(() => {
-        if (isAuthenticated && user?.role === 'admin') {
+        if (isAuthenticated) {
             fetchLocations();
         }
-    }, [searchTerm, currentPage, limit, isAuthenticated, user]);
+    }, [searchTerm, currentPage, limit, isAuthenticated]);
 
     const handleApiError = (error: any) => {
         console.error('API Error:', error);
@@ -117,7 +114,7 @@ const Locations: NextPage = () => {
         if (!confirm(t('confirmDeleteLocation'))) return;
 
         try {
-            await api.delete(`/api/users/locations//${locationId}`);
+            await api.delete(`/api/users/locations/${locationId}`);
             toast.success(t('locationDeletedSuccessfully'));
             await fetchLocations();
             if (selectedLocation === locationId) {
@@ -293,15 +290,17 @@ const Locations: NextPage = () => {
                     <CardContent className="p-0">
                         {/* Header with Add Location and Search */}
                         <div className="p-4 bg-white border-b border-gray-200 flex justify-end items-center gap-4">
-                            <Button 
-                                variant="primary" 
-                                onClick={() => setCreateDialogOpen(true)} 
-                                style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
-                                className="hover:opacity-90 text-white"
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                {t("addLocation") || "Add Location"}
-                            </Button>
+                            {user?.role === 'admin' && (
+                                <Button 
+                                    variant="primary" 
+                                    onClick={() => setCreateDialogOpen(true)} 
+                                    style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                                    className="hover:opacity-90 text-white"
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    {t("addLocation") || "Add Location"}
+                                </Button>
+                            )}
                             
                             <div className="relative">
                                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
@@ -406,27 +405,31 @@ const Locations: NextPage = () => {
                                                                 <MapPin className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
                                                                 {t("viewLocation") || "View Location"}
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleEditLocation(location);
-                                                                }}
-                                                                className="cursor-pointer hover:bg-green-50"
-                                                            >
-                                                                <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
-                                                                {t("editLocation") || "Edit Location"}
-                                                            </DropdownMenuItem>
-                                                            <Separator className="my-1" />
-                                                            <DropdownMenuItem
-                                                                className="cursor-pointer hover:bg-red-50"
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDeleteLocation(location.id);
-                                                                }}
-                                                            >
-                                                                <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
-                                                                <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
-                                                            </DropdownMenuItem>
+                                                            {user?.role === 'admin' && (
+                                                                <>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleEditLocation(location);
+                                                                        }}
+                                                                        className="cursor-pointer hover:bg-green-50"
+                                                                    >
+                                                                        <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
+                                                                        {t("editLocation") || "Edit Location"}
+                                                                    </DropdownMenuItem>
+                                                                    <Separator className="my-1" />
+                                                                    <DropdownMenuItem
+                                                                        className="cursor-pointer hover:bg-red-50"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleDeleteLocation(location.id);
+                                                                        }}
+                                                                    >
+                                                                        <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
+                                                                        <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
+                                                                    </DropdownMenuItem>
+                                                                </>
+                                                            )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </td>

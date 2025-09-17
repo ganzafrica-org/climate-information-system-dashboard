@@ -47,12 +47,9 @@ const Farmers: NextPage = () => {
 
   const [isExporting, setIsExporting] = useState(false);
 
+  // Allow all authenticated users to view farmers; admin will still control mutations
   useEffect(() => {
-    if (isAuthenticated && user?.role !== 'admin') {
-      toast.error(t('adminAccessRequired'));
-      router.push('/dashboard');
-      return;
-    }
+    // no-op: viewing is allowed for all authenticated users
   }, [isAuthenticated, user, router, t]);
 
   useEffect(() => {
@@ -60,10 +57,10 @@ const Farmers: NextPage = () => {
   }, []);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === 'admin') {
+    if (isAuthenticated) {
       fetchFarmers();
     }
-  }, [selectedLocation, searchTerm, currentPage, limit, isAuthenticated, user]);
+  }, [selectedLocation, searchTerm, currentPage, limit, isAuthenticated]);
 
   const fetchLocations = async () => {
     try {
@@ -290,15 +287,17 @@ const Farmers: NextPage = () => {
             <CardContent className="p-0">
               {/* Header with Add Farmer, All Locations dropdown, and Search */}
               <div className="p-4 bg-white border-b border-gray-200 flex justify-end items-center gap-4">
-                <Button 
-                  variant="primary" 
-                  onClick={() => setCreateDialogOpen(true)} 
-                  style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
-                  className="hover:opacity-90 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  {t("addFarmer")}
-                </Button>
+                {user?.role === 'admin' && (
+                  <Button 
+                    variant="primary" 
+                    onClick={() => setCreateDialogOpen(true)} 
+                    style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                    className="hover:opacity-90 text-white"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t("addFarmer")}
+                  </Button>
+                )}
 
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
@@ -437,16 +436,18 @@ const Farmers: NextPage = () => {
                                         <User className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
                                         {t("viewProfile") || "View Profile"}
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem 
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleEditFarmer(farmer);
-                                        }}
-                                        className="cursor-pointer hover:bg-green-50"
-                                      >
-                                        <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
-                                        {t("editFarmer") || "Edit Farmer"}
-                                      </DropdownMenuItem>
+                                      {user?.role === 'admin' && (
+                                        <DropdownMenuItem 
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleEditFarmer(farmer);
+                                          }}
+                                          className="cursor-pointer hover:bg-green-50"
+                                        >
+                                          <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
+                                          {t("editFarmer") || "Edit Farmer"}
+                                        </DropdownMenuItem>
+                                      )}
                                       <DropdownMenuItem 
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -457,17 +458,21 @@ const Farmers: NextPage = () => {
                                         <MessageSquare className="h-4 w-4 mr-2" style={{ color: '#adc9e3' }} />
                                         {t("sendMessage") || "Send Message"}
                                       </DropdownMenuItem>
-                                      <Separator className="my-1" />
-                                      <DropdownMenuItem
-                                          className="cursor-pointer hover:bg-red-50"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteFarmer(farmer.id);
-                                          }}
-                                      >
-                                        <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
-                                        <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
-                                      </DropdownMenuItem>
+                                      {user?.role === 'admin' && (
+                                        <>
+                                          <Separator className="my-1" />
+                                          <DropdownMenuItem
+                                              className="cursor-pointer hover:bg-red-50"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDeleteFarmer(farmer.id);
+                                              }}
+                                          >
+                                            <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
+                                            <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
                                     </DropdownMenuContent>
                                   </DropdownMenu>
                                 </td>
