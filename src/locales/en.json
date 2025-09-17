@@ -8,6 +8,8 @@
   "messages": "Messaging",
   "settings": "Settings",
   "sendTo":"Send To",
+  "allDays": "All Days",
+
 
   "todayForecast": "Today's Forecast",
   "weeklyOverview": "Weekly Overview",
