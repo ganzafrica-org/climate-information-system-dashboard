@@ -469,7 +469,11 @@
 
   "3days": "3 days",
   "7days": "7 days",
+  "10days": "10 days",
   "14days": "14 days",
+  "16days": "16 days",
+
+  "soilAnalysis": "Soil Analysis",
 
   "dataMaintenance": "Data Maintenance",
   "dataMaintenanceDesc": "Manage system data and perform maintenance",
@@ -1015,6 +1019,50 @@
   "noAlertsFound": "No alerts found",
   "type": "Type",
   "priority": "Priority",
-  "draft": "Draft"
+  "draft": "Draft",
+
+  "soilSuitabilityAnalysis": "Soil Suitability & Susceptibility Analysis",
+  "soilAnalysisDescription": "Analyze crop suitability and environmental risk patterns across Musanze District",
+  "filtersAndAnalysis": "Filters & Analysis",
+  "suitability": "Suitability",
+  "risk": "Risk",
+  "susceptibility": "Susceptibility",
+  "cropType": "Crop Type",
+  "hazardType": "Hazard Type",
+  "filterBySector": "Filter by Sector",
+  "filtered": "Filtered",
+  "areaDistribution": "Area Distribution",
+  "interactiveMap": "Interactive Map",
+  "loadingSoilData": "Loading soil data...",
+
+  "verySuitable": "Very Suitable",
+  "suitable": "Suitable",
+  "moderateSuitable": "Moderate Suitable",
+  "lessSuitable": "Less Suitable",
+  "notSuitable": "Not Suitable",
+
+  "extremelySusceptible": "Extremely Susceptible",
+  "highlySusceptible": "Highly Susceptible",
+  "moderateSusceptible": "Moderate Susceptible",
+  "slightlySusceptible": "Slightly Susceptible",
+
+  "irishPotatoes": "Irish Potatoes",
+
+  "flooding": "Flooding",
+  "landslide": "Landslide",
+  "soilErosion": "Soil Erosion",
+
+  "hectares": "ha",
+  "class": "Class",
+  "area": "Area",
+  "unknown": "Unknown",
+  "restrictedArea": "Restricted Area",
+  "cropSuitability": "Crop Suitability",
+  "hazardSusceptibility": "Hazard Susceptibility",
+  "openStreetMap": "OpenStreetMap",
+  "satellite": "Satellite",
+  "districtBoundary": "District Boundary",
+  "sectors": "Sectors",
+  "restrictedAreas": "Restricted Areas"
 
 }

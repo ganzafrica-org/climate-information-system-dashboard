@@ -31,7 +31,11 @@
   "editLocation": "Hindura Ahantu",
   "close": "Funga",
   "sendTo":"Ohereza Ku",
-  "allDays": "Imisi Yose",
+  "allDays": "Iminsi Yose",
+  "10days": "Iminsi 10",
+  "16days": "Iminsi 16",
+
+  "soilAnalysis": "Isesengura ry'Ubutaka",
   
 
   "todayForecast": "Iteganyagihe ry'uyu munsi",
@@ -45,7 +49,7 @@
   "Thursday" : "Kuwa Kane",
   "Friday" : "Kuwa Gatanu",
   "Saturday" : "Kuwa Gatandatu",
-  "Sunday" : "Kuwa Cyumweru",
+  "Sunday" : "Ku Cyumweru",
 
   "light rain": "Akavura Gake",
   "drizzle": "Imvura y'umuyaga muke",
@@ -1114,6 +1118,51 @@
   "noAlertsFound": "Nta mburizi zabonetse",
   "type": "Ubwoko",
   "priority": "Ibanze",
-  "draft": "Umushinga"
+  "draft": "Umushinga",
+
+  "soilSuitabilityAnalysis": "Isesengura ry'Ukwiranira n'Impurira z'Ubutaka",
+  "soilAnalysisDescription": "Sesengura ubushobozi bw'ibihingwa n'ibyago by'ibidukikije mu karere ka Musanze",
+  "filtersAndAnalysis": "Imyandikire n'Isesengura",
+  "suitability": "Ukwiranira",
+  "risk": "Akaga",
+  "susceptibility": "Impurira",
+  "cropType": "Ubwoko bw'Igihingwa",
+  "hazardType": "Ubwoko bw'Akaga",
+  "filterBySector": "Hitamo Umurenge",
+  "filtered": "Byaranditseho",
+  "areaDistribution": "Ukugabana kw'Ubuso",
+  "interactiveMap": "Ikarita Ikoreshwa",
+  "loadingSoilData": "Urimo gupakira amakuru y'ubutaka...",
+
+  "verySuitable": "Bwiza Cyane",
+  "suitable": "Bwiza",
+  "moderateSuitable": "Bwiza Gake",
+  "lessSuitable": "Budafite Ubwiza",
+  "notSuitable": "Ntibwiza",
+
+  "extremelySusceptible": "Byoroshye Cyane",
+  "highlySusceptible": "Byoroshye Cyane",
+  "moderateSusceptible": "Byoroshye Gake",
+  "slightlySusceptible": "Byoroshye Bike",
+
+  "irishPotatoes": "Ibirayi",
+
+
+  "flooding": "Imyuzure",
+  "landslide": "Inyerera z'Ubutaka",
+  "soilErosion": "Isuri y'Ubutaka",
+
+  "hectares": "ha",
+  "class": "Icyiciro",
+  "area": "Ubuso",
+  "unknown": "Ntibizwi",
+  "restrictedArea": "Agace Gafunze",
+  "cropSuitability": "Ukwiranira kw'Ibihingwa",
+  "hazardSusceptibility": "Impurira z'Akaga",
+  "openStreetMap": "OpenStreetMap",
+  "satellite": "Satelite",
+  "districtBoundary": "Imipaka y'Akarere",
+  "sectors": "Imirenge",
+  "restrictedAreas": "Uduce Dufunze"
 
 }
