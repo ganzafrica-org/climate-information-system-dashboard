@@ -1114,6 +1114,15 @@
   "noAlertsFound": "Nta mburizi zabonetse",
   "type": "Ubwoko",
   "priority": "Ibanze",
-  "draft": "Umushinga"
+  "draft": "Umushinga",
 
+  "integratedTrainingManual": "Imfashanyigisho Kubutaka, Ibihigwa no Kurwanya Udukoko",
+  "integratedTrainingManualDesc": "Ubuyobozi bukomeye bwigisha gufata amakuru y'ubutaka, gucunga umwanda w'ubutaka, gutegura ubutaka ku binyamigirire n'uburo, kurwanya udukoko, n'ubuhanga bwo gusuzugura imashini.",
+  "allLevels": "Amahango Yose",
+  "view": "Reba",
+  "download": "Kuramo",
+  "pdfViewerHint": "Niba PDF igaragara ubusa, yifunguze mu icyerekezo gishya:",
+  "openInNewTab": "Fungura mu icyerekezo gishya",
+  "pdfViewerNotSupported": "Ubusuguse bwa PDF ntibukoresha muri iyi navigateur.",
+  "clickHereToDownload": "Kanda hano ukuremo PDF"
 }
