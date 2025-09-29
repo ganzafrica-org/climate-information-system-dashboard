@@ -14,11 +14,20 @@ const SUITABILITY_COLORS = {
   'Not Suitable': '#FF5500'
 };
 
+// Handle all variations of susceptibility class names from different GeoJSON files
 const SUSCEPTIBILITY_COLORS = {
-  'Extremely Susceptible': '#8B0000',
-  'Highly Susceptible': '#DC143C',
-  'Moderate Susceptible': '#FF8C00',
-  'Slightly Susceptible': '#FFD700'
+  // Correct names from mapping guidance
+  'Extremely Susceptible': '#A80000',
+  'Highly Susceptible': '#FF5500',
+  'Moderate Susceptible': '#F5CA7A',
+  'Slightly Susceptible': '#E1E1E1',
+  // Variations with trailing spaces (flooding, soil erosion files)
+  'Extremely Susceptible ': '#A80000',
+  'Highly Susceptible ': '#FF5500',
+  'Moderately Susceptible ': '#F5CA7A',
+  'Slightly Susceptible ': '#E1E1E1',
+  // Variations without trailing spaces but with "Moderately" (landslide file)
+  'Moderately Susceptible': '#F5CA7A'
 };
 
 interface MapProps {
