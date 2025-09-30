@@ -79,17 +79,26 @@ const SUITABILITY_COLORS = {
 };
 
 const getSusceptibilityColors = (t: (key: string) => string) => ({
-  [t('extremelySusceptible')]: '#8B0000',
-  [t('highlySusceptible')]: '#DC143C',
-  [t('moderateSusceptible')]: '#FF8C00',
-  [t('slightlySusceptible')]: '#FFD700'
+  [t('extremelySusceptible')]: '#A80000',
+  [t('highlySusceptible')]: '#FF5500',
+  [t('moderateSusceptible')]: '#F5CA7A',
+  [t('slightlySusceptible')]: '#E1E1E1'
 });
 
+// Handle all variations of susceptibility class names from different GeoJSON files
 const SUSCEPTIBILITY_COLORS = {
-  'Extremely Susceptible': '#8B0000',
-  'Highly Susceptible': '#DC143C',
-  'Moderate Susceptible': '#FF8C00',
-  'Slightly Susceptible': '#FFD700'
+  // Correct names from mapping guidance
+  'Extremely Susceptible': '#A80000',
+  'Highly Susceptible': '#FF5500',
+  'Moderate Susceptible': '#F5CA7A',
+  'Slightly Susceptible': '#E1E1E1',
+  // Variations with trailing spaces (flooding, soil erosion files)
+  'Extremely Susceptible ': '#A80000',
+  'Highly Susceptible ': '#FF5500',
+  'Moderately Susceptible ': '#F5CA7A',
+  'Slightly Susceptible ': '#E1E1E1',
+  // Variations without trailing spaces but with "Moderately" (landslide file)
+  'Moderately Susceptible': '#F5CA7A'
 };
 
 const getCropTypes = (t: (key: string) => string) => [
@@ -410,7 +419,15 @@ export default function SoilSuitabilityPage() {
                     ).map(([className, area]) => {
                       const colors = activeTab === 'suitability' ? getSuitabilityColors(t) : getSusceptibilityColors(t);
                       const englishColors = activeTab === 'suitability' ? SUITABILITY_COLORS : SUSCEPTIBILITY_COLORS;
-                      const color = colors[className] || englishColors[className as keyof typeof englishColors] || '#CCCCCC';
+                      let color = colors[className] || englishColors[className as keyof typeof englishColors];
+
+                      // Handle trailing spaces and variations in class names
+                      if (!color && className) {
+                        const trimmedClass = className.trim();
+                        color = colors[trimmedClass] || englishColors[trimmedClass as keyof typeof englishColors];
+                      }
+
+                      color = color || '#CCCCCC';
 
                       return (
                           <div key={className} className="flex items-center justify-between p-2 rounded border">
@@ -441,8 +458,8 @@ export default function SoilSuitabilityPage() {
               </CardHeader>
               <CardContent className="py-2">
                 <MapWithNoSSR
-                    suitabilityData={activeTab === 'suitability' ? filteredData.suitability : null}
-                    susceptibilityData={activeTab === 'susceptibility' ? filteredData.susceptibility : null}
+                    suitabilityData={filteredData.suitability}
+                    susceptibilityData={filteredData.susceptibility}
                     sectors={sectors}
                     district={district}
                     restrictedAreas={restrictedAreas}
