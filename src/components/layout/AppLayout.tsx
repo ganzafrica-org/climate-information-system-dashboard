@@ -12,7 +12,7 @@ import {
     Menu,
     LogOut,
     BookOpen,
-    HelpCircle, MapPin, Loader2,
+    HelpCircle, MapPin, Loader2, TreePine,
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
@@ -62,6 +62,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         { href: '/communications', icon: <MessageSquare size={20} />, label: t('communications')},
         { href: '/farmers', icon: <Users size={20} />, label: t('farmers') },
         { href: '/locations', icon: <MapPin size={20} />, label: t('locations') },
+        { href: '/soil-suitability', icon: <TreePine size={20} />, label: t('soilAnalysis') },
         { href: '/training', icon: <BookOpen size={20} />, label: t('training') },
     ];
 
