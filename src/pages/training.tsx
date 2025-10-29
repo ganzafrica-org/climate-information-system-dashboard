@@ -141,7 +141,7 @@ const Training = () => {
 
             <div className="space-y-4 md:space-y-6">
                 <div className="flex items-center gap-2">
-                    <BookOpen className="h-5 w-5 text-ganz-primary" />
+                    <BookOpen className="h-5 w-5 text-[#147677]" />
                     <h2 className="text-xl font-medium">{t('training')}</h2>
                 </div>
 
@@ -195,7 +195,7 @@ const Training = () => {
                             <TabsList>
                             <TabsTrigger
                                 value="modules"
-                                className="text-gray-700 hover:bg-blue-100 hover:text-black data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                                className="text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                             >
                                 <LayoutGrid className="h-4 w-4 mr-2" />
                                 {t('trainingModules')}
@@ -203,7 +203,7 @@ const Training = () => {
                             <TabsTrigger
                                 value="faq"
                                 style={{ display: 'none' }}
-                                className="text-gray-700 hover:bg-blue-100 hover:text-black data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                                className="text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                             >
                                 <Info className="h-4 w-4 mr-2" />
                                 {t('frequentlyAskedQuestions')}
@@ -304,10 +304,10 @@ const Training = () => {
                             ) : view === 'grid' ? (
                                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-2 gap-6">
                                     {filteredModules.map((module) => (
-                                        <Card key={module.id} className="transition-all duration-300 hover:shadow-lg border-blue-100 bg-white">
+                                        <Card key={module.id} className="transition-all duration-300 hover:shadow-lg border-[#147677]/20 bg-white">
                                             <CardHeader className="pb-3">
                                                 <div className="flex justify-between items-start mb-3">
-                                                    <div className="p-3 rounded-xl bg-blue-100 text-blue-600 shadow-sm">
+                                                    <div className="p-3 rounded-xl bg-[#147677]/10 text-[#147677] shadow-sm">
                                                         {module.icon}
                                                     </div>
                                                 </div>
@@ -329,7 +329,7 @@ const Training = () => {
                                                         <Button 
                                                             variant="outline" 
                                                             size="sm" 
-                                                            className="flex-1 border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
+                                                            className="flex-1 border-[#147677]/30 text-[#147677] hover:bg-[#147677]/10 hover:border-[#147677]/50"
                                                             onClick={() => handleView(module)}
                                                         >
                                                             <Eye className="h-4 w-4 mr-2" />
@@ -338,7 +338,7 @@ const Training = () => {
                                                         <Button 
                                                             variant="primary"
                                                             size="sm" 
-                                                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                                            className="flex-1 bg-[#147677] hover:bg-[#147677]/90 text-white shadow-sm"
                                                             onClick={() => handleDownload(module)}
                                                         >
                                                             <Download className="h-4 w-4 mr-2" />
@@ -351,14 +351,14 @@ const Training = () => {
                                     ))}
                                 </div>
                             ) : (
-                                <Card className="border-blue-100 bg-white">
-                                    <div className="divide-y divide-blue-100">
+                                <Card className="border-[#147677]/20 bg-white">
+                                    <div className="divide-y divide-[#147677]/20">
                                         {filteredModules.map((module) => (
                                             <div
                                                 key={module.id}
-                                                className="p-6 flex items-start gap-6 hover:bg-blue-25 transition-colors duration-200"
+                                                className="p-6 flex items-start gap-6 hover:bg-[#147677]/5 transition-colors duration-200"
                                             >
-                                                <div className="p-3 rounded-xl bg-blue-100 text-blue-600 shadow-sm">
+                                                <div className="p-3 rounded-xl bg-[#147677]/10 text-[#147677] shadow-sm">
                                                     {module.icon}
                                                 </div>
 
@@ -385,7 +385,7 @@ const Training = () => {
                                                         <Button 
                                                             variant="outline" 
                                                             size="sm"
-                                                            className="border-blue-200 text-blue-700 hover:bg-blue-50 hover:border-blue-300"
+                                                            className="border-[#147677]/30 text-[#147677] hover:bg-[#147677]/10 hover:border-[#147677]/50"
                                                             onClick={() => handleView(module)}
                                                         >
                                                             <Eye className="h-4 w-4 mr-2" />
@@ -394,7 +394,7 @@ const Training = () => {
                                                         <Button 
                                                             variant="primary"
                                                             size="sm"
-                                                            className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                                                            className="bg-[#147677] hover:bg-[#147677]/90 text-white shadow-sm"
                                                             onClick={() => handleDownload(module)}
                                                         >
                                                             <Download className="h-4 w-4 mr-2" />

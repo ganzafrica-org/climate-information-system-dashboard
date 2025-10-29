@@ -1,5 +1,5 @@
 
-# GanzAfrica Climate Information System
+# GanzAfrica Teganyamuhinzi
 
 A localized weather and farming advisory system for farmers in Musanze region, Rwanda. This application provides real-time weather forecasts, agricultural alerts, historical data analysis, and farmer management tools.
 

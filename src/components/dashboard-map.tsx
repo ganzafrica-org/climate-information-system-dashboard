@@ -4,16 +4,26 @@ import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, ZoomControl, useMap } from 'react-leaflet';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger
+} from '@/components/ui/dropdown-menu';
 import { useLanguage } from '@/i18n';
 import {
     CloudRain,
     MapPin,
     Droplets,
-    Loader2
+    Loader2,
+    ChevronDown
 } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import api from "@/lib/api";
+import { Location, LocationsResponse } from '@/types/farmer';
+import { ApiResponse } from '@/types/weather';
 
 declare global {
 
@@ -55,16 +65,21 @@ const HeatmapController = ({ weatherData }: { weatherData: WeatherDataPoint[] })
 
     useEffect(() => {
 
+        // Load heat plugin in background without blocking
         const loadHeatPlugin = async () => {
             if (typeof window !== 'undefined' && !(window as any).L?.heatLayer) {
                 try {
-                    await import('leaflet.heat');
+                    // Use dynamic import with lower priority
+                    import('leaflet.heat').catch(() => {
+                        // Silently fail - fallback visualization will be used
+                    });
                 } catch (error) {
-                    console.warn('Leaflet.heat plugin not available, using fallback visualization');
+                    // Silently fail - fallback visualization will be used
                 }
             }
         };
 
+        // Load plugin without blocking UI
         loadHeatPlugin();
     }, []);
 
@@ -89,12 +104,12 @@ const HeatmapController = ({ weatherData }: { weatherData: WeatherDataPoint[] })
                 maxZoom: 18,
                 max: 1.0,
                 gradient: {
-                    0.0: '#dbeafe',
-                    0.2: '#93c5fd',
-                    0.4: '#60a5fa',
-                    0.6: '#3b82f6',
-                    0.8: '#2563eb',
-                    1.0: '#1e40af'
+                    0.0: '#fbbf24',
+                    0.2: '#f59e0b',
+                    0.4: '#d97706',
+                    0.6: '#b45309',
+                    0.8: '#92400e',
+                    1.0: '#78350f'
                 }
             });
 
@@ -109,10 +124,10 @@ const HeatmapController = ({ weatherData }: { weatherData: WeatherDataPoint[] })
                 const radius = Math.max(15, Math.min(35, point.rainfall / 3));
 
 
-                const color = intensity >= 0.8 ? '#1e40af' :
-                    intensity >= 0.6 ? '#2563eb' :
-                        intensity >= 0.4 ? '#3b82f6' :
-                            intensity >= 0.2 ? '#60a5fa' : '#93c5fd';
+                const color = intensity >= 0.8 ? '#78350f' :
+                    intensity >= 0.6 ? '#92400e' :
+                        intensity >= 0.4 ? '#b45309' :
+                            intensity >= 0.2 ? '#d97706' : '#f59e0b';
 
                 const circle = L.circleMarker(point.coordinates, {
                     radius: radius,
@@ -173,28 +188,44 @@ const getRainfallIntensity = (rainfall: number) => {
 
 const RainfallHeatmap: React.FC<RainfallHeatmapProps> = ({ className = "" }) => {
     const { t } = useLanguage();
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingWeather, setIsLoadingWeather] = useState(true);
+    // Musanze District coordinates - centered and zoomed in
     const [mapCenter] = useState<[number, number]>([-1.5006, 29.6348]);
-    const [mapZoom] = useState(10);
-
-
+    const [mapZoom] = useState(12); // Increased zoom level to focus on Musanze district
+    const [locations, setLocations] = useState<Location[]>([]);
+    const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
     const [weatherData, setWeatherData] = useState<WeatherDataPoint[]>([]);
+
     useEffect(() => {
-        const fetchWeatherData = async () => {
+        // Fetch both locations and weather data in parallel for faster loading
+        const fetchData = async () => {
             try {
-                const response = await api.get('/api/weather/all', {
-                    params: { type: 'daily' }
-                });
+                setIsLoadingWeather(true);
+                
+                // Fetch both API calls in parallel
+                const [locationsResponse, weatherResponse] = await Promise.all([
+                    api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
+                        params: { limit: 100 }
+                    }).catch(() => ({ data: { locations: [] } })),
+                    api.get('/api/weather/all', {
+                        params: { type: 'daily' }
+                    }).catch(() => ({ data: { locations: [] } }))
+                ]);
 
-                const locations = response.data.locations || [];
+                // Set locations
+                if (locationsResponse?.data?.locations) {
+                    setLocations(locationsResponse.data.locations);
+                }
 
-                const mappedData: WeatherDataPoint[] = locations.map((loc: any) => ({
+                // Process weather data
+                const weatherLocations = weatherResponse.data.locations || [];
+                const mappedData: WeatherDataPoint[] = weatherLocations.map((loc: any) => ({
                     location: loc.locationName,
                     coordinates: [loc.coordinates.lat, loc.coordinates.lon],
                     temperature: loc.weatherSummary.currentTemp,
                     rainfall: loc.weatherSummary.rainAmount,
-                    humidity: parseInt(loc.weatherOverview.match(/humidity level is (\d+)%/)?.[1] || '0'),
-                    wind: parseInt(loc.weatherOverview.match(/wind.*\((\d+)\s*km\/h\)/)?.[1] || '0'),
+                    humidity: parseInt(loc.weatherOverview?.match(/humidity level is (\d+)%/)?.[1] || '0'),
+                    wind: parseInt(loc.weatherOverview?.match(/wind.*\((\d+)\s*km\/h\)/)?.[1] || '0'),
                     weatherCode: loc.weatherSummary.condition || 'unknown',
                     alerts: [
                         ...(loc.alert ? [loc.alert.type] : []),
@@ -204,77 +235,95 @@ const RainfallHeatmap: React.FC<RainfallHeatmapProps> = ({ className = "" }) => 
                 }));
 
                 setWeatherData(mappedData);
-                console.log("Weather data fetched successfully:", weatherData);
             } catch (error) {
-                console.error("Error fetching weather data:", error);
+                console.error("Error fetching data:", error);
             } finally {
-                setIsLoading(false);
+                setIsLoadingWeather(false);
             }
         };
 
-        fetchWeatherData();
+        fetchData();
     }, []);
 
 
 
 
-    if (isLoading) {
-        return (
-            <Card className={`w-full border-0 shadow-xl ${className}`}>
-                <CardContent className="p-6">
-                    <div className="h-[500px] flex flex-col items-center justify-center">
-                        <Loader2 className="h-8 w-8 animinate-spin text-blue-600" />
-                        <div className="text-center">
-                            <p className="mt-2 text-slate-600">Loading rainfall heatmap...</p>
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
     return (
         <Card className={`w-full border-0 shadow-md ${className}`}>
-            <CardHeader className="bg-gradient-to-br bg-[#f2f5fa] text-blue-600 rounded-t-xl">
+            <CardHeader className="bg-[#f2f5fa] text-[#147677] rounded-t-xl">
                 <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
                         <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
-                            <CloudRain className="h-7 w-7" />
+                            <CloudRain className="h-7 w-7 text-[#147677]" />
                         </div>
                         <div>
-                            <CardTitle className="text-2xl font-bold">
+                            <CardTitle className="text-2xl font-bold text-[#147677]">
                                 {t('rainfallHeatmap') || 'Rainfall Heatmap'}
                             </CardTitle>
 
                         </div>
                     </div>
-                    <Badge variant="outline" className="bg-blue-50 text-blue-600 border-white/20 px-4 py-2">
-                        <MapPin className="h-4 w-4 mr-2" />
-                        Musanze District
-                    </Badge>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="bg-blue-50 text-[#147677] border-blue-200 px-4 py-2 hover:bg-blue-100">
+                                <MapPin className="h-4 w-4 mr-2" />
+                                {selectedLocation?.name || t('allLocations') || 'All Locations'}
+                                <ChevronDown className="ml-2 h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="max-h-[300px] overflow-y-auto">
+                            <DropdownMenuItem
+                                onClick={() => setSelectedLocation(null)}
+                            >
+                                <span className="font-medium">{t('allLocations') || 'All Locations'}</span>
+                            </DropdownMenuItem>
+                            {locations.length > 0 ? (
+                                locations.map((location) => (
+                                    <DropdownMenuItem
+                                        key={location.id}
+                                        onClick={() => setSelectedLocation(location)}
+                                    >
+                                        {location.name}
+                                    </DropdownMenuItem>
+                                ))
+                            ) : (
+                                <DropdownMenuItem disabled>
+                                    {isLoadingWeather ? (t('loading') || 'Loading...') : (t('noLocationsFound') || 'No locations found')}
+                                </DropdownMenuItem>
+                            )}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </CardHeader>
 
             <CardContent className="p-6 space-y-6">
 
                 
-                <div className="h-[500px] w-full rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner">
+                <div className="h-[500px] w-full rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner relative">
                     {typeof window !== 'undefined' && (
-                        <MapContainer
-                            center={mapCenter}
-                            zoom={mapZoom}
-                            style={{ height: '100%', width: '100%' }}
-                            zoomControl={false}
-                        >
-                            <ZoomControl position="bottomright" />
-                            <TileLayer
-                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                            />
+                        <>
+                            <MapContainer
+                                center={mapCenter}
+                                zoom={mapZoom}
+                                style={{ height: '100%', width: '100%' }}
+                                zoomControl={false}
+                            >
+                                <ZoomControl position="bottomright" />
+                                <TileLayer
+                                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                />
 
-                            <MapViewUpdater center={mapCenter} zoom={mapZoom} />
-                            <HeatmapController weatherData={weatherData} />
-                        </MapContainer>
+                                <MapViewUpdater center={mapCenter} zoom={mapZoom} />
+                                {weatherData.length > 0 && <HeatmapController weatherData={weatherData} />}
+                            </MapContainer>
+                            {isLoadingWeather && (
+                                <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center z-[1000]">
+                                    <Loader2 className="h-8 w-8 animate-spin text-[#147677]" />
+                                    <p className="mt-2 text-slate-600 text-sm">Loading weather data...</p>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
 
@@ -287,42 +336,42 @@ const RainfallHeatmap: React.FC<RainfallHeatmapProps> = ({ className = "" }) => 
                         </h3>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                             <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
-                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#dbeafe' }}></div>
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#fef3c7' }}></div>
                                 <div>
                                     <div className="font-semibold text-slate-700 text-sm">0-20mm</div>
                                     <div className="text-xs text-slate-500">Minimal</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
-                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#93c5fd' }}></div>
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#fde68a' }}></div>
                                 <div>
                                     <div className="font-semibold text-slate-700 text-sm">20-40mm</div>
                                     <div className="text-xs text-slate-500">Light</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
-                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#60a5fa' }}></div>
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#fbbf24' }}></div>
                                 <div>
                                     <div className="font-semibold text-slate-700 text-sm">40-60mm</div>
                                     <div className="text-xs text-slate-500">Moderate</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
-                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#3b82f6' }}></div>
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div>
                                 <div>
                                     <div className="font-semibold text-slate-700 text-sm">60-80mm</div>
                                     <div className="text-xs text-slate-500">Mod-Heavy</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
-                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#2563eb' }}></div>
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#d97706' }}></div>
                                 <div>
                                     <div className="font-semibold text-slate-700 text-sm">80-120mm</div>
                                     <div className="text-xs text-slate-500">Heavy</div>
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-sm">
-                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#1e40af' }}></div>
+                                <div className="w-5 h-5 rounded-full" style={{ backgroundColor: '#b45309' }}></div>
                                 <div>
                                     <div className="font-semibold text-slate-700 text-sm">120mm+</div>
                                     <div className="text-xs text-slate-500">Very Heavy</div>

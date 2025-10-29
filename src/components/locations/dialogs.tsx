@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
-import { Location, ApiResponse } from '@/types/farmer';
+import { Location, ApiResponse, CreateLocationResponse, LocationValidation } from '@/types/farmer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 
@@ -43,6 +43,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
     });
     const [isLoading, setIsLoading] = useState(false);
     const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+    const [locationValidation, setLocationValidation] = useState<LocationValidation | null>(null);
 
     const validateForm = (): boolean => {
         const errors: {[key: string]: string} = {};
@@ -76,18 +77,45 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
         }
 
         setIsLoading(true);
+        setLocationValidation(null);
         try {
-            await api.post<ApiResponse<Location>>('/api/users/locations', formData);
-            toast.success(t('locationCreatedSuccessfully') || 'Location created successfully');
+            const response = await api.post<ApiResponse<CreateLocationResponse>>('/api/admin/locations', formData);
+            
+            // Check for validation warnings
+            if (response.data?.validation && !response.data.validation.exactMatch) {
+                setLocationValidation(response.data.validation);
+                toast.warning(
+                    t('locationNameMismatch') || 
+                    `Location name "${response.data.validation.providedName}" doesn't exactly match coordinates.`,
+                    {
+                        description: t('suggestedName') || `Suggested: "${response.data.validation.suggestedName}"`,
+                        duration: 8000
+                    }
+                );
+            } else {
+                toast.success(t('locationCreatedSuccessfully') || 'Location created successfully');
+            }
+
+            // If validation shows geocoded location, update form data
+            if (response.data?.location?.geocoded && response.data.location.name) {
+                setFormData(prev => ({
+                    ...prev,
+                    name: response.data.location.name
+                }));
+            }
+
             onSuccess();
-            onOpenChange(false);
-            setFormData({
-                name: '',
-                lat: undefined,
-                lon: undefined,
-                isDefault: false
-            });
-            setValidationErrors({});
+            // Don't close dialog if there's a validation warning, let user decide
+            if (!response.data?.validation || response.data.validation.exactMatch) {
+                onOpenChange(false);
+                setFormData({
+                    name: '',
+                    lat: undefined,
+                    lon: undefined,
+                    isDefault: false
+                });
+                setValidationErrors({});
+            }
         } catch (error: any) {
             const message = error.response?.data?.message || error.message || t('failedToCreateLocation');
             toast.error(message);
@@ -177,6 +205,37 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
                             <AlertCircle className="h-4 w-4" />
                             <AlertDescription>
                                 {validationErrors.coordinates}
+                            </AlertDescription>
+                        </Alert>
+                    )}
+
+                    {locationValidation && !locationValidation.exactMatch && (
+                        <Alert variant="default" className="border-amber-200 bg-amber-50">
+                            <AlertCircle className="h-4 w-4 text-amber-600" />
+                            <AlertDescription className="text-amber-800">
+                                <div className="space-y-2">
+                                    <p className="font-medium">
+                                        {t('locationNameMismatch') || 'Location name doesn\'t exactly match coordinates'}
+                                    </p>
+                                    <p className="text-sm">
+                                        {t('suggestedName') || 'Suggested name'}: <strong>{locationValidation.suggestedName}</strong>
+                                    </p>
+                                    <p className="text-xs text-amber-700">
+                                        {locationValidation.note}
+                                    </p>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            setFormData(prev => ({ ...prev, name: locationValidation.suggestedName }));
+                                            setLocationValidation(null);
+                                        }}
+                                        className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-100"
+                                    >
+                                        {t('useSuggestedName') || 'Use Suggested Name'}
+                                    </Button>
+                                </div>
                             </AlertDescription>
                         </Alert>
                     )}
@@ -293,7 +352,18 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
                                 <MapPin className="h-8 w-8 text-muted-foreground" />
                             </div>
                             <div className="flex-1">
-                                <h3 className="text-xl font-semibold">{location.name}</h3>
+                                <div className="flex items-center gap-2">
+                                    <h3 className="text-xl font-semibold">{location.name}</h3>
+                                    {location.geocoded && (
+                                        <Badge 
+                                            variant="outline" 
+                                            className="border-green-300 bg-green-50 text-green-700 text-xs"
+                                            title={t('autoGeocodedLocation') || 'This location was automatically geocoded'}
+                                        >
+                                            {t('geocoded') || 'Auto-geocoded'}
+                                        </Badge>
+                                    )}
+                                </div>
                                 <div className="flex items-center gap-2 text-muted-foreground mt-1">
                                     {location.lat && location.lon ? (
                                         <span>{location.lat.toFixed(6)}, {location.lon.toFixed(6)}</span>

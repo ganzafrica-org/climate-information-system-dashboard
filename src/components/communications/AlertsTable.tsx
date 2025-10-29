@@ -322,14 +322,6 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             
             toast.error(errorMessage);
             
-            // Use fallback data for development/testing
-            console.log('Using fallback alerts data');
-            const fallbackAlerts = getFallbackAlerts();
-            setAlerts(fallbackAlerts);
-            setTotalCount(fallbackAlerts.length);
-            setTotalPages(Math.ceil(fallbackAlerts.length / limit));
-            setCurrentPage(1);
-            
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -451,56 +443,6 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
         }
     };
 
-    // Fallback data for development/testing
-    const getFallbackAlerts = (): Alert[] => {
-        return [
-            {
-                id: 1,
-                type: 'weather',
-                message: 'Weather update for Gashora Sector: Partly cloudy conditions expected with temperatures ranging from 18-25°C. Light winds from the east at 5-8 km/h. Rainfall probability is low at 15%.',
-                messageLength: 156,
-                messageSegments: 1,
-                isSent: true,
-                sentAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), // 2 hours ago
-                location: 'Gashora Sector',
-                createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(), // 3 hours ago
-                priority: 'medium',
-                category: 'daily_weather',
-                status: 'sent',
-                recipientCount: 245
-            },
-            {
-                id: 2,
-                type: 'alert',
-                message: 'URGENT: Heavy rainfall warning for Rugarama Sector. Expected precipitation: 40-60mm over next 6 hours. Farmers advised to secure crops and livestock. Flash flood risk in low-lying areas.',
-                messageLength: 178,
-                messageSegments: 2,
-                isSent: false,
-                sentAt: null,
-                location: 'Rugarama Sector',
-                createdAt: new Date(Date.now() - 30 * 60 * 1000).toISOString(), // 30 minutes ago
-                priority: 'high',
-                category: 'severe_weather',
-                status: 'draft',
-                recipientCount: 189
-            },
-            {
-                id: 3,
-                type: 'advisory',
-                message: 'Farming advisory: Optimal planting conditions detected for beans and maize in Kayonza District. Soil moisture at 65%, temperature stable at 22°C. Recommended planting window: next 48 hours.',
-                messageLength: 195,
-                messageSegments: 2,
-                isSent: true,
-                sentAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // 1 day ago
-                location: 'Kayonza District',
-                createdAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
-                priority: 'medium',
-                category: 'farming_advisory',
-                status: 'sent',
-                recipientCount: 412
-            }
-        ];
-    };
 
     if (isLoading && alerts.length === 0) {
         return (

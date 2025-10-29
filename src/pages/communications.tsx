@@ -97,21 +97,21 @@ export default function Communications() {
                 <TabsList>
                     <TabsTrigger 
                         value="alerts"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                     >
                       <AlertTriangle className="h-4 w-4 mr-2" />
                       {t("alerts")}
                     </TabsTrigger>
                     <TabsTrigger 
                         value="messages"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                     >
                       <MessageSquare className="h-4 w-4 mr-2" />
                       {t("customMessages")}
                     </TabsTrigger>
                     <TabsTrigger 
                         value="scheduler"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                     >
                       <Clock className="h-4 w-4 mr-2" />
                       Weather Scheduler
@@ -119,7 +119,7 @@ export default function Communications() {
                     {user?.role === 'admin' && (
                       <TabsTrigger 
                           value="logs"
-                          className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                          className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                       >
                         <Clock className="h-4 w-4 mr-2" />
                         Logs

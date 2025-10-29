@@ -5,6 +5,7 @@ import { Toaster } from '@/components/ui/sonner';
 import QueryProvider from '@/lib/queryProvider';
 import { AuthProvider } from '@/hooks/useAuth';
 import '@/styles/globals.css';
+import 'leaflet/dist/leaflet.css';
 
 const dmSans = DM_Sans({
     subsets: ["latin"],

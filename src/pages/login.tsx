@@ -9,7 +9,7 @@ const useLanguage = () => {
     const translations = {
         en: {
             login: 'Login',
-            climateInformationSystem: 'Climate Information System',
+            climateInformationSystem: 'Teganyamuhinzi',
             enterYourCredentials: 'Enter your credentials to access your account',
             username: 'Username',
             enterUsername: 'Enter your username',
@@ -151,7 +151,7 @@ const Button = ({
 }) => {
     const baseClasses = 'inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50';
     const variants = {
-        default: 'bg-blue-600 text-white hover:bg-blue-700',
+        default: 'bg-[#147677] text-white hover:bg-[#147677]/90',
         outline: 'border border-gray-300 bg-white hover:bg-gray-50'
     };
     const sizes = {
@@ -178,7 +178,7 @@ const Input = ({
 }: React.InputHTMLAttributes<HTMLInputElement>) => (
     <input
         type={type}
-        className={`flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
+        className={`flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-gray-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#147677] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
         {...props}
     />
 );
@@ -285,8 +285,8 @@ const LoginPage = () => {
         >
             {/* Centered Container with Two Sections */}
             <div className="w-full max-w-6xl flex rounded-3xl shadow-2xl overflow-hidden bg-white">
-                {/* Left Panel - Blue Section */}
-                <div className="flex-1 bg-blue-600 relative overflow-hidden flex items-center justify-center p-12">
+                {/* Left Panel - Teal Section */}
+                <div className="flex-1 bg-[#147677] relative overflow-hidden flex items-center justify-center p-12">
                     {/* Background decorative elements with different weather icons */}
                     <div className="absolute inset-0">
                         <style jsx>{`
@@ -345,7 +345,7 @@ const LoginPage = () => {
                         </div>
 
                        <h1 className="text-white text-4xl font-bold mb-6 leading-tight">
-                          Musanze <span className="text-blue-200">District</span>
+                          Musanze <span className="text-white/80">District</span>
                           </h1>
 
                        
@@ -452,15 +452,6 @@ const LoginPage = () => {
                                 </Button>
                             </div>
 
-                            {/* Sign Up Link */}
-                            <div className="text-center">
-                                <p className="text-sm text-gray-600">
-                                    {t('dontHaveAccount') || "Don't have an account?"}{' '}
-                                    <a href="/register" className="text-blue-600 hover:underline font-medium">
-                                        {t('signUp') || 'Sign up'}
-                                    </a>
-                                </p>
-                            </div>
                         </form>
 
                         {/* Footer */}

@@ -249,7 +249,7 @@ const Locations: NextPage = () => {
         <AppLayout>
             <Head>
                 <title>
-                    {t("locations") || "Locations"} | {t("climateInformationSystem") || "Climate Information System"}
+                    {t("locations") || "Locations"} | {t("climateInformationSystem") || "Teganyamuhinzi"}
                 </title>
             </Head>
 
@@ -294,7 +294,7 @@ const Locations: NextPage = () => {
                                 <Button 
                                     variant="primary" 
                                     onClick={() => setCreateDialogOpen(true)} 
-                                    style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                                    style={{ backgroundColor: '#147677', borderColor: '#147677' }}
                                     className="hover:opacity-90 text-white"
                                 >
                                     <Plus className="h-4 w-4 mr-2" />

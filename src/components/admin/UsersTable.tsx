@@ -163,7 +163,7 @@ export function UsersTable() {
               <Search className="h-4 w-4 absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" />
               <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users" className="pl-8 w-64" />
             </div>
-            <Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-blue-600 text-white hover:bg-blue-700">
+            <Button onClick={() => setIsCreateOpen(true)} size="sm" className="bg-[#147677] text-white hover:bg-[#147677]/90">
               <Plus className="h-4 w-4 mr-2" />
               Add User
             </Button>

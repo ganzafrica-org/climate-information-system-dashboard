@@ -1,8 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON, LayersControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { SuitabilityData, SusceptibilityData, AdministrativeData } from '@/pages/soil-suitability';
+
+// Fix for Leaflet default icons in Next.js
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
 const { BaseLayer, Overlay } = LayersControl;
 
@@ -14,11 +22,20 @@ const SUITABILITY_COLORS = {
   'Not Suitable': '#FF5500'
 };
 
+// Handle all variations of susceptibility class names from different GeoJSON files
 const SUSCEPTIBILITY_COLORS = {
-  'Extremely Susceptible': '#8B0000',
-  'Highly Susceptible': '#DC143C',
-  'Moderate Susceptible': '#FF8C00',
-  'Slightly Susceptible': '#FFD700'
+  // Correct names from mapping guidance
+  'Extremely Susceptible': '#A80000',
+  'Highly Susceptible': '#FF5500',
+  'Moderate Susceptible': '#F5CA7A',
+  'Slightly Susceptible': '#E1E1E1',
+  // Variations with trailing spaces (flooding, soil erosion files)
+  'Extremely Susceptible ': '#A80000',
+  'Highly Susceptible ': '#FF5500',
+  'Moderately Susceptible ': '#F5CA7A',
+  'Slightly Susceptible ': '#E1E1E1',
+  // Variations without trailing spaces but with "Moderately" (landslide file)
+  'Moderately Susceptible': '#F5CA7A'
 };
 
 interface MapProps {
@@ -42,24 +59,28 @@ function MapUpdater({ sectors, selectedSector, onSectorSelect }: {
   const map = useMap();
 
   useEffect(() => {
-    if (sectors && selectedSector) {
-      const selectedFeature = sectors.features.find(
-        feature => feature.properties.NAME === selectedSector
-      );
+    try {
+      if (sectors && selectedSector) {
+        const selectedFeature = sectors.features.find(
+          feature => feature.properties.NAME === selectedSector
+        );
 
-      if (selectedFeature) {
-        const layer = L.geoJSON(selectedFeature);
+        if (selectedFeature) {
+          const layer = L.geoJSON(selectedFeature);
+          const bounds = layer.getBounds();
+          if (bounds.isValid()) {
+            map.fitBounds(bounds, { padding: [20, 20] });
+          }
+        }
+      } else if (sectors) {
+        const layer = L.geoJSON(sectors);
         const bounds = layer.getBounds();
         if (bounds.isValid()) {
           map.fitBounds(bounds, { padding: [20, 20] });
         }
       }
-    } else if (sectors) {
-      const layer = L.geoJSON(sectors);
-      const bounds = layer.getBounds();
-      if (bounds.isValid()) {
-        map.fitBounds(bounds, { padding: [20, 20] });
-      }
+    } catch (error) {
+      console.error('Error updating map bounds:', error);
     }
   }, [map, sectors, selectedSector]);
 
@@ -79,31 +100,76 @@ export default function SoilSuitabilityMap({
   selectedHazard
 }: MapProps) {
   const mapRef = useRef<L.Map | null>(null);
+  const [isMapReady, setIsMapReady] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Set map as ready after component mounts
+    const timer = setTimeout(() => {
+      setIsMapReady(true);
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Don't render on server side
+  if (typeof window === 'undefined') {
+    return (
+      <div className="h-[600px] w-full rounded-lg overflow-hidden border bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <div className="text-gray-600">Loading map...</div>
+        </div>
+      </div>
+    );
+  }
 
   const getSuitabilityStyle = (feature: any) => {
-    const suitabilityClass = feature.properties?.Suitability_Class;
-    const color = SUITABILITY_COLORS[suitabilityClass as keyof typeof SUITABILITY_COLORS] || '#CCCCCC';
+    try {
+      const suitabilityClass = feature.properties?.Suitability_Class;
+      const color = SUITABILITY_COLORS[suitabilityClass as keyof typeof SUITABILITY_COLORS] || '#CCCCCC';
 
-    return {
-      fillColor: color,
-      weight: 0,
-      opacity: 0,
-      fillOpacity: 0.7,
-      color: 'transparent'
-    };
+      return {
+        fillColor: color,
+        weight: 0,
+        opacity: 0,
+        fillOpacity: 0.7,
+        color: 'transparent'
+      };
+    } catch (error) {
+      console.error('Error getting suitability style:', error);
+      return {
+        fillColor: '#CCCCCC',
+        weight: 0,
+        opacity: 0,
+        fillOpacity: 0.7,
+        color: 'transparent'
+      };
+    }
   };
 
   const getSusceptibilityStyle = (feature: any) => {
-    const susceptibilityClass = feature.properties?.Susceptibility_Class;
-    const color = SUSCEPTIBILITY_COLORS[susceptibilityClass as keyof typeof SUSCEPTIBILITY_COLORS] || '#CCCCCC';
+    try {
+      const susceptibilityClass = feature.properties?.Susceptibility_Class;
+      const color = SUSCEPTIBILITY_COLORS[susceptibilityClass as keyof typeof SUSCEPTIBILITY_COLORS] || '#CCCCCC';
 
-    return {
-      fillColor: color,
-      weight: 0,
-      opacity: 0,
-      fillOpacity: 0.7,
-      color: 'transparent'
-    };
+      return {
+        fillColor: color,
+        weight: 0,
+        opacity: 0,
+        fillOpacity: 0.7,
+        color: 'transparent'
+      };
+    } catch (error) {
+      console.error('Error getting susceptibility style:', error);
+      return {
+        fillColor: '#CCCCCC',
+        weight: 0,
+        opacity: 0,
+        fillOpacity: 0.7,
+        color: 'transparent'
+      };
+    }
   };
 
   const getDistrictStyle = () => ({
@@ -134,27 +200,68 @@ export default function SoilSuitabilityMap({
   });
 
   const onSectorClick = (feature: any, layer: L.Layer) => {
-    const sectorName = feature.properties?.NAME;
-    if (sectorName) {
-      onSectorSelect(selectedSector === sectorName ? '' : sectorName);
+    try {
+      const sectorName = feature.properties?.NAME;
+      if (sectorName) {
+        onSectorSelect(selectedSector === sectorName ? '' : sectorName);
+      }
+    } catch (error) {
+      console.error('Error handling sector click:', error);
     }
   };
 
   const createTooltipContent = (properties: any, type: 'suitability' | 'susceptibility') => {
-    const className = type === 'suitability'
-      ? properties.Suitability_Class
-      : properties.Susceptibility_Class;
-    const area = properties.Area_ha;
-    const sector = properties.SECTOR || properties.Sector || properties.sector || 'Unknown';
+    try {
+      const className = type === 'suitability'
+        ? properties.Suitability_Class
+        : properties.Susceptibility_Class;
+      const area = properties.Area_ha;
+      const sector = properties.SECTOR || properties.Sector || properties.sector || 'Unknown';
 
-    return `
-      <div class="font-medium">
-        <div><strong>Class:</strong> ${className || 'Unknown'}</div>
-        <div><strong>Area:</strong> ${area ? area.toLocaleString() : 'Unknown'} ha</div>
-        <div><strong>Sector:</strong> ${sector}</div>
-      </div>
-    `;
+      return `
+        <div class="font-medium">
+          <div><strong>Class:</strong> ${className || 'Unknown'}</div>
+          <div><strong>Area:</strong> ${area ? area.toLocaleString() : 'Unknown'} ha</div>
+          <div><strong>Sector:</strong> ${sector}</div>
+        </div>
+      `;
+    } catch (error) {
+      console.error('Error creating tooltip content:', error);
+      return '<div class="font-medium">Error loading data</div>';
+    }
   };
+
+  if (mapError) {
+    return (
+      <div className="h-[600px] w-full rounded-lg overflow-hidden border bg-red-50 flex items-center justify-center">
+        <div className="text-center p-6">
+          <div className="text-red-600 font-medium text-lg mb-2">Map Error</div>
+          <div className="text-red-500 text-sm mb-4">{mapError}</div>
+          <button 
+            onClick={() => {
+              setMapError(null);
+              setIsMapReady(false);
+              setTimeout(() => setIsMapReady(true), 100);
+            }}
+            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isMapReady) {
+    return (
+      <div className="h-[600px] w-full rounded-lg overflow-hidden border bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+          <div className="text-gray-600">Loading map...</div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-[600px] w-full rounded-lg overflow-hidden border">
@@ -163,6 +270,14 @@ export default function SoilSuitabilityMap({
         zoom={15}
         style={{ height: '100%', width: '100%' }}
         ref={mapRef}
+        whenReady={() => {
+          try {
+            console.log('Map is ready');
+          } catch (error) {
+            console.error('Map ready error:', error);
+            setMapError('Failed to initialize map');
+          }
+        }}
       >
         <LayersControl position="topright">
           <BaseLayer checked name="OpenStreetMap">
