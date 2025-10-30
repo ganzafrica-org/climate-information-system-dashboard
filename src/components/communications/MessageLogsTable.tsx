@@ -11,20 +11,26 @@ import { toast } from 'sonner';
 import { useLanguage } from '@/i18n';
 
 interface MessageLog {
-    level: string;
+    id?: number;
+    level?: string;
     message: string;
-    timestamp: string;
+    timestamp?: string;
     alertId: number;
     alertTitle: string; 
     alertType: string;
     farmerId: number;
     farmerName: string; 
     phoneNumber: string;
-    success: boolean;
+    success?: boolean;
+    status?: string;
     messageId: string;
-    error: string | null;
-    errorReason: string | null;
-    messageLength: number;
+    error?: string | null;
+    errorMessage?: string | null;
+    errorReason?: string | null;
+    messageLength?: number;
+    provider?: string;
+    sentAt?: string | null;
+    createdAt?: string;
 }
 
 interface ApiResponse {
@@ -80,7 +86,13 @@ export function MessageLogsTable() {
     const fetchLogs = async () => {
         setIsLoading(true);
         try {
-            const response = await api.get<any>('/api/weather/admin/logs/messages');
+            const response = await api.get<any>(
+                '/api/weather/admin/logs/messages',
+                {
+                    params: { _ts: Date.now() },
+                    headers: { 'Cache-Control': 'no-cache' }
+                }
+            );
             const data = response as any;
             console.log('Logs API raw payload:', data);
             
@@ -108,30 +120,74 @@ export function MessageLogsTable() {
         if (!searchTerm) return source;
         const term = searchTerm.toLowerCase();
         return source.filter((l) => {
-            return [l.message, l.phoneNumber, l.messageId, l.alertId?.toString(), l.farmerName, l.level, l.alertTitle, l.alertType]
+            return [l.message, l.phoneNumber, l.messageId, l.alertId?.toString(), l.farmerName, l.level, l.alertTitle, l.alertType, l.status, l.provider]
                 .filter(Boolean)
                 .some((v) => String(v).toLowerCase().includes(term));
         });
     }, [logs, searchTerm]);
 
-    const StatusBadge = ({ success, level }: { success?: boolean; level?: string }) => {
-        if (success === true || level === 'info') {
+    const logStats = useMemo(() => {
+        const source = Array.isArray(logs) ? logs : [];
+        let sentCount = 0;
+        let failedCount = 0;
+
+        source.forEach((log) => {
+            const status = log.status?.toLowerCase();
+            const success = log.success;
+            const level = log.level?.toLowerCase();
+            const hasError = log.error || log.errorMessage;
+
+            // Count as sent/success
+            if (status === 'sent' || status === 'delivered' || status === 'success' || success === true || level === 'info') {
+                sentCount++;
+            }
+            // Count as failed
+            else if (status === 'failed' || status === 'error' || success === false || level === 'error' || hasError) {
+                failedCount++;
+            }
+        });
+
+        return { total: source.length, sentCount, failedCount };
+    }, [logs]);
+
+    const StatusBadge = ({ log }: { log: MessageLog }) => {
+        // Determine status from multiple possible fields
+        const status = log.status?.toLowerCase();
+        const success = log.success;
+        const level = log.level?.toLowerCase();
+        const hasError = log.error || log.errorMessage;
+        
+        // Success cases
+        if (status === 'sent' || status === 'delivered' || status === 'success' || success === true || level === 'info') {
             return (
                 <Badge style={{ backgroundColor: '#ECFDF6', color: '#16a34a', border: '1px solid #ECFDF6' }}>
                     {t('success') || 'Success'}
                 </Badge>
             );
         }
-        if (success === false || level === 'error') {
+        
+        // Failure cases
+        if (status === 'failed' || status === 'error' || success === false || level === 'error' || hasError) {
             return (
                 <Badge style={{ backgroundColor: '#FEE2E2', color: '#DC2626', border: '1px solid #FEE2E2' }}>
                     {t('failed') || 'Failed'}
                 </Badge>
             );
         }
+        
+        // Pending/processing cases
+        if (status === 'pending' || status === 'processing' || status === 'queued') {
+            return (
+                <Badge style={{ backgroundColor: '#FEF3C7', color: '#D97706', border: '1px solid #FEF3C7' }}>
+                    {t('pending') || 'Pending'}
+                </Badge>
+            );
+        }
+        
+        // Unknown/other cases
         return (
-            <Badge style={{ backgroundColor: '#FEF3C7', color: '#D97706', border: '1px solid #FEF3C7' }}>
-                {level || 'Unknown'}
+            <Badge style={{ backgroundColor: '#F3F4F6', color: '#6B7280', border: '1px solid #E5E7EB' }}>
+                {status || level || t('unknown') || 'Unknown'}
             </Badge>
         );
     };
@@ -152,6 +208,7 @@ export function MessageLogsTable() {
             return;
         }
         const exportData = filteredLogs.map((l) => ({
+            [t('id') || 'ID']: l.id || '-',
             [t('alertId') || 'Alert ID']: l.alertId,
             [t('alertTitle') || 'Alert Title']: l.alertTitle || '-',
             [t('alertType') || 'Alert Type']: l.alertType || '-',
@@ -159,14 +216,26 @@ export function MessageLogsTable() {
             [t('phoneNumber') || 'Phone Number']: l.phoneNumber || '-',
             [t('message') || 'Message']: l.message || '-',
             [t('messageId') || 'Message ID']: l.messageId || '-',
-            [t('success') || 'Success']: l.success ? 'Yes' : 'No',
-            [t('messageLength') || 'Message Length']: l.messageLength ?? '-',
+            [t('status') || 'Status']: l.status || (l.success ? 'Success' : 'Failed'),
+            [t('provider') || 'Provider']: l.provider || '-',
+            [t('messageLength') || 'Message Length']: l.messageLength ?? l.message?.length ?? '-',
             [t('level') || 'Level']: l.level || '-',
-            [t('error') || 'Error']: l.error || '-',
+            [t('error') || 'Error']: l.error || l.errorMessage || '-',
             [t('errorReason') || 'Error Reason']: l.errorReason || '-',
-            [t('timestamp') || 'Timestamp']: l.timestamp ? new Date(l.timestamp).toLocaleString() : '-',
+            [t('sentAt') || 'Sent At']: l.sentAt ? new Date(l.sentAt).toLocaleString() : '-',
+            [t('timestamp') || 'Timestamp']: l.timestamp ? new Date(l.timestamp).toLocaleString() : l.createdAt ? new Date(l.createdAt).toLocaleString() : '-',
         }));
         api.exportAsCSV(exportData, `message_logs_${new Date().toISOString().split('T')[0]}.csv`);
+    };
+
+    const formatTimestamp = (log: MessageLog) => {
+        const timestamp = log.timestamp || log.sentAt || log.createdAt;
+        if (!timestamp) return '-';
+        return new Date(timestamp).toLocaleString();
+    };
+
+    const getMessageLength = (log: MessageLog) => {
+        return log.messageLength ?? log.message?.length ?? 0;
     };
 
     return (
@@ -213,7 +282,7 @@ export function MessageLogsTable() {
                             <span className="text-red-600">Failed: {summary.failedCount}</span>
                         </div>
                     )}
-                    <div className="relative">
+                    <div className="relative ml-auto">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                             type="search"
@@ -226,7 +295,7 @@ export function MessageLogsTable() {
                 </div>
 
                 {isLoading ? (
-                    <div className="flex items-center justify-center py-16 ">
+                    <div className="flex items-center justify-center py-16">
                         <div className="flex flex-col items-center space-y-3">
                             <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
                             <span className="text-gray-500">{t('loading') || 'Loading...'}</span>
@@ -242,6 +311,7 @@ export function MessageLogsTable() {
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('farmerName') || 'Farmer Name'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('phoneNumber') || 'Phone'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('status') || 'Status'}</th>
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('provider') || 'Provider'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('messageLength') || 'Length'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('timestamp') || 'Timestamp'}</th>
                                     <th className="py-4 px-6 text-center font-semibold text-sm">{t('actions') || 'Actions'}</th>
@@ -250,14 +320,14 @@ export function MessageLogsTable() {
                             <tbody className="bg-white">
                                 {filteredLogs.length === 0 ? (
                                     <tr>
-                                        <td colSpan={8} className="py-16 text-center">
+                                        <td colSpan={9} className="py-16 text-center">
                                             <div className="text-gray-500">{t('noLogsFound') || 'No logs found'}</div>
                                         </td>
                                     </tr>
                                 ) : (
                                     filteredLogs.map((log, index) => (
                                         <tr
-                                            key={`${log.messageId}-${index}`}
+                                            key={`${log.messageId}-${log.id}-${index}`}
                                             className={`border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
                                         >
                                             <td className="py-4 px-6 text-sm text-gray-900">{index + 1}</td>
@@ -271,11 +341,16 @@ export function MessageLogsTable() {
                                             </td>
                                             <td className="py-4 px-6 text-sm font-mono">{log.phoneNumber}</td>
                                             <td className="py-4 px-6">
-                                                <StatusBadge success={log.success} level={log.level} />
+                                                <StatusBadge log={log} />
                                             </td>
-                                            <td className="py-4 px-6 text-sm">{log.messageLength} chars</td>
                                             <td className="py-4 px-6 text-sm">
-                                                {log.timestamp ? new Date(log.timestamp).toLocaleString() : '-'}
+                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                                    {log.provider || 'N/A'}
+                                                </Badge>
+                                            </td>
+                                            <td className="py-4 px-6 text-sm">{getMessageLength(log)} chars</td>
+                                            <td className="py-4 px-6 text-sm">
+                                                {formatTimestamp(log)}
                                             </td>
                                             <td className="py-4 px-6 text-center">
                                                 <DropdownMenu>
@@ -290,13 +365,29 @@ export function MessageLogsTable() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="w-56">
                                                         <DropdownMenuItem 
-                                                            onClick={() => toast.info(JSON.stringify(log, null, 2))} 
+                                                            onClick={() => {
+                                                                const details = {
+                                                                    'Alert ID': log.alertId,
+                                                                    'Alert Title': log.alertTitle,
+                                                                    'Farmer': log.farmerName,
+                                                                    'Phone': log.phoneNumber,
+                                                                    'Status': log.status,
+                                                                    'Provider': log.provider,
+                                                                    'Message ID': log.messageId,
+                                                                    'Message': log.message,
+                                                                    'Error': log.error || log.errorMessage || 'None'
+                                                                };
+                                                                toast.info(JSON.stringify(details, null, 2));
+                                                            }} 
                                                             className="cursor-pointer hover:bg-blue-50"
                                                         >
                                                             View Details
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem 
-                                                            onClick={() => toast.info(`Message ID: ${log.messageId}`)} 
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(log.messageId);
+                                                                toast.success('Message ID copied to clipboard');
+                                                            }} 
                                                             className="cursor-pointer hover:bg-green-50"
                                                         >
                                                             Copy Message ID
@@ -307,9 +398,9 @@ export function MessageLogsTable() {
                                                         >
                                                             View Message
                                                         </DropdownMenuItem>
-                                                        {log.error && (
+                                                        {(log.error || log.errorMessage) && (
                                                             <DropdownMenuItem 
-                                                                onClick={() => toast.error(log.error!)} 
+                                                                onClick={() => toast.error(log.error || log.errorMessage || 'Unknown error')} 
                                                                 className="cursor-pointer hover:bg-red-50"
                                                             >
                                                                 View Error

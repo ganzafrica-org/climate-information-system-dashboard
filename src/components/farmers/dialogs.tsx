@@ -283,6 +283,16 @@ interface ImportResult {
         row: any;
         error: string;
     }>;
+    createdLocations?: Array<{
+        id: number;
+        name: string;
+        created: boolean;
+        geocoded?: boolean;
+        coordinates?: {
+            lat: number;
+            lon: number;
+        };
+    }>;
 }
 
 interface ImportFarmersDialogProps {
@@ -862,6 +872,38 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                                     <div className="text-sm" style={{ color: '#2580f5' }}>{t('total')}</div>
                                 </div>
                             </div>
+
+                            {importResult.createdLocations && importResult.createdLocations.length > 0 && (
+                                <div className="space-y-2">
+                                    <h5 className="font-medium" style={{ color: '#2580f5' }}>
+                                        {t('createdLocations') || 'Created Locations'} ({importResult.createdLocations.length})
+                                    </h5>
+                                    <div className="max-h-40 overflow-y-auto space-y-2">
+                                        {importResult.createdLocations.map((location, index) => (
+                                            <Alert key={index} className="border-blue-200" style={{ backgroundColor: '#E0EDFD' }}>
+                                                <MapPin className="h-4 w-4" style={{ color: '#2580f5' }} />
+                                                <AlertDescription className="text-sm">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <strong>{location.name}</strong>
+                                                            {location.geocoded && (
+                                                                <Badge variant="outline" className="ml-2 text-xs border-green-300 bg-green-50 text-green-700">
+                                                                    {t('geocoded') || 'Auto-geocoded'}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        {location.coordinates && (
+                                                            <span className="text-xs text-muted-foreground font-mono">
+                                                                {location.coordinates.lat.toFixed(4)}, {location.coordinates.lon.toFixed(4)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </AlertDescription>
+                                            </Alert>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
                             {importResult.errorDetails.length > 0 && (
                                 <div className="space-y-2">

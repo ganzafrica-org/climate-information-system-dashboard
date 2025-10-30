@@ -11,6 +11,20 @@ export interface Location {
         id: number;
         username: string;
     };
+    geocoded?: boolean;  // Indicates if location was auto-geocoded
+}
+
+export interface LocationValidation {
+    providedName: string;
+    suggestedName: string;
+    exactMatch: boolean;
+    partialMatch: boolean;
+    note: string;
+}
+
+export interface CreateLocationResponse {
+    location: Location;
+    validation?: LocationValidation;  // Optional - only present when there's a mismatch
 }
 
 export interface Farmer {

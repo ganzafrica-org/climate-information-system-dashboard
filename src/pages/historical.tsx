@@ -44,23 +44,23 @@ import { Location, LocationsResponse } from '@/types/farmer';
 const chartConfig = {
     temperature: {
         label: 'Temperature (°C)',
-        color: '#2563eb',
+        color: '#147677',
     },
     tempMin: {
         label: 'Min Temperature (°C)',
-        color: '#0ea5e9',
+        color: '#F59E0B', // Orange
     },
     tempMax: {
         label: 'Max Temperature (°C)',
-        color: '#ef4444',
+        color: '#FF5500', // AMI Red
     },
     tempAvg: {
         label: 'Avg Temperature (°C)',
-        color: '#10b981',
+        color: '#147677',
     },
     rainfall: {
         label: 'Rainfall (mm)',
-        color: '#2563eb',
+        color: '#147677',
     },
     historical: {
         label: 'Historical Average',
@@ -560,7 +560,7 @@ const Historical: NextPage = () => {
                             variant="outline"
                             onClick={errorType === 'no_locations' ? fetchLocations : handleRefresh}
                             disabled={isRefreshing || isLoading}
-                            className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                            className="bg-[#147677] hover:bg-[#147677]/90 text-white border-[#147677]"
                         >
                             <RefreshCw className={`h-4 w-4 mr-2 ${(isRefreshing || isLoading) ? 'animate-spin' : ''}`} />
                             {(isRefreshing || isLoading) ? (t('loading') || 'Loading...') : (t('tryAgain') || 'Try Again')}
@@ -601,12 +601,12 @@ const Historical: NextPage = () => {
     return (
         <AppLayout>
             <Head>
-                <title>{t('historical') || 'Historical'} | {t('climateInformationSystem') || 'Climate Information System'}</title>
+                <title>{t('historical') || 'Historical'} | {t('climateInformationSystem') || 'Teganyamuhinzi'}</title>
             </Head>
 
             <div className="space-y-4 md:space-y-6">
                 
-                <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
+                <div className="bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] rounded-2xl p-6 text-white shadow-xl">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="flex items-center gap-4">
                             <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
@@ -647,14 +647,14 @@ const Historical: NextPage = () => {
                         variant="outline"
                         onClick={handleRefresh}
                         disabled={isRefreshing || isLoading || !selectedLocation}
-                        className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                        className="bg-[#147677] hover:bg-[#147677]/90 text-white border-[#147677]"
                     >
                         <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                         {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
                     </Button>
 
                     <Button
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
                         onClick={handleExportData}
                         disabled={!historicalData.length}
                     >
@@ -665,8 +665,8 @@ const Historical: NextPage = () => {
 
                 
                 <Card className="border-0 shadow-md">
-                    <CardHeader className="bg-gradient-to-r from-slate-50 to-blue-50 border-b border-slate-200">
-                        <CardTitle className="flex items-center gap-2 text-slate-800">
+                    <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50 border-b border-slate-200/50">
+                        <CardTitle className="flex items-center gap-2 text-slate-900">
                             <Filter className="h-5 w-5 text-blue-600" />
                             {t('dataFilters') || 'Data Filters'}
                         </CardTitle>
@@ -677,7 +677,7 @@ const Historical: NextPage = () => {
                                 <Label className="text-slate-700 font-medium">{t('viewType') || 'View Type'}</Label>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between border-slate-300 hover:border-blue-500">
+                                        <Button variant="outline" className="w-full justify-between border-slate-300 hover:border-slate-400 hover:bg-slate-50">
                                             <span className="capitalize">{t(viewType) || viewType}</span>
                                             <ChevronDown className="h-4 w-4" />
                                         </Button>
@@ -738,33 +738,33 @@ const Historical: NextPage = () => {
                             </CardContent>
                         </Card>
 
-                        <Card className="border-0 shadow-md bg-gradient-to-br from-blue-500 to-blue-600 text-white">
+                        <Card className="border-0 shadow-md bg-gradient-to-br from-[#147677] to-[#0f5f5f] text-white">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-base flex items-center gap-2">
                                     <CloudRain className="h-5 w-5" />
                                     {t('totalRainfall') || 'Total Rainfall'}
                                 </CardTitle>
-                                <CardDescription className="text-blue-100">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                                <CardDescription className="text-white/80">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold mb-1">{totalRainfall.toFixed(0)}mm</div>
-                                <div className="flex items-center text-sm text-blue-100">
+                                <div className="flex items-center text-sm text-white/80">
                                     <span>{rainyDays} {t('rainyDays') || 'rainy days'}</span>
                                 </div>
                             </CardContent>
                         </Card>
 
-                        <Card className="border-0 shadow-md bg-gradient-to-br from-green-500 to-green-600 text-white">
+                        <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-500 to-emerald-600 text-white">
                             <CardHeader className="pb-2">
                                 <CardTitle className="text-base flex items-center gap-2">
                                     <Calendar className="h-5 w-5" />
                                     {t('rainyDays') || 'Rainy Days'}
                                 </CardTitle>
-                                <CardDescription className="text-green-100">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
+                                <CardDescription className="text-emerald-100">{t('forSelectedPeriod') || 'For Selected Period'}</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="text-3xl font-bold mb-1">{rainyDays}</div>
-                                <div className="flex items-center text-sm text-green-100">
+                                <div className="flex items-center text-sm text-emerald-100">
                                     <span>{t('daysWithRain') || 'days with rain'}</span>
                                 </div>
                             </CardContent>
@@ -793,13 +793,13 @@ const Historical: NextPage = () => {
                     <>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                             <Card className="border-0 shadow-xl">
-                                <CardHeader className="bg-gradient-to-r from-red-50 to-orange-50 border-b border-red-100">
-                                    <CardTitle className="text-red-900">
+                                <CardHeader className="bg-gradient-to-r from-slate-50 via-red-50/50 to-slate-50 border-b border-slate-200/50">
+                                    <CardTitle className="text-slate-900">
                                         {viewType === 'seasonal' ? (t('seasonalTemperature') || 'Seasonal Temperature') :
                                             viewType === 'weekly' ? (t('weeklyTemperature') || 'Weekly Temperature') :
                                                 (t('monthlyTemperature') || 'Monthly Temperature')}
                                     </CardTitle>
-                                    <CardDescription className="text-red-700">
+                                    <CardDescription className="text-slate-600">
                                         {selectedLocation?.name} - {new Date(dateRange.startDate).getFullYear()} to {new Date(dateRange.endDate).getFullYear()}
                                     </CardDescription>
                                 </CardHeader>
@@ -814,7 +814,7 @@ const Historical: NextPage = () => {
                                                 <Legend />
                                                 <Bar
                                                     dataKey="temperature"
-                                                    fill="#10b981"
+                                                    fill="#147677"
                                                     name={t('avgTemperature') || 'Avg Temperature'}
                                                     radius={4}
                                                 />
@@ -829,26 +829,26 @@ const Historical: NextPage = () => {
                                                 <Line
                                                     type="monotone"
                                                     dataKey="tempAvg"
-                                                    stroke="#10b981"
+                                                    stroke="#147677"
                                                     name={t('avgTemperature') || 'Avg Temperature'}
                                                     strokeWidth={3}
-                                                    dot={{ fill: '#10b981', strokeWidth: 2 }}
+                                                    dot={{ fill: '#147677', strokeWidth: 2 }}
                                                 />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="tempMin"
-                                                    stroke="#0ea5e9"
+                                                    stroke="#F59E0B"
                                                     name={t('minTemperature') || 'Min Temperature'}
                                                     strokeWidth={2}
-                                                    dot={{ fill: '#0ea5e9', strokeWidth: 2 }}
+                                                    dot={{ fill: '#F59E0B', strokeWidth: 2 }}
                                                 />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="tempMax"
-                                                    stroke="#ef4444"
+                                                    stroke="#FF5500"
                                                     name={t('maxTemperature') || 'Max Temperature'}
                                                     strokeWidth={2}
-                                                    dot={{ fill: '#ef4444', strokeWidth: 2 }}
+                                                    dot={{ fill: '#FF5500', strokeWidth: 2 }}
                                                 />
                                             </LineChart>
                                         )}
@@ -857,13 +857,13 @@ const Historical: NextPage = () => {
                             </Card>
 
                             <Card className="border-0 shadow-xl">
-                                <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
-                                    <CardTitle className="text-blue-900">
+                                <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50 border-b border-slate-200/50">
+                                    <CardTitle className="text-slate-900">
                                         {viewType === 'seasonal' ? (t('seasonalRainfall') || 'Seasonal Rainfall') :
                                             viewType === 'weekly' ? (t('weeklyRainfall') || 'Weekly Rainfall') :
                                                 (t('monthlyRainfall') || 'Monthly Rainfall')}
                                     </CardTitle>
-                                    <CardDescription className="text-blue-700">
+                                    <CardDescription className="text-slate-600">
                                         {selectedLocation?.name} - {new Date(dateRange.startDate).getFullYear()} to {new Date(dateRange.endDate).getFullYear()}
                                     </CardDescription>
                                 </CardHeader>
@@ -877,7 +877,7 @@ const Historical: NextPage = () => {
                                             <Legend />
                                             <Bar
                                                 dataKey="rainfall"
-                                                fill="#2563eb"
+                                                fill="#147677"
                                                 name={t('rainfall') || 'Rainfall'}
                                                 radius={4}
                                             />
@@ -889,9 +889,9 @@ const Historical: NextPage = () => {
 
                         
                         <Card className="border-0 shadow-xl">
-                            <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 border-b border-purple-100">
-                                <CardTitle className="text-purple-900">{t('compareLocations') || 'Compare Locations'}</CardTitle>
-                                <CardDescription className="text-purple-700">{t('compareLocationWeatherData') || 'Compare weather data between different locations'}</CardDescription>
+                            <CardHeader className="bg-gradient-to-r from-slate-50 via-indigo-50/50 to-slate-50 border-b border-slate-200/50">
+                                <CardTitle className="text-slate-900">{t('compareLocations') || 'Compare Locations'}</CardTitle>
+                                <CardDescription className="text-slate-600">{t('compareLocationWeatherData') || 'Compare weather data between different locations'}</CardDescription>
                             </CardHeader>
                             <CardContent className="p-6">
                                 <div className="flex flex-wrap gap-4 mb-6">
@@ -899,7 +899,7 @@ const Historical: NextPage = () => {
                                         <label className="text-sm font-medium text-slate-700">{t('selectLocation1') || 'Select Location 1'}</label>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="outline" className="border-slate-300 hover:border-blue-500">
+                                                <Button variant="outline" className="border-slate-300 hover:border-slate-400 hover:bg-slate-50">
                                                     <span>{comparisonLocation1?.name || t('selectLocation') || 'Select Location'}</span>
                                                     <ChevronDown className="ml-2 h-4 w-4" />
                                                 </Button>
@@ -921,7 +921,7 @@ const Historical: NextPage = () => {
                                         <label className="text-sm font-medium text-slate-700">{t('selectLocation2') || 'Select Location 2'}</label>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="outline" className="border-slate-300 hover:border-blue-500">
+                                                <Button variant="outline" className="border-slate-300 hover:border-slate-400 hover:bg-slate-50">
                                                     <span>{comparisonLocation2?.name || t('selectLocation') || 'Select Location'}</span>
                                                     <ChevronDown className="ml-2 h-4 w-4" />
                                                 </Button>
@@ -943,7 +943,7 @@ const Historical: NextPage = () => {
                                         <label className="text-sm font-medium text-slate-700">{t('dataType') || 'Data Type'}</label>
                                         <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                                <Button variant="outline" className="border-slate-300 hover:border-blue-500">
+                                                <Button variant="outline" className="border-slate-300 hover:border-slate-400 hover:bg-slate-50">
                                                     {comparisonDataType === 'temperature' ? (
                                                         <>
                                                             <Thermometer className="mr-2 h-4 w-4 text-red-500" />
@@ -973,7 +973,7 @@ const Historical: NextPage = () => {
 
                                     <div className="flex items-end">
                                         <Button
-                                            className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white"
+                                            className="bg-[#147677] hover:bg-[#147677]/90 text-white hover:text-white"
                                             onClick={fetchComparisonData}
                                             disabled={!comparisonLocation1 || !comparisonLocation2}
                                         >
@@ -995,18 +995,18 @@ const Historical: NextPage = () => {
                                                 <Line
                                                     type="monotone"
                                                     dataKey="location1"
-                                                    stroke="#10b981"
+                                                    stroke="#147677"
                                                     name={comparisonLocation1?.name || 'Location 1'}
                                                     strokeWidth={3}
-                                                    dot={{ fill: '#10b981', strokeWidth: 2 }}
+                                                    dot={{ fill: '#147677', strokeWidth: 2 }}
                                                 />
                                                 <Line
                                                     type="monotone"
                                                     dataKey="location2"
-                                                    stroke="#2563eb"
+                                                    stroke="#0f5f5f"
                                                     name={comparisonLocation2?.name || 'Location 2'}
                                                     strokeWidth={3}
-                                                    dot={{ fill: '#2563eb', strokeWidth: 2 }}
+                                                    dot={{ fill: '#0f5f5f', strokeWidth: 2 }}
                                                 />
                                             </LineChart>
                                         </ChartContainer>
@@ -1015,27 +1015,27 @@ const Historical: NextPage = () => {
 
                                 {comparisonData1.length > 0 && comparisonData2.length > 0 && (
                                     <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500">
+                                        <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 border-l-4 border-l-emerald-500 hover:shadow-lg transition-shadow">
                                             <CardHeader className="pb-2">
-                                                <CardTitle className="text-base text-green-900">{comparisonLocation1?.name}</CardTitle>
+                                                <CardTitle className="text-base text-slate-900">{comparisonLocation1?.name}</CardTitle>
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="space-y-2 text-sm">
                                                     <div className="flex justify-between">
                                                         <span className="text-slate-600">{t('avgTemperature') || 'Avg Temperature'}:</span>
-                                                        <span className="font-medium text-green-700">
+                                                        <span className="font-medium text-slate-900">
                                                             {comparisonData1.length > 0 ? (comparisonData1.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / comparisonData1.length).toFixed(1) : '0'}°C
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span className="text-slate-600">{t('totalRainfall') || 'Total Rainfall'}:</span>
-                                                        <span className="font-medium text-green-700">
+                                                        <span className="font-medium text-slate-900">
                                                             {comparisonData1.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0).toFixed(0)}mm
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span className="text-slate-600">{t('rainyDays') || 'Rainy Days'}:</span>
-                                                        <span className="font-medium text-green-700">
+                                                        <span className="font-medium text-slate-900">
                                                             {comparisonData1.filter(record => record.weatherSummary.precipitation.rainAmount > 0.1).length}
                                                         </span>
                                                     </div>
@@ -1043,27 +1043,27 @@ const Historical: NextPage = () => {
                                             </CardContent>
                                         </Card>
 
-                                        <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-l-blue-500">
+                                        <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50/80 to-sky-50/80 border-l-4 border-l-blue-500 hover:shadow-lg transition-shadow">
                                             <CardHeader className="pb-2">
-                                                <CardTitle className="text-base text-blue-900">{comparisonLocation2?.name}</CardTitle>
+                                                <CardTitle className="text-base text-slate-900">{comparisonLocation2?.name}</CardTitle>
                                             </CardHeader>
                                             <CardContent>
                                                 <div className="space-y-2 text-sm">
                                                     <div className="flex justify-between">
                                                         <span className="text-slate-600">{t('avgTemperature') || 'Avg Temperature'}:</span>
-                                                        <span className="font-medium text-blue-700">
+                                                        <span className="font-medium text-slate-900">
                                                             {comparisonData2.length > 0 ? (comparisonData2.reduce((sum, record) => sum + record.weatherSummary.temperature.current, 0) / comparisonData2.length).toFixed(1) : '0'}°C
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span className="text-slate-600">{t('totalRainfall') || 'Total Rainfall'}:</span>
-                                                        <span className="font-medium text-blue-700">
+                                                        <span className="font-medium text-slate-900">
                                                             {comparisonData2.reduce((sum, record) => sum + record.weatherSummary.precipitation.rainAmount, 0).toFixed(0)}mm
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between">
                                                         <span className="text-slate-600">{t('rainyDays') || 'Rainy Days'}:</span>
-                                                        <span className="font-medium text-blue-700">
+                                                        <span className="font-medium text-slate-900">
                                                             {comparisonData2.filter(record => record.weatherSummary.precipitation.rainAmount > 0.1).length}
                                                         </span>
                                                     </div>
@@ -1077,8 +1077,8 @@ const Historical: NextPage = () => {
 
                         
                         <Card className="border-0 shadow-xl">
-                            <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 border-b border-slate-200">
-                                <CardTitle className="text-slate-800">{t('weatherInsights') || 'Weather Insights'}</CardTitle>
+                            <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50 border-b border-slate-200/50">
+                                <CardTitle className="text-slate-900">{t('weatherInsights') || 'Weather Insights'}</CardTitle>
                                 <CardDescription className="text-slate-600">
                                     {t('keyTrendsAndPatterns') || 'Key trends and patterns'} - {selectedLocation?.name}
                                 </CardDescription>
@@ -1091,21 +1091,21 @@ const Historical: NextPage = () => {
                                             {t('temperatureTrend') || 'Temperature Trend'}
                                         </h4>
                                         <div className="text-sm space-y-2">
-                                            <div className="flex justify-between p-2 bg-red-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-red-50/80 to-red-100/80 rounded-lg border border-red-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('highest') || 'Highest'}:</span>
-                                                <span className="font-medium text-red-600">
+                                                <span className="font-medium text-slate-900">
                                                     {historicalData.length > 0 ? Math.max(...historicalData.map(r => r.weatherSummary.temperature.max)).toFixed(1) : '0'}°C
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between p-2 bg-blue-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-blue-50/80 to-blue-100/80 rounded-lg border border-blue-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('lowest') || 'Lowest'}:</span>
-                                                <span className="font-medium text-blue-600">
+                                                <span className="font-medium text-slate-900">
                                                     {historicalData.length > 0 ? Math.min(...historicalData.map(r => r.weatherSummary.temperature.min)).toFixed(1) : '0'}°C
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between p-2 bg-green-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 rounded-lg border border-emerald-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('average') || 'Average'}:</span>
-                                                <span className="font-medium text-green-600">
+                                                <span className="font-medium text-slate-900">
                                                     {avgTemp.toFixed(1)}°C
                                                 </span>
                                             </div>
@@ -1117,21 +1117,21 @@ const Historical: NextPage = () => {
                                             {t('rainfallPattern') || 'Rainfall Pattern'}
                                         </h4>
                                         <div className="text-sm space-y-2">
-                                            <div className="flex justify-between p-2 bg-blue-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-blue-50/80 to-blue-100/80 rounded-lg border border-blue-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('totalRainfall') || 'Total Rainfall'}:</span>
-                                                <span className="font-medium text-blue-600">
+                                                <span className="font-medium text-slate-900">
                                                     {totalRainfall.toFixed(0)}mm
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between p-2 bg-cyan-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-sky-50/80 to-sky-100/80 rounded-lg border border-sky-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('rainyDays') || 'Rainy Days'}:</span>
-                                                <span className="font-medium text-cyan-600">
+                                                <span className="font-medium text-slate-900">
                                                     {rainyDays}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between p-2 bg-indigo-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-indigo-50/80 to-indigo-100/80 rounded-lg border border-indigo-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('maxDailyRain') || 'Max Daily Rain'}:</span>
-                                                <span className="font-medium text-indigo-600">
+                                                <span className="font-medium text-slate-900">
                                                     {historicalData.length > 0 ? Math.max(...historicalData.map(r => r.weatherSummary.precipitation.rainAmount)).toFixed(1) : '0'}mm
                                                 </span>
                                             </div>
@@ -1143,21 +1143,21 @@ const Historical: NextPage = () => {
                                             {t('extremeEvents') || 'Extreme Events'}
                                         </h4>
                                         <div className="text-sm space-y-2">
-                                            <div className="flex justify-between p-2 bg-amber-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-amber-50/80 to-amber-100/80 rounded-lg border border-amber-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('totalEvents') || 'Total Events'}:</span>
-                                                <span className="font-medium text-amber-600">
+                                                <span className="font-medium text-slate-900">
                                                     {extremeEvents}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between p-2 bg-orange-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-orange-50/80 to-orange-100/80 rounded-lg border border-orange-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('hotDays') || 'Hot Days'} (&gt;30°C):</span>
-                                                <span className="font-medium text-orange-600">
+                                                <span className="font-medium text-slate-900">
                                                     {historicalData.filter(r => r.weatherSummary.temperature.max > 30).length}
                                                 </span>
                                             </div>
-                                            <div className="flex justify-between p-2 bg-red-50 rounded-lg">
+                                            <div className="flex justify-between p-2 bg-gradient-to-br from-red-50/80 to-red-100/80 rounded-lg border border-red-200/50 hover:shadow-sm transition-shadow">
                                                 <span className="text-slate-600">{t('heavyRain') || 'Heavy Rain'} (&gt;50mm):</span>
-                                                <span className="font-medium text-red-600">
+                                                <span className="font-medium text-slate-900">
                                                     {historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length}
                                                 </span>
                                             </div>
@@ -1168,35 +1168,35 @@ const Historical: NextPage = () => {
                                     <h4 className="font-medium mb-4 text-slate-800">{t('farmingInsights') || 'Farming Insights'}</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div className="space-y-3">
-                                            <h5 className="text-sm font-medium text-green-600 bg-green-50 px-3 py-2 rounded-lg">{t('favorableConditions') || 'Favorable Conditions'}</h5>
+                                            <h5 className="text-sm font-medium text-slate-900 bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 px-3 py-2 rounded-lg border border-emerald-200/50">{t('favorableConditions') || 'Favorable Conditions'}</h5>
                                             <ul className="text-sm space-y-2">
-                                                <li className="flex items-start gap-3 p-2 bg-green-50 rounded-lg">
-                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-2 flex-shrink-0" />
+                                                <li className="flex items-start gap-3 p-2 bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 rounded-lg border border-emerald-200/50 hover:shadow-sm transition-shadow">
+                                                    <div className="rounded-full bg-emerald-500 h-2 w-2 mt-2 flex-shrink-0" />
                                                     <span className="text-slate-700">
-                                                        <span className="font-medium text-green-700">{historicalData.filter(r => r.weatherSummary.temperature.current >= 18 && r.weatherSummary.temperature.current <= 25).length}</span> {t('daysOptimalTemp') || 'days with optimal temperature'}
+                                                        <span className="font-medium text-slate-900">{historicalData.filter(r => r.weatherSummary.temperature.current >= 18 && r.weatherSummary.temperature.current <= 25).length}</span> {t('daysOptimalTemp') || 'days with optimal temperature'}
                                                     </span>
                                                 </li>
-                                                <li className="flex items-start gap-3 p-2 bg-green-50 rounded-lg">
-                                                    <div className="rounded-full bg-green-500 h-2 w-2 mt-2 flex-shrink-0" />
+                                                <li className="flex items-start gap-3 p-2 bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 rounded-lg border border-emerald-200/50 hover:shadow-sm transition-shadow">
+                                                    <div className="rounded-full bg-emerald-500 h-2 w-2 mt-2 flex-shrink-0" />
                                                     <span className="text-slate-700">
-                                                        <span className="font-medium text-green-700">{historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 1 && r.weatherSummary.precipitation.rainAmount < 30).length}</span> {t('daysModerateRain') || 'days with moderate rain'}
+                                                        <span className="font-medium text-slate-900">{historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 1 && r.weatherSummary.precipitation.rainAmount < 30).length}</span> {t('daysModerateRain') || 'days with moderate rain'}
                                                     </span>
                                                 </li>
                                             </ul>
                                         </div>
                                         <div className="space-y-3">
-                                            <h5 className="text-sm font-medium text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">{t('challengingConditions') || 'Challenging Conditions'}</h5>
+                                            <h5 className="text-sm font-medium text-slate-900 bg-gradient-to-br from-amber-50/80 to-amber-100/80 px-3 py-2 rounded-lg border border-amber-200/50">{t('challengingConditions') || 'Challenging Conditions'}</h5>
                                             <ul className="text-sm space-y-2">
-                                                <li className="flex items-start gap-3 p-2 bg-amber-50 rounded-lg">
+                                                <li className="flex items-start gap-3 p-2 bg-gradient-to-br from-amber-50/80 to-amber-100/80 rounded-lg border border-amber-200/50 hover:shadow-sm transition-shadow">
                                                     <div className="rounded-full bg-amber-500 h-2 w-2 mt-2 flex-shrink-0" />
                                                     <span className="text-slate-700">
-                                                        <span className="font-medium text-amber-700">{historicalData.filter(r => r.weatherSummary.temperature.max > 30 || r.weatherSummary.temperature.min < 10).length}</span> {t('daysExtremeTemp') || 'days with extreme temperature'}
+                                                        <span className="font-medium text-slate-900">{historicalData.filter(r => r.weatherSummary.temperature.max > 30 || r.weatherSummary.temperature.min < 10).length}</span> {t('daysExtremeTemp') || 'days with extreme temperature'}
                                                     </span>
                                                 </li>
-                                                <li className="flex items-start gap-3 p-2 bg-amber-50 rounded-lg">
+                                                <li className="flex items-start gap-3 p-2 bg-gradient-to-br from-amber-50/80 to-amber-100/80 rounded-lg border border-amber-200/50 hover:shadow-sm transition-shadow">
                                                     <div className="rounded-full bg-amber-500 h-2 w-2 mt-2 flex-shrink-0" />
                                                     <span className="text-slate-700">
-                                                        <span className="font-medium text-amber-700">{historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length}</span> {t('daysHeavyRain') || 'days with heavy rain'}
+                                                        <span className="font-medium text-slate-900">{historicalData.filter(r => r.weatherSummary.precipitation.rainAmount > 50).length}</span> {t('daysHeavyRain') || 'days with heavy rain'}
                                                     </span>
                                                 </li>
                                             </ul>
