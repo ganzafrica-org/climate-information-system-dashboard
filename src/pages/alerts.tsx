@@ -14,7 +14,6 @@ import { Loader2 } from "lucide-react";
 
 const Alerts: NextPage = () => {
   const { t } = useLanguage();
-  const router = useRouter();
   const [selectedSector, setSelectedSector] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [locations, setLocations] = useState<Location[]>([]);

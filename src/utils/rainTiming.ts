@@ -53,7 +53,11 @@ export function calculateRainTiming(hourly: HourlyForecast[]): RainTiming | null
         night: [] as RainPeriod[]
     };
 
-    let peakRain: { hour: number; time: string; amount: number; chance: number } | null = null;
+    let peakHour = 0;
+    let peakTime = '';
+    let peakAmount = 0;
+    let peakChance = 0;
+    let hasPeak = false;
     let rainStart: { hour: number; time: string; timestamp: number } | null = null;
     let rainEnd: { hour: number; time: string; timestamp: number } | null = null;
 
@@ -80,14 +84,13 @@ export function calculateRainTiming(hourly: HourlyForecast[]): RainTiming | null
             };
 
             // Track peak rain (prioritize rain amount, then chance)
-            if (!peakRain || rainAmount > peakRain.amount || 
-                (rainAmount === peakRain.amount && rainChance > peakRain.chance)) {
-                peakRain = {
-                    hour: hourOfDay,
-                    time: period.time,
-                    amount: rainAmount,
-                    chance: rainChance
-                };
+            if (!hasPeak || rainAmount > peakAmount || 
+                (rainAmount === peakAmount && rainChance > peakChance)) {
+                peakHour = hourOfDay;
+                peakTime = period.time;
+                peakAmount = rainAmount;
+                peakChance = rainChance;
+                hasPeak = true;
             }
 
             // Track rain start
@@ -143,16 +146,21 @@ export function calculateRainTiming(hourly: HourlyForecast[]): RainTiming | null
 
     const summary = periodNames.join('_and_');
 
+    let peakRainTime: { hour: number; time: string; amount: string; chance: number } | null = null;
+    if (hasPeak) {
+        peakRainTime = {
+            hour: peakHour,
+            time: peakTime,
+            amount: peakAmount.toFixed(1),
+            chance: peakChance
+        };
+    }
+
     return {
         hasRain: true,
         summary,
         periods,
-        peakRainTime: peakRain ? {
-            hour: peakRain.hour,
-            time: peakRain.time,
-            amount: peakRain.amount.toFixed(1),
-            chance: peakRain.chance
-        } : null,
+        peakRainTime,
         totalPeriods,
         rainStartsAt: rainStart,
         rainEndsAt: rainEnd
