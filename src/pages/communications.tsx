@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { AlertsTable } from '@/components/communications/AlertsTable';
 import { MessagesTable } from '@/components/communications/MessagesTable';
 import { WeatherSchedulerTable } from '@/components/communications/SchedulerTable';
+import { MessageLogsTable } from '@/components/communications/MessageLogsTable';
 import { AlertTriangle, MessageSquare, Bell, Plus, Filter, Search, MapPin, ChevronDown, Loader2, Clock } from 'lucide-react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import Head from 'next/head';
 import { useLanguage } from '@/i18n';
+import { useAuth } from '@/hooks/useAuth';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +25,7 @@ export default function Communications() {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const { t } = useLanguage();
+  const { user } = useAuth();
 
   useEffect(() => {
     fetchLocations();
@@ -94,25 +97,34 @@ export default function Communications() {
                 <TabsList>
                     <TabsTrigger 
                         value="alerts"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                     >
                       <AlertTriangle className="h-4 w-4 mr-2" />
                       {t("alerts")}
                     </TabsTrigger>
                     <TabsTrigger 
                         value="messages"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                     >
                       <MessageSquare className="h-4 w-4 mr-2" />
                       {t("customMessages")}
                     </TabsTrigger>
                     <TabsTrigger 
                         value="scheduler"
-                        className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
+                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
                     >
                       <Clock className="h-4 w-4 mr-2" />
                       Weather Scheduler
                     </TabsTrigger>
+                    {user?.role === 'admin' && (
+                      <TabsTrigger 
+                          value="logs"
+                          className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
+                      >
+                        <Clock className="h-4 w-4 mr-2" />
+                        Logs
+                      </TabsTrigger>
+                    )}
                 </TabsList>
             </Tabs>
 
@@ -130,6 +142,8 @@ export default function Communications() {
                     />
                 ) : activeTab === 'scheduler' ? (
                     <WeatherSchedulerTable />
+                ) : (activeTab === 'logs' && user?.role === 'admin') ? (
+                    <MessageLogsTable />
                 ) : null}
             </div>
         </div>

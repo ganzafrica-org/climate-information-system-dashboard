@@ -14,14 +14,48 @@ interface RequestOptions {
     skipRetry?: boolean;
 }
 
+// User types
+interface User {
+    id: string;
+    username: string;
+    email: string;
+    role: "admin" | "agronomist";
+    status?: "active" | "pending" | "suspended";
+    phone?: string;
+    isActive?: boolean;
+    createdAt?: string;
+    updatedAt?: string;
+    lastLogin?: string;
+    emailVerified?: boolean;
+}
+
+interface CreateUserInput {
+    username: string;
+    email: string;
+    role: "admin" | "agronomist";
+    status?: "active" | "pending" | "suspended";
+    phone?: string;
+    password?: string;
+}
+
+interface UpdateUserInput {
+    username?: string;
+    email?: string;
+    role?: "admin" | "agronomist";
+    status?: "active" | "pending" | "suspended";
+    phone?: string;
+    password?: string;
+    isActive?: boolean;
+}
+
 class ApiClient {
     private instance: AxiosInstance;
     private maxRetries: number;
     private retryDelay: number;
 
     constructor(config: ApiClientConfig = {}) {
-        this.maxRetries = config.maxRetries || 3;
-        this.retryDelay = config.retryDelay || 1000;
+        this.maxRetries = config.maxRetries || 6;
+        this.retryDelay = config.retryDelay || 500;
         
         // Ensure baseURL ends without trailing slash
         const baseURL = config.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -44,6 +78,27 @@ class ApiClient {
                 const token = this.getAuthToken();
                 if (token) {
                     config.headers.Authorization = `Bearer ${token}`;
+                }
+
+                // Attach language preference from localStorage
+                try {
+                    const locale = typeof window !== 'undefined' ? (localStorage.getItem('locale') || '') : '';
+                    const normalizedLang = (locale === 'rw' || locale === 'en') ? locale : undefined;
+
+                    // Prefer explicit header if caller didn't set it
+                    if (normalizedLang && !(config.headers && ('x-language' in config.headers || 'x-lang' in config.headers))) {
+                        (config.headers as any) = {
+                            ...(config.headers || {}),
+                            'x-language': normalizedLang,
+                            'Accept-Language': normalizedLang,
+                        };
+                    }
+
+                    // Do NOT append a lang query param globally to avoid 400s on endpoints
+                    // that don't allow extra params. If needed, callers can pass params.lang
+                    // explicitly or backend can read from headers above.
+                } catch (_) {
+                    // no-op if localStorage is unavailable
                 }
 
                 // Clean URL path - remove double slashes
@@ -89,26 +144,21 @@ class ApiClient {
                     message: error.message
                 });
 
-                // Handle 404 errors specifically
-                if (error.response?.status === 404) {
-                    console.error(`404 Not Found: ${error.config?.method?.toUpperCase()} ${error.config?.url}`);
-                    const notFoundError = new Error(`Endpoint not found: ${error.config?.url}`);
-                    notFoundError.name = 'NotFoundError';
-                    (notFoundError as any).status = 404;
-                    return Promise.reject(notFoundError);
-                }
-
-                // Handle 429 rate limiting with retry
-                if (error.response?.status === 429 && !error.config._retry && !error.config.skipRetry) {
-                    const retryAfter = error.response.headers['retry-after'];
-                    const delay = retryAfter ? parseInt(retryAfter) * 1000 : this.retryDelay;
-                    
-                    console.log(`Rate limited. Retrying after ${delay}ms...`);
-                    
-                    error.config._retry = true;
-                    await this.delay(delay);
-                    
-                    return this.instance(error.config);
+                // Handle 429 rate limiting with bounded retries here (in addition to service-level retries)
+                if (error.response?.status === 429 && !error.config.skipRetry) {
+                    const retryCount = (error.config._retryCount || 0);
+                    const maxInterceptorRetries = Math.min(2, this.maxRetries - 1);
+                    if (retryCount < maxInterceptorRetries) {
+                        const retryAfter = error.response.headers?.['retry-after'];
+                        const baseDelay = retryAfter ? parseInt(retryAfter) * 1000 : this.retryDelay;
+                        const backoff = baseDelay * Math.pow(2, retryCount);
+                        const jitter = Math.floor(Math.random() * 150);
+                        const wait = backoff + jitter;
+                        console.log(`Rate limited (429). Interceptor retry ${retryCount + 1}/${maxInterceptorRetries} in ${wait}ms`);
+                        error.config._retryCount = retryCount + 1;
+                        await this.delay(wait);
+                        return this.instance(error.config);
+                    }
                 }
 
                 if (error.response?.status === 401) {
@@ -118,6 +168,13 @@ class ApiClient {
 
                 if (error.response?.status === 403) {
                     console.error('Forbidden - insufficient permissions');
+                }
+
+                // Don't transform the error here - let the service layer handle it
+                // Just ensure we have the response data attached for proper error handling
+                if (error.response) {
+                    error.status = error.response.status;
+                    error.data = error.response.data;
                 }
 
                 return Promise.reject(error);
@@ -137,19 +194,19 @@ class ApiClient {
         try {
             return await requestFn();
         } catch (error: any) {
-            // Don't retry on 404 errors
-            if (error.response?.status === 404) {
+            // Don't retry on client errors (4xx) except 429
+            if (error.response?.status >= 400 && error.response?.status < 500 && error.response?.status !== 429) {
                 throw error;
             }
 
             if (retries > 0 && (error.response?.status === 429 || error.code === 'ECONNABORTED')) {
                 const retryAfter = error.response?.headers?.['retry-after'];
-                const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : delay;
-                
+                const base = retryAfter ? parseInt(retryAfter) * 1000 : delay;
+                const jitter = Math.floor(Math.random() * 200);
+                const waitTime = base + jitter;
                 console.log(`Retrying request in ${waitTime}ms... (${retries} retries left)`);
                 await this.delay(waitTime);
-                
-                return this.retryRequest(requestFn, retries - 1, delay * 2); // Exponential backoff
+                return this.retryRequest(requestFn, retries - 1, Math.min(delay * 2, 8000)); // Cap backoff
             }
             throw error;
         }
@@ -170,15 +227,20 @@ class ApiClient {
             timeout: options.timeout,
         };
 
-        if (options.skipRetry) {
-            const response = await this.instance.get<T>(cleanUrl, config);
-            return response.data;
-        }
+        try {
+            if (options.skipRetry) {
+                const response = await this.instance.get<T>(cleanUrl, config);
+                return response.data;
+            }
 
-        return this.retryRequest(async () => {
-            const response = await this.instance.get<T>(cleanUrl, config);
-            return response.data;
-        });
+            return await this.retryRequest(async () => {
+                const response = await this.instance.get<T>(cleanUrl, config);
+                return response.data;
+            });
+        } catch (error: any) {
+            // Ensure error has proper structure for service layer
+            throw this.normalizeError(error);
+        }
     }
 
     async post<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<T> {
@@ -189,15 +251,20 @@ class ApiClient {
             timeout: options.timeout,
         };
 
-        if (options.skipRetry) {
-            const response = await this.instance.post<T>(cleanUrl, data, config);
-            return response.data;
-        }
+        try {
+            if (options.skipRetry) {
+                const response = await this.instance.post<T>(cleanUrl, data, config);
+                return response.data;
+            }
 
-        return this.retryRequest(async () => {
-            const response = await this.instance.post<T>(cleanUrl, data, config);
-            return response.data;
-        });
+            return await this.retryRequest(async () => {
+                const response = await this.instance.post<T>(cleanUrl, data, config);
+                return response.data;
+            });
+        } catch (error: any) {
+            // Ensure error has proper structure for service layer
+            throw this.normalizeError(error);
+        }
     }
 
     async put<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<T> {
@@ -208,15 +275,19 @@ class ApiClient {
             timeout: options.timeout,
         };
 
-        if (options.skipRetry) {
-            const response = await this.instance.put<T>(cleanUrl, data, config);
-            return response.data;
-        }
+        try {
+            if (options.skipRetry) {
+                const response = await this.instance.put<T>(cleanUrl, data, config);
+                return response.data;
+            }
 
-        return this.retryRequest(async () => {
-            const response = await this.instance.put<T>(cleanUrl, data, config);
-            return response.data;
-        });
+            return await this.retryRequest(async () => {
+                const response = await this.instance.put<T>(cleanUrl, data, config);
+                return response.data;
+            });
+        } catch (error: any) {
+            throw this.normalizeError(error);
+        }
     }
 
     async patch<T = any>(url: string, data?: any, options: RequestOptions = {}): Promise<T> {
@@ -227,15 +298,19 @@ class ApiClient {
             timeout: options.timeout,
         };
 
-        if (options.skipRetry) {
-            const response = await this.instance.patch<T>(cleanUrl, data, config);
-            return response.data;
-        }
+        try {
+            if (options.skipRetry) {
+                const response = await this.instance.patch<T>(cleanUrl, data, config);
+                return response.data;
+            }
 
-        return this.retryRequest(async () => {
-            const response = await this.instance.patch<T>(cleanUrl, data, config);
-            return response.data;
-        });
+            return await this.retryRequest(async () => {
+                const response = await this.instance.patch<T>(cleanUrl, data, config);
+                return response.data;
+            });
+        } catch (error: any) {
+            throw this.normalizeError(error);
+        }
     }
 
     async delete<T = any>(url: string, options: RequestOptions = {}): Promise<T> {
@@ -246,15 +321,19 @@ class ApiClient {
             timeout: options.timeout,
         };
 
-        if (options.skipRetry) {
-            const response = await this.instance.delete<T>(cleanUrl, config);
-            return response.data;
-        }
+        try {
+            if (options.skipRetry) {
+                const response = await this.instance.delete<T>(cleanUrl, config);
+                return response.data;
+            }
 
-        return this.retryRequest(async () => {
-            const response = await this.instance.delete<T>(cleanUrl, config);
-            return response.data;
-        });
+            return await this.retryRequest(async () => {
+                const response = await this.instance.delete<T>(cleanUrl, config);
+                return response.data;
+            });
+        } catch (error: any) {
+            throw this.normalizeError(error);
+        }
     }
 
     async uploadFile<T = any>(url: string, file: File, options: RequestOptions = {}): Promise<T> {
@@ -271,15 +350,47 @@ class ApiClient {
             timeout: options.timeout || 60000,
         };
 
-        if (options.skipRetry) {
-            const response = await this.instance.post<T>(cleanUrl, formData, config);
-            return response.data;
-        }
+        try {
+            if (options.skipRetry) {
+                const response = await this.instance.post<T>(cleanUrl, formData, config);
+                return response.data;
+            }
 
-        return this.retryRequest(async () => {
-            const response = await this.instance.post<T>(cleanUrl, formData, config);
-            return response.data;
-        });
+            return await this.retryRequest(async () => {
+                const response = await this.instance.post<T>(cleanUrl, formData, config);
+                return response.data;
+            });
+        } catch (error: any) {
+            throw this.normalizeError(error);
+        }
+    }
+
+    // Normalize error to ensure consistent structure for service layer
+    private normalizeError(error: any): any {
+        if (error.response) {
+            // Axios error with response
+            return {
+                ...error,
+                response: {
+                    status: error.response.status,
+                    statusText: error.response.statusText,
+                    data: error.response.data,
+                    headers: error.response.headers,
+                },
+                message: error.message,
+                status: error.response.status,
+            };
+        } else if (error.request) {
+            // Network error
+            return {
+                ...error,
+                message: error.message || 'Network error',
+                isNetworkError: true,
+            };
+        } else {
+            // Other error
+            return error;
+        }
     }
 
     exportAsCSV(data: any[], filename: string, headers?: string[]): void {
@@ -359,6 +470,41 @@ class ApiClient {
     getBaseURL(): string {
         return this.instance.defaults.baseURL || '';
     }
+
+    // User service methods
+    async listUsers(): Promise<User[]> {
+        const data: any = await this.get("/api/admin/users");
+        const users: User[] = Array.isArray(data)
+            ? data
+            : Array.isArray(data?.users)
+                ? data.users
+                : Array.isArray(data?.data)
+                    ? data.data
+                    : Array.isArray(data?.data?.users)
+                        ? data.data.users
+                        : [];
+        return users;
+    }
+
+    async getUser(userId: string | number): Promise<User> {
+        const data = await this.get<User>(`/api/admin/users/${userId}`);
+        return data;
+    }
+
+    async createUser(input: CreateUserInput): Promise<User> {
+        const data = await this.post<User>("/api/admin/users", input);
+        return data;
+    }
+
+    async updateUserRole(userId: string | number, role: User["role"]): Promise<User> {
+        const data = await this.patch<User>(`/api/admin/users/${userId}/role`, { role });
+        return data;
+    }
+
+    async deleteUser(userId: string | number): Promise<{ success: boolean }> {
+        const data = await this.delete<{ success: boolean }>(`/api/admin/users/${userId}`);
+        return data;
+    }
 }
 
 // Create instance with retry configuration
@@ -367,6 +513,42 @@ const api = new ApiClient({
     retryDelay: 1000, 
 });
 
+// User service functions as named exports
+export async function listUsers(): Promise<User[]> {
+    const data: any = await api.get("/api/admin/users");
+    const users: User[] = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.users)
+            ? data.users
+            : Array.isArray(data?.data)
+                ? data.data
+                : Array.isArray(data?.data?.users)
+                    ? data.data.users
+                    : [];
+    return users;
+}
+
+export async function getUser(userId: string | number): Promise<User> {
+    const data = await api.get<User>(`/api/admin/users/${userId}`);
+    return data;
+}
+
+export async function createUser(input: CreateUserInput): Promise<User> {
+    const data = await api.post<User>("/api/admin/users", input);
+    return data;
+}
+
+export async function updateUserRole(userId: string | number, role: User["role"]): Promise<User> {
+    const data = await api.patch<User>(`/api/admin/users/${userId}/role`, { role });
+    return data;
+}
+
+export async function deleteUser(userId: string | number): Promise<{ success: boolean }> {
+    const data = await api.delete<{ success: boolean }>(`/api/admin/users/${userId}`);
+    return data;
+}
+
+// Default export and other exports
 export default api;
-export type { RequestOptions };
+export type { RequestOptions, User, CreateUserInput, UpdateUserInput };
 export { ApiClient };

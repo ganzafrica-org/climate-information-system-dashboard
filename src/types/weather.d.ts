@@ -1,10 +1,11 @@
 export interface WeatherLocation {
-    id: number;
+    id?: number;
     name: string;
     coordinates: {
         lat: number;
         lon: number;
     };
+    geocoded?: boolean;  // Indicates if location was auto-geocoded
 }
 
 export interface CurrentWeather {
@@ -20,6 +21,28 @@ export interface CurrentWeather {
     conditionMain: string;
     icon: string;
     timeOfDay: string;
+}
+
+export interface HourlyForecast {
+    dt: number;                       // Unix timestamp (seconds)
+    temp: number;                     // Temperature (°C)
+    feels_like: number;               // Feels-like temperature (°C)
+    humidity: number;                 // Humidity (%)
+    pressure: number;                 // Atmospheric pressure (hPa)
+    wind_speed: number;               // Wind speed (m/s) - multiply by 3.6 for km/h
+    wind_deg: number;                 // Wind direction (degrees, 0-360)
+    wind_gust?: number;               // Wind gust (m/s) - optional
+    pop: number;                      // Probability of precipitation (0-1) - multiply by 100 for %
+    rain: number;                     // Rain amount (mm) for 3-hour period
+    snow: number;                     // Snow amount (mm) for 3-hour period
+    clouds: number;                   // Cloud coverage (%)
+    weather: Array<{
+        id: number;
+        main: string;
+        description: string;
+        icon: string;
+    }>;
+    visibility: number;                // Visibility (meters)
 }
 
 export interface DailyWeather {
@@ -50,6 +73,7 @@ export interface DailyWeather {
         timing: string;
         confidence: string;
     };
+    hourly?: HourlyForecast[];        // Raw hourly data from OpenWeatherMap (3-hour intervals, today only)
     overview: string;
     message: string;
 }
@@ -200,8 +224,8 @@ export interface WeatherAlertsResponse {
 export interface CoordinatesWeatherRequest {
     lat: number;
     lon: number;
-    locationName: string;
-    type: 'daily' | 'warning' | 'forecast';
+    locationName?: string;  // Optional - will be auto-filled via geocoding
+    type?: 'daily' | 'warning' | 'forecast';
 }
 
 export interface ApiResponse<T> {

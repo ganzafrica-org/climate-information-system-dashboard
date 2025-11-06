@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {ScrollArea, ScrollBar} from "@/components/ui/scroll-area";
 import {
   AlertCircle, ChevronDown, ChevronLeft, ChevronRight, CloudDrizzle, CloudRain,
-  Cloud, Download, MapPin, Share2, Sun, Wind, RefreshCw, Loader2, Droplets, WifiOff, AlertTriangle
+  Cloud, Download, MapPin, Share2, Sun, Wind, RefreshCw, Loader2, Droplets, WifiOff, AlertTriangle, Calendar
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -18,6 +18,8 @@ import {
   WeatherData, ApiResponse, WeatherRequestParams
 } from "@/types/weather";
 import { Location, LocationsResponse } from "@/types/farmer";
+import { RainTimingDisplay } from '@/components/ui/rain-timing';
+import { HourlyForecastDisplay } from '@/components/ui/hourly-forecast';
 
 const getWeatherIcon = (condition: string, isActive = false): React.ReactElement => {
   const baseClass = "h-8 w-8";
@@ -66,6 +68,7 @@ const Forecasts: NextPage = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [errorType, setErrorType] = useState<string>('');
+  const [forecastFilter, setForecastFilter] = useState<'all' | '7days' | '10days' | '14days' | '16days'>('all');
 
   useEffect(() => {
     fetchLocations();
@@ -159,13 +162,13 @@ const Forecasts: NextPage = () => {
   };
 
   const handleExportForecast = () => {
-    if (!weatherData || !weatherData.weather?.daily?.length) {
+    if (!filteredForecastData.length) {
       toast.error(t('noDataToExport') || 'No data available to export.');
       return;
     }
 
     try {
-      const exportData = weatherData.weather.daily.map(day => ({
+      const exportData = filteredForecastData.map(day => ({
         [t('date') || 'Date']: day.date,
         [t('day') || 'Day']: day.dayOfWeek,
         [t('condition') || 'Condition']: day.condition,
@@ -176,11 +179,12 @@ const Forecasts: NextPage = () => {
         [t('rainAmount') || 'Rain Amount']: `${day.rainAmount}mm`,
         [t('windSpeed') || 'Wind Speed']: `${day.windSpeed} km/h`,
         [t('windDirection') || 'Wind Direction']: day.windDirection,
-        [t('overview') || 'Overview']: day.farmingRecommendation,
+        [t('overview') || 'Overview']: day.overview,
+        [t('farmingRecommendation') || 'Farming Recommendation']: day.farmingRecommendation,
         [t('soilCondition') || 'Soil Condition']: day.soilCondition,
       }));
 
-      const filename = `weather_forecast_${selectedLocation?.name || 'location'}_${new Date().toISOString().split('T')[0]}.csv`;
+      const filename = `weather_forecast_${selectedLocation?.name || 'location'}_${forecastFilter}_${new Date().toISOString().split('T')[0]}.csv`;
       api.exportAsCSV(exportData, filename);
 
       toast.success(t('forecastExportedSuccessfully') || 'Forecast exported successfully.');
@@ -191,14 +195,14 @@ const Forecasts: NextPage = () => {
   };
 
   const handleShareForecast = () => {
-    if (!weatherData || !selectedLocation || !weatherData.weather?.daily?.length) {
+    if (!weatherData || !selectedLocation || !filteredForecastData.length) {
       toast.error(t('noDataToShare') || 'No data available to share.');
       return;
     }
 
     try {
-      const activeDayData = weatherData.weather.daily[activeDay];
-      const shareText = `Weather Forecast for ${selectedLocation.name}\n${activeDayData.dayOfWeek}, ${activeDayData.formattedDate}\n${activeDayData.condition}\nTemp: ${activeDayData.tempMin}°C - ${activeDayData.tempMax}°C\nRain: ${activeDayData.rainChance}%\n\n${activeDayData.farmingRecommendation}`;
+      const activeDayData = filteredForecastData[activeDay];
+      const shareText = `Weather Forecast for ${selectedLocation.name}\n${activeDayData.dayOfWeek}, ${activeDayData.formattedDate}\n${activeDayData.condition}\nTemp: ${activeDayData.tempMin}°C - ${activeDayData.tempMax}°C\nRain: ${activeDayData.rainChance}%\n\nOverview: ${activeDayData.overview}\n\nFarming Recommendation: ${activeDayData.farmingRecommendation}`;
 
       if (navigator.share) {
         navigator.share({
@@ -216,6 +220,55 @@ const Forecasts: NextPage = () => {
       console.error('Share error:', error);
       toast.error(t('failedToShareForecast') || 'Failed to share forecast.');
     }
+  };
+
+  // Filter forecast data based on selected filter
+  const filteredForecastData = weatherData?.weather?.daily ? (() => {
+    const allDays = weatherData.weather.daily;
+    switch (forecastFilter) {
+      case '7days':
+        return allDays.slice(0, 7);
+      case '10days':
+        return allDays.slice(0, 10);
+      case '14days':
+        return allDays.slice(0, 14);
+      case '16days':
+        return allDays.slice(0, 16);
+      case 'all':
+      default:
+        return allDays;
+    }
+  })() : [];
+
+  // Reset active day when filter changes
+  useEffect(() => {
+    if (activeDay >= filteredForecastData.length && filteredForecastData.length > 0) {
+      setActiveDay(0);
+    }
+  }, [forecastFilter, filteredForecastData.length]);
+
+  const getFilterOptions = () => {
+    if (!weatherData?.weather?.daily?.length) return [];
+    
+    const totalDays = weatherData.weather.daily.length;
+    const options = [
+      { value: 'all', label: t('allDays') || `${t('all') || 'All'} ${totalDays} ${t('days') || 'days'}`, available: true }
+    ];
+
+    if (totalDays >= 7) {
+      options.push({ value: '7days', label: t('7days') || '7 days', available: true });
+    }
+    if (totalDays >= 10) {
+      options.push({ value: '10days', label: t('10days') || '10 days', available: true });
+    }
+    if (totalDays >= 14) {
+      options.push({ value: '14days', label: t('14days') || '14 days', available: true });
+    }
+    if (totalDays >= 16) {
+      options.push({ value: '16days', label: t('16days') || '16 days', available: true });
+    }
+
+    return options;
   };
 
   const renderEmptyState = () => {
@@ -266,7 +319,7 @@ const Forecasts: NextPage = () => {
                   variant="outline"
                   onClick={errorType === 'no_locations' ? fetchLocations : handleRefresh}
                   disabled={isRefreshing || isLoading}
-                  className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                  className="bg-[#147677] hover:bg-[#147677]/90 text-white border-[#147677]"
               >
                 <RefreshCw className={`h-4 w-4 mr-2 ${(isRefreshing || isLoading) ? 'animate-spin' : ''}`} />
                 {(isRefreshing || isLoading) ? (t('loading') || 'Loading...') : (t('tryAgain') || 'Try Again')}
@@ -294,13 +347,13 @@ const Forecasts: NextPage = () => {
       <AppLayout>
         <Head>
           <title>
-            {t("forecasts") || "Forecasts"} | {t("climateInformationSystem") || "Climate Information System"}
+            {t("forecasts") || "Forecasts"} | {t("climateInformationSystem") || "Teganyamuhinzi"}
           </title>
         </Head>
 
         <div className="space-y-4 md:space-y-6">
           
-          <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
+          <div className="bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] rounded-2xl p-6 text-white shadow-xl">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div className="flex items-center gap-4">
                 <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
@@ -308,6 +361,11 @@ const Forecasts: NextPage = () => {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold">{t("weatherForecast") || "Weather Forecast"}</h2>
+                  {filteredForecastData.length > 0 && (
+                    <p className="text-blue-100 text-sm">
+                      {filteredForecastData.length} {t("dayForecast") || "day forecast"}
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -337,11 +395,35 @@ const Forecasts: NextPage = () => {
 
           
           <div className="flex flex-wrap items-center gap-3">
+            {/* Forecast Filter Dropdown */}
+            {weatherData && weatherData.weather?.daily?.length > 7 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 hover:border-slate-400">
+                    <Calendar className="h-4 w-4 mr-2" />
+                    {getFilterOptions().find(opt => opt.value === forecastFilter)?.label || t('filterDays') || 'Filter Days'}
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  {getFilterOptions().map((option) => (
+                    <DropdownMenuItem
+                      key={option.value}
+                      onClick={() => setForecastFilter(option.value as any)}
+                      className={forecastFilter === option.value ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}
+                    >
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+
             <Button
                 variant="outline"
                 onClick={handleRefresh}
                 disabled={isRefreshing || isLoading || !selectedLocation}
-                className="bg-blue-600 hover:bg-blue-700 text-white hover:text-white border-blue-600"
+                className="bg-[#147677] hover:bg-[#147677]/90 text-white hover:text-white border-[#147677]"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
               {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
@@ -350,8 +432,8 @@ const Forecasts: NextPage = () => {
             <Button
                 variant="outline"
                 onClick={handleExportForecast}
-                className="bg-green-600 hover:bg-green-700 text-white hover:text-white border-green-600"
-                disabled={!weatherData || !weatherData.weather?.daily?.length}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white hover:text-white border-emerald-600"
+                disabled={!filteredForecastData.length}
             >
               <Download className="mr-2 h-4 w-4" />
               {t("exportForecast") || "Export Forecast"}
@@ -361,7 +443,7 @@ const Forecasts: NextPage = () => {
                 variant="outline"
                 onClick={handleShareForecast}
                 className="bg-amber-600 hover:bg-amber-700 text-white hover:text-white border-amber-600"
-                disabled={!weatherData || !weatherData.weather?.daily?.length}
+                disabled={!filteredForecastData.length}
             >
               <Share2 className="mr-2 h-4 w-4" />
               {t("shareForecast") || "Share Forecast"}
@@ -373,15 +455,16 @@ const Forecasts: NextPage = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-4">
                   
                   <div className="lg:col-span-1 order-1">
+                    {/* Mobile horizontal scroll for filtered forecast days */}
                     <div className="md:hidden">
                       <ScrollArea className="w-full whitespace-nowrap">
                         <div className="flex space-x-3 pb-4">
-                          {weatherData.weather.daily.map((day, index) => (
+                          {filteredForecastData.map((day, index) => (
                               <Card
                                   key={day.date}
                                   className={`w-[120px] flex-shrink-0 cursor-pointer transition-all duration-200 border-0 shadow-md ${
                                       activeDay === index
-                                          ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg scale-105"
+                                          ? "bg-gradient-to-br from-[#147677] to-[#0f5f5f] text-white shadow-lg scale-105"
                                           : "bg-white hover:bg-blue-50 hover:shadow-lg"
                                   }`}
                                   onClick={() => setActiveDay(index)}
@@ -392,13 +475,12 @@ const Forecasts: NextPage = () => {
                                   </div>
                                   <div className={`text-xs ${activeDay === index ? 'text-blue-100' : 'text-slate-500'}`}>
                                     {(() => {
-                                      const formattedDate = weatherData.weather.daily[activeDay].formattedDate;
-                                      const [month, day] = formattedDate.split(' ');
+                                      const formattedDate = day.formattedDate;
+                                      const [month, dayNum] = formattedDate.split(' ');
                                       const translatedMonth = t(month);
 
-                                      return `${translatedMonth} ${day}`;
+                                      return `${translatedMonth} ${dayNum}`;
                                     })()}
-
                                   </div>
                                   <div className="my-2 flex justify-center">
                                     {getWeatherIcon(day.conditionMain, activeDay === index)}
@@ -421,16 +503,16 @@ const Forecasts: NextPage = () => {
                       </ScrollArea>
                     </div>
 
-                    
+                    {/* Desktop vertical scroll for filtered forecast days */}
                     <div className="hidden md:block">
-                      <ScrollArea className="h-[600px]">
+                      <ScrollArea className="h-[800px]">
                         <div className="space-y-3">
-                          {weatherData.weather.daily.map((day, index) => (
+                          {filteredForecastData.map((day, index) => (
                               <Card
                                   key={day.date}
                                   className={`cursor-pointer transition-all duration-200 border-0 shadow-md ${
                                       activeDay === index
-                                          ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg"
+                                          ? "bg-gradient-to-br from-[#147677] to-[#0f5f5f] text-white shadow-lg"
                                           : "bg-white hover:bg-blue-50 hover:shadow-lg hover:border-blue-200"
                                   }`}
                                   onClick={() => setActiveDay(index)}
@@ -442,11 +524,11 @@ const Forecasts: NextPage = () => {
                                     </div>
                                     <div className={`text-xs mb-2 ${activeDay === index ? 'text-blue-100' : 'text-slate-500'}`}>
                                       {(() => {
-                                        const formattedDate = weatherData.weather.daily[activeDay].formattedDate;
-                                        const [month, day] = formattedDate.split(' ');
+                                        const formattedDate = day.formattedDate;
+                                        const [month, dayNum] = formattedDate.split(' ');
                                         const translatedMonth = t(month);
 
-                                        return `${translatedMonth} ${day}`;
+                                        return `${translatedMonth} ${dayNum}`;
                                       })()}
                                     </div>
                                     <div className="flex justify-center mb-2">
@@ -477,18 +559,19 @@ const Forecasts: NextPage = () => {
                   
                   <div className="md:col-span-3 lg:col-span-4 order-2">
                     <Card className="border-0 shadow-xl">
-                      <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100">
+                      <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50 border-b border-slate-200/50">
                         <div className="flex items-center justify-between">
                           <div>
-                            <CardTitle className="text-blue-900">
-                              {weatherData.weather.daily[activeDay].isToday
+                            <CardTitle className="text-slate-900">
+                              {filteredForecastData[activeDay]?.isToday
                                   ? (t('today') || 'Today')
-                                  : (t(`${weatherData.weather.daily[activeDay].dayOfWeek}`))
+                                  : (t(`${filteredForecastData[activeDay]?.dayOfWeek}`))
                               }
                             </CardTitle>
-                            <CardDescription className="text-blue-700">
+                            <CardDescription className="text-slate-600">
                               {(() => {
-                                const formattedDate = weatherData.weather.daily[activeDay].formattedDate;
+                                const formattedDate = filteredForecastData[activeDay]?.formattedDate;
+                                if (!formattedDate) return '';
                                 const [month, day] = formattedDate.split(' ');
                                 const translatedMonth = t(month);
 
@@ -503,18 +586,18 @@ const Forecasts: NextPage = () => {
                                 size="icon"
                                 disabled={activeDay === 0}
                                 onClick={() => setActiveDay((prev) => Math.max(0, prev - 1))}
-                                className="border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                                className="border-slate-300 hover:bg-slate-50 hover:border-slate-400"
                             >
-                              <ChevronLeft className="h-4 w-4 text-blue-600" />
+                              <ChevronLeft className="h-4 w-4 text-slate-600" />
                             </Button>
                             <Button
                                 variant="outline"
                                 size="icon"
-                                disabled={activeDay === weatherData.weather.daily.length - 1}
-                                onClick={() => setActiveDay((prev) => Math.min(weatherData.weather.daily.length - 1, prev + 1))}
-                                className="border-blue-200 hover:bg-blue-50 hover:border-blue-300"
+                                disabled={activeDay === (weatherData?.weather?.daily?.length || 0) - 1}
+                                onClick={() => setActiveDay((prev) => Math.min((weatherData?.weather?.daily?.length || 0) - 1, prev + 1))}
+                                className="border-slate-300 hover:bg-slate-50 hover:border-slate-400"
                             >
-                              <ChevronRight className="h-4 w-4 text-blue-600" />
+                              <ChevronRight className="h-4 w-4 text-slate-600" />
                             </Button>
                           </div>
                         </div>
@@ -525,56 +608,56 @@ const Forecasts: NextPage = () => {
                         <div className="flex flex-col md:flex-row justify-between items-center gap-6">
                           <div className="flex items-center">
                             <div className="text-blue-500 mr-6">
-                              {getWeatherIcon(weatherData.weather.daily[activeDay].conditionMain)}
+                              {getWeatherIcon(filteredForecastData[activeDay]?.conditionMain)}
                             </div>
                             <div>
                               <div className="text-4xl font-bold text-slate-900">
-                                {weatherData.weather.daily[activeDay].tempMax}°C
+                                {filteredForecastData[activeDay]?.tempMax}°C
                               </div>
                               <div className="text-sm text-slate-500">
-                                {t("lowTemp") || "Low"}: {weatherData.weather.daily[activeDay].tempMin}°C
+                                {t("lowTemp") || "Low"}: {filteredForecastData[activeDay]?.tempMin}°C
                               </div>
                               <div className="text-sm text-slate-600 capitalize mt-1">
-                                {(t(`${weatherData.weather.daily[activeDay].condition}`))}
+                                {(t(`${filteredForecastData[activeDay]?.condition}`))}
                               </div>
                             </div>
                           </div>
 
                           
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-4">
-                            <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-xl">
-                              <CloudRain className="h-5 w-5 text-blue-500" />
+                            <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-blue-50/80 to-blue-100/80 rounded-xl border border-blue-200/50 hover:shadow-md transition-shadow">
+                              <CloudRain className="h-5 w-5 text-blue-600" />
                               <div>
-                                <div className="text-sm text-blue-700 font-medium">{t("precipitation") || "Precipitation"}</div>
-                                <div className="font-semibold text-blue-900">
-                                  {weatherData.weather.daily[activeDay].rainChance}%
+                                <div className="text-sm text-slate-700 font-medium">{t("precipitation") || "Precipitation"}</div>
+                                <div className="font-semibold text-slate-900">
+                                  {filteredForecastData[activeDay]?.rainChance}%
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 p-3 bg-slate-50 rounded-xl">
-                              <Wind className="h-5 w-5 text-slate-500" />
+                            <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-slate-50/80 to-slate-100/80 rounded-xl border border-slate-200/50 hover:shadow-md transition-shadow">
+                              <Wind className="h-5 w-5 text-slate-600" />
                               <div>
                                 <div className="text-sm text-slate-700 font-medium">{t("wind") || "Wind"}</div>
                                 <div className="font-semibold text-slate-900">
-                                  {weatherData.weather.daily[activeDay].windSpeed} km/h
+                                  {filteredForecastData[activeDay]?.windSpeed} km/h
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 p-3 bg-cyan-50 rounded-xl">
-                              <Droplets className="h-5 w-5 text-cyan-500" />
+                            <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-sky-50/80 to-sky-100/80 rounded-xl border border-sky-200/50 hover:shadow-md transition-shadow">
+                              <Droplets className="h-5 w-5 text-sky-600" />
                               <div>
-                                <div className="text-sm text-cyan-700 font-medium">{t("humidity") || "Humidity"}</div>
-                                <div className="font-semibold text-cyan-900">
-                                  {weatherData.weather.daily[activeDay].humidity}%
+                                <div className="text-sm text-slate-700 font-medium">{t("humidity") || "Humidity"}</div>
+                                <div className="font-semibold text-slate-900">
+                                  {filteredForecastData[activeDay]?.humidity}%
                                 </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-xl">
-                              <Sun className="h-5 w-5 text-yellow-500" />
+                            <div className="flex items-center gap-2 p-3 bg-gradient-to-br from-amber-50/80 to-amber-100/80 rounded-xl border border-amber-200/50 hover:shadow-md transition-shadow">
+                              <Sun className="h-5 w-5 text-amber-600" />
                               <div>
-                                <div className="text-sm text-yellow-700 font-medium">{t("uvIndex") || "UV Index"}</div>
-                                <div className="font-semibold text-yellow-900">
-                                  {weatherData.weather.daily[activeDay].uvIndex}
+                                <div className="text-sm text-slate-700 font-medium">{t("uvIndex") || "UV Index"}</div>
+                                <div className="font-semibold text-slate-900">
+                                  {filteredForecastData[activeDay]?.uvIndex}
                                 </div>
                               </div>
                             </div>
@@ -585,24 +668,24 @@ const Forecasts: NextPage = () => {
                         <div>
                           <h3 className="font-semibold mb-4 text-slate-800 text-lg">{t("weatherInsights") || "Weather Insights"}</h3>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500">
+                            <Card className="border-0 shadow-md bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 border-l-4 border-l-emerald-500 hover:shadow-lg transition-shadow">
                               <CardHeader className="pb-3">
-                                <CardTitle className="text-base text-green-900">{t("overview") || "Farming Recommendation"}</CardTitle>
+                                <CardTitle className="text-base text-slate-900">{t("overview") || "Overview"}</CardTitle>
                               </CardHeader>
                               <CardContent>
                                 <p className="text-sm mb-4 text-slate-700 leading-relaxed">
-                                  {weatherData.weather.daily[activeDay].farmingRecommendation}
+                                  {filteredForecastData[activeDay]?.overview}
                                 </p>
                                 <div className="space-y-3">
                                   <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                                      {t("soilCondition") || "Soil Condition"}: {weatherData.weather.daily[activeDay].soilCondition}
+                                    <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-300">
+                                      {t("soilCondition") || "Soil Condition"}: {filteredForecastData[activeDay]?.soilCondition}
                                     </Badge>
                                   </div>
-                                  {weatherData.weather.daily[activeDay].rainAmount > 0 && (
+                                  {(filteredForecastData[activeDay]?.rainAmount || 0) > 0 && (
                                       <div className="flex items-center gap-2">
                                         <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-blue-300">
-                                          {t("expectedRainfall") || "Expected Rainfall"}: {weatherData.weather.daily[activeDay].rainAmount}mm
+                                          {t("expectedRainfall") || "Expected Rainfall"}: {filteredForecastData[activeDay]?.rainAmount}mm
                                         </Badge>
                                       </div>
                                   )}
@@ -610,41 +693,44 @@ const Forecasts: NextPage = () => {
                               </CardContent>
                             </Card>
 
-                            <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-cyan-50 border-l-4 border-l-blue-500">
+                            <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50/80 to-sky-50/80 border-l-4 border-l-blue-500 hover:shadow-lg transition-shadow">
                               <CardHeader className="pb-3">
-                                <CardTitle className="text-base text-blue-900">{t("additionalInsights") || "Additional Insights"}</CardTitle>
+                                <CardTitle className="text-base text-slate-900">{t("farmingRecommendation") || "Farming Recommendation"}</CardTitle>
                               </CardHeader>
                               <CardContent>
+                                <p className="text-sm mb-4 text-slate-700 leading-relaxed">
+                                  {filteredForecastData[activeDay]?.farmingRecommendation}
+                                </p>
                                 <div className="space-y-3 text-sm">
                                   <div className="flex justify-between p-2 bg-white rounded-lg">
                                     <span className="text-slate-600">{t("windDirection") || "Wind Direction"}:</span>
                                     <span className="font-medium capitalize text-slate-800">
-                                      {weatherData.weather.daily[activeDay].windDirection}
+                                      {filteredForecastData[activeDay]?.windDirection}
                                     </span>
                                   </div>
                                   <div className="flex justify-between p-2 bg-white rounded-lg">
                                     <span className="text-slate-600">{t("windStrength") || "Wind Strength"}:</span>
                                     <span className="font-medium capitalize text-slate-800">
-                                      {weatherData.weather.daily[activeDay].windStrength}
+                                      {filteredForecastData[activeDay]?.windStrength}
                                     </span>
                                   </div>
                                   <div className="flex justify-between p-2 bg-white rounded-lg">
                                     <span className="text-slate-600">{t("rainChance") || "Rain Chance"}:</span>
                                     <span className="font-medium text-slate-800">
-                                      {weatherData.weather.daily[activeDay].rainChance || 'Unknown'}%
+                                      {filteredForecastData[activeDay]?.rainChance || 'Unknown'}%
                                     </span>
                                   </div>
                                   <div className="flex justify-between p-2 bg-white rounded-lg">
                                     <span className="text-slate-600">{t("rainPrediction") || "Rain Prediction"}:</span>
                                     <span className="font-medium text-slate-800">
-                                      {weatherData.weather.daily[activeDay].rainPrediction?.confidence || 'Unknown'}
+                                      {filteredForecastData[activeDay]?.rainPrediction?.confidence || 'Unknown'}
                                     </span>
                                   </div>
-                                  {weatherData.weather.daily[activeDay].extremeWeatherConditions && (
+                                  {filteredForecastData[activeDay]?.extremeWeatherConditions && (
                                       <div className="mt-3">
                                         <span className="text-xs text-slate-500 font-medium">{t("conditions") || "Conditions"}:</span>
                                         <div className="flex flex-wrap gap-1 mt-2">
-                                          {weatherData.weather.daily[activeDay].extremeWeatherConditions.map((condition, index) => (
+                                          {filteredForecastData[activeDay]?.extremeWeatherConditions.map((condition, index) => (
                                               <Badge key={index} variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-300">
                                                 {condition}
                                               </Badge>
@@ -657,6 +743,20 @@ const Forecasts: NextPage = () => {
                             </Card>
                           </div>
                         </div>
+
+                        {/* Rain Timing Display (only for today) - calculated from hourly data */}
+                        {filteredForecastData[activeDay]?.isToday && filteredForecastData[activeDay]?.hourly && filteredForecastData[activeDay].hourly.length > 0 && (
+                            <div className="mt-6">
+                                <RainTimingDisplay hourly={filteredForecastData[activeDay].hourly} />
+                            </div>
+                        )}
+
+                        {/* Hourly Forecast Display (only for today) */}
+                        {filteredForecastData[activeDay]?.isToday && filteredForecastData[activeDay]?.hourly && filteredForecastData[activeDay].hourly.length > 0 && (
+                            <div className="mt-6">
+                                <HourlyForecastDisplay hourly={filteredForecastData[activeDay].hourly} />
+                            </div>
+                        )}
 
                         
                         {weatherData.weather.alerts && weatherData.weather.alerts.length > 0 && (

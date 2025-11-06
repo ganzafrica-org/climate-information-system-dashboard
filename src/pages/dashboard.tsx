@@ -44,6 +44,8 @@ import { toast } from 'sonner';
 import api from '@/lib/api';
 import { Location, LocationsResponse } from '@/types/farmer';
 import { ApiResponse, WeatherData, WeatherRequestParams } from '@/types/weather';
+import { RainTimingDisplay } from '@/components/ui/rain-timing';
+import { HourlyForecastDisplay } from '@/components/ui/hourly-forecast';
 
 const RainfallHeatmap = dynamic(
     () => import('@/components/dashboard-map'),
@@ -64,27 +66,6 @@ const getWeatherIcon = (condition: string): React.ReactElement => {
     return iconMap[conditionKey] || <Cloud className="h-10 w-10 text-gray-500" />;
 };
 
-const getConditionStatus = (value: number, type: 'planting' | 'harvesting' | 'pest' | 'disease'): { status: string, color: string } => {
-    if (type === 'planting') {
-        if (value >= 70) return { status: 'favorable', color: 'text-green-600' };
-        if (value >= 40) return { status: 'moderate', color: 'text-amber-600' };
-        return { status: 'unfavorable', color: 'text-red-600' };
-    }
-
-    if (type === 'harvesting') {
-        if (value <= 30) return { status: 'favorable', color: 'text-green-600' };
-        if (value <= 60) return { status: 'moderate', color: 'text-amber-600' };
-        return { status: 'unfavorable', color: 'text-red-600' };
-    }
-
-    if (type === 'pest' || type === 'disease') {
-        if (value <= 30) return { status: 'low', color: 'text-green-600' };
-        if (value <= 60) return { status: 'moderate', color: 'text-amber-600' };
-        return { status: 'high', color: 'text-red-600' };
-    }
-
-    return { status: 'unknown', color: 'text-gray-600' };
-};
 
 type Alert = {
     type: string;
@@ -100,6 +81,10 @@ type DashboardStats = {
     messagesSent: number;
     activeAlerts: number;
     activeLocations: number;
+    totalFarmersCount?: number;
+    totalMessagesCount?: number;
+    totalAlertsCount?: number;
+    totalLocationsCount?: number;
 };
 
 const Dashboard: NextPage = () => {
@@ -117,7 +102,10 @@ const Dashboard: NextPage = () => {
         totalFarmers: 0,
         messagesSent: 0,
         activeAlerts: 0,
-        activeLocations: 0
+        activeLocations: 0,
+        totalFarmersCount: 0,
+        totalMessagesCount: 0,
+        totalAlertsCount: 0,
     });
 
     useEffect(() => {
@@ -139,44 +127,138 @@ const Dashboard: NextPage = () => {
 
     const fetchDashboardStats = async () => {
         try {
-            // Fetch total farmers
-            const farmersResponse = await api.get('/api/admin/farmers');
-            const farmersData = farmersResponse.data?.data?.farmers || farmersResponse.data?.farmers || [];
-            const totalFarmers = Array.isArray(farmersData) ? farmersData.length : 0;
+            const [farmersRes, alertsListRes, messagesLogsRes, locsRes] = await Promise.all([
+                // Farmers
+                api.get('/api/admin/farmers').catch((e: any) => e),
+                // List alerts (with a large limit to approximate totals)
+                api.get('/api/weather/alerts', { params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc' } }).catch((e: any) => e),
+                // Use admin messages logs endpoint to compute total messages sent (bypass cache)
+                api.get('/api/weather/admin/logs/messages', { 
+                    params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc', _ts: Date.now() },
+                }).catch(() => null),
+                // Locations
+                api.get('/api/admin/locations').catch((e: any) => e),
+            ]);
 
-            // Fetch alerts data
-            const alertsResponse = await api.get('/api/weather/alerts');
-            const alertsData = alertsResponse.data?.data?.alerts || alertsResponse.data?.alerts || [];
-            
-            const messagesSent = Array.isArray(alertsData) ? alertsData.filter((alert: any) => alert.status === 'sent').length : 0;
-            const activeAlerts = Array.isArray(alertsData) ? alertsData.filter((alert: any) => alert.isActive === true).length : 0;
+            // Farmers total - extract both count and total
+            const farmersData = farmersRes?.data?.data?.farmers || farmersRes?.data?.farmers || farmersRes?.farmers || [];
+            const totalFarmers = Array.isArray(farmersData)
+                ? farmersData.length
+                : (farmersRes?.data?.count || farmersRes?.count || 0);
+            const totalFarmersCount = farmersRes?.data?.data?.total || farmersRes?.data?.total || farmersRes?.total || totalFarmers;
 
-            // Fetch active locations
-            const locationsResponse = await api.get('/api/admin/locations');
-            const locationsData = locationsResponse.data?.data?.locations || locationsResponse.data?.locations || [];
-            const activeLocations = Array.isArray(locationsData) ? locationsData.length : 0;
+            // Alerts sent/active counts from alerts list only
+            let sentAlerts = 0;
+            let activeAlerts = 0;
+            let totalAlertsCount = 0;
+
+            // Parse list response for alerts to compute counts
+            const alertsPayload = alertsListRes?.data || alertsListRes;
+            let alertsArray: any[] = [];
+            if (Array.isArray(alertsPayload)) {
+                alertsArray = alertsPayload;
+            } else if (alertsPayload?.data?.alerts) {
+                alertsArray = alertsPayload.data.alerts;
+            } else if (alertsPayload?.alerts) {
+                alertsArray = alertsPayload.alerts;
+            }
+
+            // Extract total count from pagination metadata
+            totalAlertsCount = alertsPayload?.data?.total || alertsPayload?.total || alertsPayload?.pagination?.total || alertsArray.length;
+
+            if (alertsArray.length > 0) {
+                const now = Date.now();
+                const parsed = alertsArray.map((a: any) => ({
+                    status: a.status || (a.isSent ? 'sent' : 'draft'),
+                    isSent: Boolean(a.isSent || a.status === 'sent' || a.sentAt),
+                    isActive: a.isActive,
+                    validUntil: a.validUntil ? Date.parse(a.validUntil) : null,
+                }));
+
+                sentAlerts = parsed.filter(p => p.isSent).length;
+                activeAlerts = parsed.filter(p => {
+                    if (p.isActive === true) return true;
+                    if (p.isSent && p.validUntil && p.validUntil > now) return true;
+                    return false;
+                }).length;
+            }
+
+            // Messages totals (use summary.total or pagination.total)
+            let messagesTotalFromLogs = 0;
+            let totalMessagesCount = 0; // keep for detailed stats if needed
+            if (messagesLogsRes) {
+                const raw = messagesLogsRes;
+                const payloadRoot = raw?.data ?? raw;
+                
+                // Extract summary and pagination nodes
+                const summaryNode = payloadRoot?.data?.summary || payloadRoot?.summary || null;
+                const paginationNode = payloadRoot?.data?.pagination || payloadRoot?.pagination || null;
+
+                // Use total from summary or pagination as the displayed total
+                messagesTotalFromLogs = (
+                    (typeof summaryNode?.total === 'number' ? summaryNode.total : undefined) ??
+                    (typeof paginationNode?.total === 'number' ? paginationNode.total : undefined) ??
+                    0
+                );
+                
+                // Use pagination.total for total messages count
+                totalMessagesCount = (
+                    (typeof paginationNode?.total === 'number' ? paginationNode.total : undefined) ??
+                    (typeof summaryNode?.total === 'number' ? summaryNode.total : undefined) ??
+                    0
+                );
+                
+                console.log('Message logs extraction:', {
+                    messagesTotal: messagesTotalFromLogs,
+                    totalMessages: totalMessagesCount,
+                    summary: summaryNode,
+                    pagination: paginationNode
+                });
+            }
+
+            // Display the exact total from logs on the card
+            const messagesSent = messagesTotalFromLogs;
+            const totalMessages = totalMessagesCount;
+
+            // Active locations - extract both count and total
+            const locationsData = locsRes?.data?.data?.locations || locsRes?.data?.locations || locsRes?.locations || [];
+            const activeLocations = Array.isArray(locationsData)
+                ? locationsData.length
+                : (locsRes?.data?.count || locsRes?.count || (locations?.length || 0));
+            const totalLocationsCount = locsRes?.data?.data?.total || locsRes?.data?.total || locsRes?.total || locsRes?.pagination?.total || activeLocations;
 
             setDashboardStats({
                 totalFarmers,
                 messagesSent,
                 activeAlerts,
-                activeLocations
+                activeLocations,
+                totalFarmersCount,
+                totalMessagesCount: totalMessages,
+                totalAlertsCount,
+                totalLocationsCount,
             });
 
-            console.log('Dashboard stats updated:', {
-                totalFarmers,
-                messagesSent,
-                activeAlerts,
-                activeLocations
+            console.log('Dashboard stats updated:', { 
+                totalFarmers, 
+                totalFarmersCount,
+                messagesSent, 
+                totalMessages,
+                activeAlerts, 
+                totalAlertsCount,
+                activeLocations,
+                totalLocationsCount 
             });
         } catch (error: any) {
             console.error('Failed to fetch dashboard stats:', error);
-            // Set default values or use mock data for development
             setDashboardStats({
-                totalFarmers: 1247,
-                messagesSent: 234,
-                activeAlerts: 3,
-                activeLocations: locations.length || 6
+                totalFarmers: 0,
+                messagesSent: 0,
+                activeAlerts: 0,
+                activeLocations: locations.length || 0,
+                totalFarmersCount: 0,
+                totalMessagesCount: 0,
+                totalAlertsCount: 0,
+                totalLocationsCount: locations.length || 0,
             });
         }
     };
@@ -302,67 +384,66 @@ const Dashboard: NextPage = () => {
         }));
     };
 
-    const getFarmingConditions = () => {
+    const getWeatherMetrics = () => {
         if (!todayWeather) return null;
 
-        const temp = todayWeather.tempMax;
-        const humidity = todayWeather.humidity;
-        const rainChance = todayWeather.rainChance;
-        const windSpeed = todayWeather.windSpeed;
+        // Get current weather data if available
+        const currentWeather = weatherData?.weather?.current;
+        
+        // Get average cloud coverage from hourly data if available
+        const avgClouds = todayWeather.hourly && todayWeather.hourly.length > 0
+            ? Math.round(todayWeather.hourly.reduce((sum: number, h: any) => sum + (h.clouds || 0), 0) / todayWeather.hourly.length)
+            : null;
 
-        const plantingScore = temp >= 18 && temp <= 28 && humidity >= 50 ? 70 :
-            temp >= 15 && temp <= 32 && humidity >= 40 ? 50 : 30;
+        // Get average visibility from hourly data if available
+        const avgVisibility = todayWeather.hourly && todayWeather.hourly.length > 0
+            ? Math.round(todayWeather.hourly.reduce((sum: number, h: any) => sum + (h.visibility || 10000), 0) / todayWeather.hourly.length)
+            : null;
 
-        const harvestingScore = rainChance <= 20 && windSpeed <= 5 ? 80 :
-            rainChance <= 40 && windSpeed <= 8 ? 50 : 20;
-
-        const pestRisk = temp > 25 && humidity > 70 ? 80 :
-            temp > 20 && humidity > 60 ? 50 : 20;
-
-        const diseaseRisk = temp > 20 && humidity > 65 && rainChance > 40 ? 75 :
-            temp > 15 && humidity > 55 ? 45 : 25;
+        // Get max wind gust from hourly data if available
+        const maxWindGust = todayWeather.hourly && todayWeather.hourly.length > 0
+            ? Math.max(...todayWeather.hourly.map((h: any) => h.wind_gust || 0))
+            : null;
 
         return {
-            planting: getConditionStatus(plantingScore, 'planting'),
-            harvesting: getConditionStatus(harvestingScore, 'harvesting'),
-            pestRisk: getConditionStatus(pestRisk, 'pest'),
-            diseaseRisk: getConditionStatus(diseaseRisk, 'disease')
+            uvIndex: todayWeather.uvIndex || currentWeather?.uvIndex || 0,
+            pressure: currentWeather?.pressure || null,
+            windDirection: todayWeather.windDirection || currentWeather?.windDirection || 'N/A',
+            cloudCoverage: avgClouds,
+            visibility: avgVisibility ? (avgVisibility / 1000).toFixed(1) : null, // Convert to km
+            feelsLike: currentWeather?.feelsLike || null,
+            windGust: maxWindGust ? Math.round(maxWindGust * 3.6) : null, // Convert to km/h
         };
     };
 
-    const getRecommendedActivities = () => {
-        if (!todayWeather) return [];
+    const getWeeklyForecastSummary = () => {
+        if (!weatherData?.weather?.daily) return null;
 
-        const activities = [];
-        const temp = todayWeather.tempMax;
-        const rainChance = todayWeather.rainChance;
-        const humidity = todayWeather.humidity;
+        const daily = weatherData.weather.daily;
+        const next7Days = daily.slice(0, 7);
 
-        if (temp >= 18 && temp <= 28 && rainChance > 30) {
-            activities.push(t('goodTimeToPlantBeans') || 'Igihe cyiza cyo gutera ibishyimbo n\'imboga');
-        }
+        if (next7Days.length === 0) return null;
 
-        if (temp >= 20 && temp <= 30 && humidity >= 50) {
-            activities.push(t('applyFertilizerToMaize') || 'Shyira ifumbire mu bigori');
-        }
+        const avgTemp = Math.round(next7Days.reduce((sum, d) => sum + d.tempMax, 0) / next7Days.length);
+        const avgHumidity = Math.round(next7Days.reduce((sum, d) => sum + d.humidity, 0) / next7Days.length);
+        const totalRain = next7Days.reduce((sum, d) => sum + d.rainAmount, 0);
+        const avgWindSpeed = Math.round(next7Days.reduce((sum, d) => sum + d.windSpeed, 0) / next7Days.length * 3.6); // Convert to km/h
 
-        if (humidity > 70 && temp > 20) {
-            activities.push(t('monitorPotatoesForBlight') || 'Kora igenzura ry\'ibirayi ureba ibimenyetso by\'indwara');
-        }
+        return {
+            avgTemp,
+            avgHumidity,
+            totalRain: totalRain.toFixed(1),
+            avgWindSpeed,
+            daysWithRain: next7Days.filter(d => d.hasRain || d.rainChance > 30).length,
+        };
+    };
 
-        if (rainChance < 20) {
-            activities.push(t('goodTimeForHarvesting') || 'Ibihe byiza byo kweza');
-        }
-
-        if (temp > 25) {
-            activities.push(t('provideShadeForLivestock') || 'Tanga igicucu cy\'amatungo');
-        }
-
-        if (activities.length === 0) {
-            activities.push(t('monitorCropsRegularly') || 'Kora igenzura ry\'ibihingwa buri gihe');
-        }
-
-        return activities;
+    const getUVIndexStatus = (uvIndex: number) => {
+        if (uvIndex <= 2) return { level: 'low', color: 'text-green-600', bg: 'bg-green-100' };
+        if (uvIndex <= 5) return { level: 'moderate', color: 'text-yellow-600', bg: 'bg-yellow-100' };
+        if (uvIndex <= 7) return { level: 'high', color: 'text-orange-600', bg: 'bg-orange-100' };
+        if (uvIndex <= 10) return { level: 'veryHigh', color: 'text-red-600', bg: 'bg-red-100' };
+        return { level: 'extreme', color: 'text-purple-600', bg: 'bg-purple-100' };
     };
 
     if (isLoading) {
@@ -379,8 +460,8 @@ const Dashboard: NextPage = () => {
     }
 
     const alerts = getIntelligentAlerts();
-    const farmingConditions = getFarmingConditions();
-    const recommendedActivities = getRecommendedActivities();
+    const weatherMetrics = getWeatherMetrics();
+    const weeklySummary = getWeeklyForecastSummary();
 
     return (
         <AppLayout>
@@ -390,7 +471,7 @@ const Dashboard: NextPage = () => {
 
             <div className="space-y-6">
                 {/* Header Section */}
-                <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 rounded-2xl p-6 text-white shadow-xl">
+                <div className="bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] rounded-2xl p-6 text-white shadow-xl">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                         <div className="flex items-center gap-4">
                             <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
@@ -398,7 +479,7 @@ const Dashboard: NextPage = () => {
                             </div>
                             <div>
                                 <h1 className="text-3xl font-bold">{t('dashboard')}</h1>
-                                <p className="text-blue-100 text-lg">{t('climateInformationSystem')}</p>
+                                <p className="text-white/80 text-lg">{t('climateInformationSystem')}</p>
                             </div>
                         </div>
 
@@ -423,73 +504,62 @@ const Dashboard: NextPage = () => {
 
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card className="border border-gray-200 shadow-md bg-white">
+                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-blue-50/30 hover:shadow-lg transition-shadow">
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-600 text-sm font-medium">Farmers Reached</p>
-                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.totalFarmers.toLocaleString()}</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <TrendingUp className="h-4 w-4 text-green-500" />
-                                        <span className="text-xs text-green-600">+12% this month</span>
-                                    </div>
+                                    <p className="text-slate-600 text-sm font-medium">Farmers Reached</p>
+                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.totalFarmers.toLocaleString()}</p>
                                 </div>
-                                <div className="bg-blue-500/10 backdrop-blur-sm p-3 rounded-2xl">
-                                    <Users className="h-6 w-6 text-blue-500" />
+                                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-2xl shadow-sm">
+                                    <Users className="h-6 w-6 text-white" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border border-gray-200 shadow-md bg-white">
+                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-emerald-50/30 hover:shadow-lg transition-shadow">
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-600 text-sm font-medium">Messages Sent</p>
-                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.messagesSent.toLocaleString()}</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <TrendingUp className="h-4 w-4 text-green-500" />
-                                        <span className="text-xs text-green-600">+24% this month</span>
-                                    </div>
+                                    <p className="text-slate-600 text-sm font-medium">Messages Sent</p>
+                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.messagesSent.toLocaleString()}</p>
                                 </div>
-                                <div className="bg-green-500/10 backdrop-blur-sm p-3 rounded-2xl">
-                                    <MessageSquare className="h-6 w-6 text-green-500" />
+                                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-2xl shadow-sm">
+                                    <MessageSquare className="h-6 w-6 text-white" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border border-gray-200 shadow-md bg-white">
+                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-amber-50/30 hover:shadow-lg transition-shadow">
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-600 text-sm font-medium">Active Alerts</p>
-                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.activeAlerts.toLocaleString()}</p>
+                                    <p className="text-slate-600 text-sm font-medium">Active Alerts</p>
+                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.activeAlerts.toLocaleString()}</p>
                                     <div className="flex items-center gap-1 mt-2">
-                                        <TrendingDown className="h-4 w-4 text-green-500" />
-                                        <span className="text-xs text-green-600">-5% from last week</span>
+                                        <span className="text-xs text-slate-500">
+                                            Total Alerts:  {(dashboardStats.totalAlertsCount || 0).toLocaleString()}
+                                        </span>
                                     </div>
                                 </div>
-                                <div className="bg-orange-500/10 backdrop-blur-sm p-3 rounded-2xl">
-                                    <AlertTriangle className="h-6 w-6 text-orange-500" />
+                                <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-3 rounded-2xl shadow-sm">
+                                    <AlertTriangle className="h-6 w-6 text-white" />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="border border-gray-200 shadow-md bg-white">
+                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-indigo-50/30 hover:shadow-lg transition-shadow">
                         <CardContent className="p-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-gray-600 text-sm font-medium">Active Locations</p>
-                                    <p className="text-3xl font-bold text-gray-900">{dashboardStats.activeLocations.toLocaleString()}</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <TrendingUp className="h-4 w-4 text-green-500" />
-                                        <span className="text-xs text-green-600">+8% this month</span>
-                                    </div>
+                                    <p className="text-slate-600 text-sm font-medium">Active Locations</p>
+                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.activeLocations.toLocaleString()}</p>
                                 </div>
-                                <div className="bg-purple-500/10 backdrop-blur-sm p-3 rounded-2xl">
-                                    <MapPin className="h-6 w-6 text-purple-500" />
+                                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-3 rounded-2xl shadow-sm">
+                                    <MapPin className="h-6 w-6 text-white" />
                                 </div>
                             </div>
                         </CardContent>
@@ -503,15 +573,15 @@ const Dashboard: NextPage = () => {
                 <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
                     {/* Today's Weather */}
                     <Card className="border-0 shadow-md bg-white lg:col-span-1">
-                        <CardHeader className="bg-gradient-to-r from-blue-50 to-cyan-50 border-b border-blue-100 pb-4">
-                            <CardTitle className="flex items-center gap-2 text-blue-900">
+                        <CardHeader className="bg-white border-b border-gray-200 pb-4">
+                            <CardTitle className="flex items-center gap-2 text-slate-900">
                                 <Sun className="h-5 w-5 text-yellow-500" />
                                 {t('todayForecast')}
                             </CardTitle>
-                            <CardDescription className="text-blue-700 flex items-center gap-2">
+                            <CardDescription className="text-slate-600 flex items-center gap-2">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="text-blue-700 hover:text-blue-900 p-0 h-auto">
+                                        <Button variant="ghost" size="sm" className="text-slate-700 hover:text-slate-900 p-0 h-auto">
                                             <MapPin className="h-4 w-4 mr-1" />
                                             {selectedLocation?.name || t('selectLocation')}
                                             <ChevronDown className="ml-1 h-3 w-3" />
@@ -539,42 +609,61 @@ const Dashboard: NextPage = () => {
                                                 {t('temperature')}
                                             </p>
                                             <p className="text-4xl font-bold text-slate-900">{todayWeather.tempMax}°C</p>
-                                            <p className="text-sm text-slate-500">Feels like {todayWeather.tempMax + 2}°C</p>
+                                            <p className="text-sm text-slate-500">
+                                                {weatherMetrics?.feelsLike 
+                                                    ? `Feels like ${Math.round(weatherMetrics.feelsLike)}°C`
+                                                    : `Feels like ${todayWeather.tempMax + 2}°C`
+                                                }
+                                            </p>
                                         </div>
-                                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center">
+                                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center shadow-sm">
                                             {getWeatherIcon(todayWeather.conditionMain)}
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
-                                        <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+                                        <div className="bg-gradient-to-br from-[#147677]/10 to-[#147677]/20 p-4 rounded-xl border border-[#147677]/30 hover:shadow-md transition-shadow">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <CloudRain className="h-4 w-4 text-blue-600" />
-                                                <p className="text-sm font-medium text-blue-700">Rainfall</p>
+                                                <CloudRain className="h-4 w-4 text-[#147677]" />
+                                                <p className="text-sm font-medium text-slate-700">Rainfall</p>
                                             </div>
-                                            <p className="text-2xl font-bold text-blue-900">{todayWeather.rainAmount}mm</p>
+                                            <p className="text-2xl font-bold text-slate-900">{todayWeather.rainAmount}mm</p>
                                         </div>
-                                        <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 p-4 rounded-xl border border-cyan-200">
+                                        <div className="bg-gradient-to-br from-sky-50/80 to-sky-100/80 p-4 rounded-xl border border-sky-200/50 hover:shadow-md transition-shadow">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Droplets className="h-4 w-4 text-cyan-600" />
-                                                <p className="text-sm font-medium text-cyan-700">Humidity</p>
+                                                <Droplets className="h-4 w-4 text-sky-600" />
+                                                <p className="text-sm font-medium text-slate-700">Humidity</p>
                                             </div>
-                                            <p className="text-2xl font-bold text-cyan-900">{todayWeather.humidity}%</p>
+                                            <p className="text-2xl font-bold text-slate-900">{todayWeather.humidity}%</p>
                                         </div>
-                                        <div className="bg-gradient-to-br from-gray-50 to-gray-100 p-4 rounded-xl border border-gray-200">
+                                        <div className="bg-gradient-to-br from-slate-50/80 to-slate-100/80 p-4 rounded-xl border border-slate-200/50 hover:shadow-md transition-shadow">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Wind className="h-4 w-4 text-gray-600" />
-                                                <p className="text-sm font-medium text-gray-700">Wind</p>
+                                                <Wind className="h-4 w-4 text-slate-600" />
+                                                <p className="text-sm font-medium text-slate-700">Wind</p>
                                             </div>
-                                            <p className="text-2xl font-bold text-gray-900">{Math.round(todayWeather.windSpeed * 3.6)} km/h</p>
+                                            <p className="text-2xl font-bold text-slate-900">{Math.round(todayWeather.windSpeed * 3.6)} km/h</p>
                                         </div>
-                                        <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                                        <div className="bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 p-4 rounded-xl border border-emerald-200/50 hover:shadow-md transition-shadow">
                                             <div className="flex items-center gap-2 mb-2">
-                                                <Eye className="h-4 w-4 text-green-600" />
-                                                <p className="text-sm font-medium text-green-700">Soil</p>
+                                                <Eye className="h-4 w-4 text-emerald-600" />
+                                                <p className="text-sm font-medium text-slate-700">Soil</p>
                                             </div>
-                                            <p className="text-lg font-bold text-green-900">{todayWeather.soilCondition}</p>
+                                            <p className="text-lg font-bold text-slate-900">{todayWeather.soilCondition}</p>
                                         </div>
                                     </div>
+
+                                    {/* Rain Timing Display (only for today) - calculated from hourly data */}
+                                    {todayWeather?.hourly && todayWeather.hourly.length > 0 && (
+                                        <div className="mt-4">
+                                            <RainTimingDisplay hourly={todayWeather.hourly} />
+                                        </div>
+                                    )}
+
+                                    {/* Hourly Forecast Display (only for today) */}
+                                    {todayWeather?.hourly && todayWeather.hourly.length > 0 && (
+                                        <div className="mt-4">
+                                            <HourlyForecastDisplay hourly={todayWeather.hourly} />
+                                        </div>
+                                    )}
                                 </>
                             ) : (
                                 <div className="flex items-center justify-center py-8">
@@ -583,7 +672,7 @@ const Dashboard: NextPage = () => {
                             )}
                         </CardContent>
                         <CardFooter className="bg-slate-50 border-t border-slate-100">
-                            <Button className="w-full bg-blue-600 hover:bg-blue-700 h-11" onClick={() => router.push('/forecasts')}>
+                            <Button className="w-full bg-[#147677] hover:bg-[#147677]/90 h-11" onClick={() => router.push('/forecasts')}>
                                 {t('viewDetails')}
                                 <ArrowRight className="ml-2 h-4 w-4" />
                             </Button>
@@ -593,73 +682,144 @@ const Dashboard: NextPage = () => {
                     {/* Right Column */}
                     <div className="lg:col-span-2 space-y-6">
                     
-                        {/* Farming Conditions */}
+                        {/* Weather Conditions & Metrics */}
                         <Card className="border-0 shadow-md bg-white">
-                            <CardHeader className="bg-gradient-to-r from-green-50 to-emerald-50 border-b border-green-100 pb-4">
-                                <CardTitle className="flex items-center gap-2 text-green-900">
-                                    <Droplets className="h-5 w-5 text-green-600" />
-                                    {t('farmingConditions')}
+                            <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50 border-b border-slate-200/50 pb-4">
+                                <CardTitle className="flex items-center gap-2 text-slate-900">
+                                    <Droplets className="h-5 w-5 text-blue-600" />
+                                    {t('weatherConditions') || 'Weather Conditions'}
                                 </CardTitle>
-                                <CardDescription className="text-green-700">{t('forNextWeek')}</CardDescription>
+                                <CardDescription className="text-slate-600">{t('forNextWeek')}</CardDescription>
                             </CardHeader>
                             <CardContent className="p-6 space-y-4">
-                                {farmingConditions ? (
+                                {todayWeather && weatherMetrics ? (
                                     <>
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <Droplets className="h-4 w-4 text-blue-600" />
-                                                    <span className="font-medium text-blue-900">{t('planting')}</span>
+                                            {/* UV Index */}
+                                            {weatherMetrics.uvIndex !== null && (
+                                                <div className={`bg-gradient-to-br p-4 rounded-xl border ${getUVIndexStatus(weatherMetrics.uvIndex).bg} border-current`}>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Sun className="h-4 w-4 text-yellow-600" />
+                                                        <span className="font-medium text-slate-900">{t('uvIndex') || 'UV Index'}</span>
+                                                    </div>
+                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.uvIndex}</p>
+                                                    <p className={`text-xs font-semibold mt-1 ${getUVIndexStatus(weatherMetrics.uvIndex).color}`}>
+                                                        {t(`uv${getUVIndexStatus(weatherMetrics.uvIndex).level}`) || getUVIndexStatus(weatherMetrics.uvIndex).level}
+                                                    </p>
                                                 </div>
-                                                <span className={`text-sm font-semibold ${farmingConditions.planting.color}`}>
-                                                    {t(farmingConditions.planting.status)}
-                                                </span>
-                                            </div>
-                                            <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl border border-amber-200">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <Umbrella className="h-4 w-4 text-amber-600" />
-                                                    <span className="font-medium text-amber-900">{t('harvesting')}</span>
+                                            )}
+
+                                            {/* Atmospheric Pressure */}
+                                            {weatherMetrics.pressure !== null && (
+                                                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-xl border border-indigo-200">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Activity className="h-4 w-4 text-indigo-600" />
+                                                        <span className="font-medium text-slate-900">{t('pressure') || 'Pressure'}</span>
+                                                    </div>
+                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.pressure} hPa</p>
+                                                    <p className="text-xs text-slate-600 mt-1">
+                                                        {weatherMetrics.pressure > 1013 ? t('highPressure') || 'High' : t('lowPressure') || 'Low'}
+                                                    </p>
                                                 </div>
-                                                <span className={`text-sm font-semibold ${farmingConditions.harvesting.color}`}>
-                                                    {t(farmingConditions.harvesting.status)}
-                                                </span>
-                                            </div>
-                                            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
+                                            )}
+
+                                            {/* Wind Direction */}
+                                            <div className="bg-gradient-to-br from-sky-50 to-sky-100 p-4 rounded-xl border border-sky-200">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <AlertCircle className="h-4 w-4 text-orange-600" />
-                                                    <span className="font-medium text-orange-900">{t('pestRisk')}</span>
+                                                    <Wind className="h-4 w-4 text-sky-600" />
+                                                    <span className="font-medium text-slate-900">{t('windDirection') || 'Wind Direction'}</span>
                                                 </div>
-                                                <span className={`text-sm font-semibold ${farmingConditions.pestRisk.color}`}>
-                                                    {t(farmingConditions.pestRisk.status)}
-                                                </span>
+                                                <p className="text-xl font-bold text-slate-900">{todayWeather.windDirection || weatherMetrics.windDirection}</p>
+                                                <p className="text-xs text-slate-600 mt-1">
+                                                    {todayWeather.windStrength || t('moderate') || 'Moderate'}
+                                                </p>
                                             </div>
-                                            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
+
+                                            {/* Cloud Coverage */}
+                                            {weatherMetrics.cloudCoverage !== null && (
+                                                <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-4 rounded-xl border border-slate-200">
                                                 <div className="flex items-center gap-2 mb-2">
-                                                    <Eye className="h-4 w-4 text-purple-600" />
-                                                    <span className="font-medium text-purple-900">{t('diseaseRisk')}</span>
+                                                        <Cloud className="h-4 w-4 text-slate-600" />
+                                                        <span className="font-medium text-slate-900">{t('cloudCoverage') || 'Cloud Coverage'}</span>
                                                 </div>
-                                                <span className={`text-sm font-semibold ${farmingConditions.diseaseRisk.color}`}>
-                                                    {t(farmingConditions.diseaseRisk.status)}
-                                                </span>
+                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.cloudCoverage}%</p>
+                                                    <p className="text-xs text-slate-600 mt-1">
+                                                        {weatherMetrics.cloudCoverage > 75 ? t('overcast') || 'Overcast' :
+                                                         weatherMetrics.cloudCoverage > 50 ? t('mostlyCloudy') || 'Mostly Cloudy' :
+                                                         weatherMetrics.cloudCoverage > 25 ? t('partlyCloudy') || 'Partly Cloudy' :
+                                                         t('clear') || 'Clear'}
+                                                    </p>
                                             </div>
+                                            )}
+
+                                            {/* Visibility */}
+                                            {weatherMetrics.visibility !== null && (
+                                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                        <Eye className="h-4 w-4 text-blue-600" />
+                                                        <span className="font-medium text-slate-900">{t('visibility') || 'Visibility'}</span>
+                                                </div>
+                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.visibility} km</p>
+                                                    <p className="text-xs text-slate-600 mt-1">
+                                                        {parseFloat(weatherMetrics.visibility) > 10 ? t('excellent') || 'Excellent' :
+                                                         parseFloat(weatherMetrics.visibility) > 5 ? t('good') || 'Good' :
+                                                         t('fair') || 'Fair'}
+                                                    </p>
+                                            </div>
+                                            )}
+
+                                            {/* Wind Gust */}
+                                            {weatherMetrics.windGust !== null && weatherMetrics.windGust > 0 && (
+                                                <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl border border-amber-200">
+                                                <div className="flex items-center gap-2 mb-2">
+                                                        <Zap className="h-4 w-4 text-amber-600" />
+                                                        <span className="font-medium text-slate-900">{t('windGust') || 'Wind Gust'}</span>
+                                                </div>
+                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.windGust} km/h</p>
+                                                    <p className="text-xs text-slate-600 mt-1">
+                                                        {weatherMetrics.windGust > 50 ? t('strong') || 'Strong' : t('moderate') || 'Moderate'}
+                                                    </p>
+                                            </div>
+                                            )}
                                         </div>
 
+                                        {/* Weekly Forecast Summary */}
+                                        {weeklySummary && (
+                                            <>
                                         <Separator />
-
                                         <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-5 rounded-xl border border-slate-200">
                                             <h3 className="font-semibold mb-3 text-slate-900 flex items-center gap-2">
-                                                <Target className="h-4 w-4 text-blue-600" />
-                                                {t('recommendedActivities')}
+                                                        <Calendar className="h-4 w-4 text-blue-600" />
+                                                        {t('weeklyForecast') || '7-Day Forecast Summary'}
                                             </h3>
-                                            <ul className="space-y-3">
-                                                {recommendedActivities.map((activity, index) => (
-                                                    <li key={index} className="flex items-start gap-3">
-                                                        <div className="rounded-full bg-gradient-to-r from-green-500 to-emerald-500 h-2 w-2 mt-2 flex-shrink-0" />
-                                                        <span className="text-sm text-slate-700 leading-relaxed">{activity}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
+                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                                        <div>
+                                                            <p className="text-xs text-slate-600 mb-1">{t('averageTemperature') || 'Avg Temperature'}</p>
+                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.avgTemp}°C</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-slate-600 mb-1">{t('averageHumidity') || 'Avg Humidity'}</p>
+                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.avgHumidity}%</p>
+                                                        </div>
+                                                        <div className="bg-gradient-to-br from-[#147677]/10 to-[#147677]/20 p-4 rounded-xl border border-[#147677]/30 hover:shadow-md transition-shadow">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <CloudRain className="h-4 w-4 text-[#147677]" />
+                                                                <p className="text-xs font-medium text-slate-700">{t('totalRainfall') || 'Total Rainfall'}</p>
+                                                            </div>
+                                                            <p className="text-2xl font-bold text-[#147677]">{weeklySummary.totalRain} mm</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-slate-600 mb-1">{t('averageWindSpeed') || 'Avg Wind Speed'}</p>
+                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.avgWindSpeed} km/h</p>
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs text-slate-600 mb-1">{t('daysWithRain') || 'Rainy Days'}</p>
+                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.daysWithRain} {t('days') || 'days'}</p>
+                                                        </div>
+                                                    </div>
                                         </div>
+                                            </>
+                                        )}
                                     </>
                                 ) : (
                                     <div className="flex items-center justify-center py-8">

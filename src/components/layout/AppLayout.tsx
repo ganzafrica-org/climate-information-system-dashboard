@@ -12,7 +12,7 @@ import {
     Menu,
     LogOut,
     BookOpen,
-    HelpCircle, MapPin, Loader2,
+    HelpCircle, MapPin, Loader2, TreePine,
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
@@ -62,6 +62,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         { href: '/communications', icon: <MessageSquare size={20} />, label: t('communications')},
         { href: '/farmers', icon: <Users size={20} />, label: t('farmers') },
         { href: '/locations', icon: <MapPin size={20} />, label: t('locations') },
+        { href: '/soil-suitability', icon: <TreePine size={20} />, label: t('soilAnalysis') },
         { href: '/training', icon: <BookOpen size={20} />, label: t('training') },
     ];
 
@@ -102,7 +103,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                         <Link href={item.href}>
                                             <Button
                                                 variant="ghost"
-                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-blue-100 hover:text-black ${isActive ? 'bg-blue-600 text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${isActive ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
                                             >
                                                 {item.icon}
                                                 {(sidebarOpen || isMobile) && <span className="ml-3">{item.label}</span>}
@@ -120,12 +121,40 @@ export function AppLayout({ children }: AppLayoutProps) {
                     </TooltipProvider>
                 </nav>
                 <div className="mt-auto px-2 py-4">
+                    {/* Admin section */}
+                    {user?.role === 'admin' && (
+                        <div className="mb-4">
+                            <Separator className="mb-3" />
+                            <TooltipProvider delayDuration={300}>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Link href="/admin/users">
+                                            <Button
+                                                variant="ghost"
+                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${router.pathname === '/admin/users' ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                            >
+                                                <Users size={20} />
+                                                {(sidebarOpen || isMobile) && <span className="ml-3">Admin</span>}
+                                            </Button>
+                                        </Link>
+                                    </TooltipTrigger>
+                                    {!sidebarOpen && !isMobile && (
+                                        <TooltipContent side="right">
+                                            Admin
+                                        </TooltipContent>
+                                    )}
+                                </Tooltip>
+                            </TooltipProvider>
+                        </div>
+                    )}
+                    
+                    {/* Logout section */}
                     <TooltipProvider delayDuration={300}>
                         <Tooltip>
                             <TooltipTrigger asChild>
                                 <Button
                                     variant="ghost"
-                                    className={`w-full justify-start text-gray-700 hover:bg-blue-900 hover:text-white ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                    className={`w-full justify-start text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
                                     onClick={handleLogout}
                                 >
                                     <LogOut size={20} />
@@ -168,7 +197,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                     </svg>
                                 </div>
                             </div>
-                            <span className="font-bold text-lg text-ganz-primary">GanzAfrica</span>
+                            <span className="font-bold text-lg text-ganz-primary">TeganyaMuhinzi</span>
                         </div>
                     </div>
 
@@ -191,6 +220,23 @@ export function AppLayout({ children }: AppLayoutProps) {
                             })}
                         </nav>
                         <div className="mt-auto px-2 py-4">
+                            {/* Admin section for mobile */}
+                            {user?.role === 'admin' && (
+                                <div className="mb-4">
+                                    <Separator className="mb-3" />
+                                    <Link href="/admin/users">
+                                        <Button
+                                            variant={router.pathname === '/admin/users' ? "secondary" : "ghost"}
+                                            className="w-full justify-start"
+                                            onClick={() => setSidebarOpen(false)}
+                                        >
+                                            <Users size={20} />
+                                            <span className="ml-3">Admin</span>
+                                        </Button>
+                                    </Link>
+                                </div>
+                            )}
+                            
                             <Separator className="my-2" />
                             <Button
                                 variant="ghost"
@@ -210,7 +256,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     return (
         <div className="flex h-screen overflow-hidden bg-[#f9fafb]">
             
-            <header className="fixed top-0 left-0 right-0 z-50 bg-blue-600 text-white border-b h-16 flex items-center justify-between px-4 md:px-6">
+            <header className="fixed top-0 left-0 right-0 z-50 bg-[#147677] text-white border-b h-16 flex items-center justify-between px-4 md:px-6">
                 <div className="flex items-center">
                     {isMobile && <MobileSidebar />}
                     <div className="flex items-center space-x-2">
@@ -222,7 +268,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 </svg>
                             </div>
                         </div>
-                        <span className="font-bold text-lg text-white">GanzAfrica</span>
+                        <span className="font-bold text-lg text-white">TeganyaMuhinzi</span>
                     </div>
                 </div>
                 <div className="flex items-center space-x-2">
