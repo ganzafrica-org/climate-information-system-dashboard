@@ -63,7 +63,9 @@ const Settings: NextPage = () => {
 
         const phoneRegex = /^\+250\d{9}$/;
         if (!phoneRegex.test(profileData.phone)) {
-            setProfileError(t('invalidPhoneFormat') || 'Phone number must be in format +250XXXXXXXXX');
+            const errorMsg = t('invalidPhoneFormat') || 'Phone number must be in format +250XXXXXXXXX';
+            setProfileError(errorMsg);
+            toast.error(errorMsg);
             setProfileLoading(false);
             return;
         }
@@ -72,7 +74,9 @@ const Settings: NextPage = () => {
             await updateProfile(profileData.phone);
             toast.success(t('profileUpdated') || 'Profile updated successfully');
         } catch (error: any) {
-            setProfileError(error.message || t('profileUpdateFailed') || 'Failed to update profile');
+            const errorMsg = error.message || t('profileUpdateFailed') || 'Failed to update profile';
+            setProfileError(errorMsg);
+            toast.error(errorMsg);
         } finally {
             setProfileLoading(false);
         }
@@ -84,19 +88,25 @@ const Settings: NextPage = () => {
         setPasswordLoading(true);
 
         if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
-            setPasswordError(t('pleaseEnterAllFields') || 'Please fill in all fields');
+            const errorMsg = t('pleaseEnterAllFields') || 'Please fill in all fields';
+            setPasswordError(errorMsg);
+            toast.error(errorMsg);
             setPasswordLoading(false);
             return;
         }
 
         if (passwordData.newPassword !== passwordData.confirmPassword) {
-            setPasswordError(t('passwordsDoNotMatch') || 'New passwords do not match');
+            const errorMsg = t('passwordsDoNotMatch') || 'New passwords do not match';
+            setPasswordError(errorMsg);
+            toast.error(errorMsg);
             setPasswordLoading(false);
             return;
         }
 
         if (passwordData.newPassword.length < 6) {
-            setPasswordError(t('passwordTooShort') || 'New password must be at least 6 characters long');
+            const errorMsg = t('passwordTooShort') || 'New password must be at least 6 characters long';
+            setPasswordError(errorMsg);
+            toast.error(errorMsg);
             setPasswordLoading(false);
             return;
         }
@@ -110,7 +120,9 @@ const Settings: NextPage = () => {
                 confirmPassword: '',
             });
         } catch (error: any) {
-            setPasswordError(error.message || t('passwordChangeFailed') || 'Failed to change password');
+            const errorMsg = error.message || t('passwordChangeFailed') || 'Failed to change password';
+            setPasswordError(errorMsg);
+            toast.error(errorMsg);
         } finally {
             setPasswordLoading(false);
         }
