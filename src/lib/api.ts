@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { getApiBaseUrl } from './apiConfig';
 
 interface ApiClientConfig {
     baseURL?: string;
@@ -58,7 +59,7 @@ class ApiClient {
         this.retryDelay = config.retryDelay || 500;
         
         // Ensure baseURL ends without trailing slash
-        const baseURL = config.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        const baseURL = config.baseURL || getApiBaseUrl();
         const cleanBaseURL = baseURL.replace(/\/$/, '');
         
         this.instance = axios.create({
