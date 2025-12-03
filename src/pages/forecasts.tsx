@@ -205,7 +205,9 @@ const Forecasts: NextPage = () => {
         navigator.share({
           title: `Weather Forecast - ${selectedLocation.name}`,
           text: shareText,
-        }).catch(err => );
+        }).catch(() => {
+          toast.error(t('failedToShareForecast') || 'Failed to share forecast.');
+        });
       } else {
         navigator.clipboard.writeText(shareText).then(() => {
           toast.success(t('forecastCopiedToClipboard') || 'Forecast copied to clipboard.');
