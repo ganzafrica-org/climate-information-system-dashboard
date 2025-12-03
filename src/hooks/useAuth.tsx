@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/router';
+import { getApiBaseUrl } from '@/lib/apiConfig';
 
 interface User {
     id: number;
@@ -38,7 +39,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [isInitialized, setIsInitialized] = useState(false);
     const router = useRouter();
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+    // Get API base URL - always evaluate at runtime to ensure correct URL in production
+    const getApiUrl = () => getApiBaseUrl();
 
     const isAuthenticated = !!user && !!token;
 
@@ -70,7 +72,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const fetchUserProfile = async (authToken: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
+            const response = await fetch(`${getApiUrl()}/api/users/profile`, {
                 headers: {
                     'Authorization': `Bearer ${authToken}`,
                     'Content-Type': 'application/json',
@@ -96,7 +98,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const login = async (username: string, password: string) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+            const response = await fetch(`${getApiUrl()}/api/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -124,7 +126,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const register = async (username: string, password: string, phone: string) => {
         setIsLoading(true);
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/register`, {
+            const response = await fetch(`${getApiUrl()}/api/auth/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -155,7 +157,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!token) throw new Error('No authentication token');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
+            const response = await fetch(`${getApiUrl()}/api/users/profile`, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `Bearer ${token}`,
@@ -180,7 +182,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         if (!token) throw new Error('No authentication token');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/api/auth/change-password`, {
+            const response = await fetch(`${getApiUrl()}/api/auth/change-password`, {
                 method: 'POST',
                 headers: {
                     'Authorization': `Bearer ${token}`,
