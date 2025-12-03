@@ -22,31 +22,15 @@ export function getApiBaseUrl(): string {
     // This works for production when API is on the same domain
     if (typeof window !== 'undefined') {
         const origin = window.location.origin;
-        // Warn if we're using origin fallback in production
-        if (process.env.NODE_ENV === 'production') {
-            console.warn(
-                '⚠️ NEXT_PUBLIC_API_URL is not set. Using window.location.origin as API base URL:',
-                origin,
-                '\nFor production, please set NEXT_PUBLIC_API_URL environment variable with your API server URL (e.g., http://10.10.100.52:3002)'
-            );
-        }
         return origin;
     }
 
     // Fallback ONLY for server-side rendering in development
     if (process.env.NODE_ENV === 'development') {
-        console.warn(
-            '⚠️ NEXT_PUBLIC_API_URL is not set. Using localhost:3000 as fallback.',
-            '\nPlease set NEXT_PUBLIC_API_URL in your .env.local file (e.g., NEXT_PUBLIC_API_URL=http://10.10.100.52:3002)'
-        );
         return 'http://localhost:3000';
     }
 
-    // Production SSR fallback - should not happen, but provide error message
-    console.error(
-        '❌ NEXT_PUBLIC_API_URL is not set and this is a production build!',
-        '\nPlease set NEXT_PUBLIC_API_URL environment variable with your API server URL (e.g., http://10.10.100.52:3002)'
-    );
+    // Production SSR fallback - should not happen
     // Return empty string to fail fast in production if not configured
     return '';
 }

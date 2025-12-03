@@ -169,8 +169,6 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
   }, [selectedLocation, searchTerm, currentPage]);
 
   const handleApiError = (error: any, fallbackMessage: string) => {
-    console.error('API Error:', error);
-    
     let errorMessage = fallbackMessage;
     
     if (error.name === 'NotFoundError') {
@@ -203,14 +201,11 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
 
       for (const endpoint of possibleEndpoints) {
         try {
-          console.log(`Trying endpoint: ${endpoint}`);
           response = await api.get(endpoint);
           usedEndpoint = endpoint;
-          console.log(`Successfully connected to: ${endpoint}`);
           break;
         } catch (error: any) {
           if (error.response?.status === 404) {
-            console.log(`Endpoint ${endpoint} not found, trying next...`);
             continue;
           } else {
             // If it's not a 404, throw the error (could be auth, server error, etc.)
@@ -222,8 +217,6 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
       if (!response) {
         throw new Error('No valid API endpoint found for locations');
       }
-      
-      console.log('All locations API response:', response);
       
       let locationsData: Location[] = [];
       
@@ -237,7 +230,6 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
       } else if (response.data && response.data.locations && Array.isArray(response.data.locations)) {
         locationsData = response.data.locations;
       } else {
-        console.warn('Unexpected response structure:', response);
         locationsData = [];
       }
 
@@ -283,14 +275,11 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
 
       for (const endpoint of possibleEndpoints) {
         try {
-          console.log(`Trying endpoint: ${endpoint} with filters:`, filters);
           response = await api.get(endpoint, { params: filters });
           usedEndpoint = endpoint;
-          console.log(`Successfully fetched from: ${endpoint}`);
           break;
         } catch (error: any) {
           if (error.response?.status === 404) {
-            console.log(`Endpoint ${endpoint} not found, trying next...`);
             continue;
           } else {
             throw error;
@@ -301,8 +290,6 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
       if (!response) {
         throw new Error('No valid API endpoint found for locations');
       }
-
-      console.log('Locations API response:', response);
 
       // Handle the API response
       let locationsData: any[] = [];
@@ -321,7 +308,6 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
         locationsData = response.data.locations;
         countData = response.data.count || response.data.locations.length;
       } else {
-        console.warn('Unexpected response structure:', response);
         locationsData = [];
         countData = 0;
       }
@@ -371,14 +357,11 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
 
       for (const endpoint of possibleEndpoints) {
         try {
-          console.log(`Trying delete endpoint: ${endpoint}`);
           await api.delete(endpoint);
-          console.log(`Successfully deleted from: ${endpoint}`);
           success = true;
           break;
         } catch (error: any) {
           if (error.response?.status === 404) {
-            console.log(`Delete endpoint ${endpoint} not found, trying next...`);
             continue;
           } else {
             throw error;
@@ -433,14 +416,11 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
 
       for (const endpoint of possibleEndpoints) {
         try {
-          console.log(`Trying messaging endpoint: ${endpoint}`);
           response = await api.post(endpoint, requestData);
           usedEndpoint = endpoint;
-          console.log(`Successfully sent message via: ${endpoint}`);
           break;
         } catch (error: any) {
           if (error.response?.status === 404) {
-            console.log(`Messaging endpoint ${endpoint} not found, trying next...`);
             continue;
           } else {
             throw error;
@@ -512,14 +492,11 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
 
       for (const endpoint of possibleEndpoints) {
         try {
-          console.log(`Trying custom messaging endpoint: ${endpoint}`);
           response = await api.post(endpoint, requestData);
           usedEndpoint = endpoint;
-          console.log(`Successfully sent custom message via: ${endpoint}`);
           break;
         } catch (error: any) {
           if (error.response?.status === 404) {
-            console.log(`Custom messaging endpoint ${endpoint} not found, trying next...`);
             continue;
           } else {
             throw error;
@@ -559,7 +536,6 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
       setCustomMessageDialogOpen(false);
       
     } catch (error: any) {
-      console.warn('Custom messaging failed, but showing success:', error);
       // Show success even if API fails
       toast.success(t('customMessageSentSuccessfully') || 'Custom message sent successfully');
       

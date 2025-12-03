@@ -89,7 +89,7 @@ export function WeatherSchedulerTable() {
     try {
       const response = await api.get('/api/weather/scheduler/status');
       
-      console.log('Scheduler API Response:', response.data); // Debug log
+      // Debug log
       
       // Check if the response has the expected structure
       if (response.data && typeof response.data === 'object') {
@@ -111,8 +111,6 @@ export function WeatherSchedulerTable() {
         throw new Error('No data received from API');
       }
     } catch (error: any) {
-      console.error('Failed to fetch scheduler status:', error);
-      
       // Handle 501 error (controller not implemented)
       if (error.response?.status === 501) {
         toast.error('Weather Scheduler Controller not implemented');
@@ -150,7 +148,7 @@ export function WeatherSchedulerTable() {
 
       const response = await api.post(endpoint);
       
-      console.log(`${action} Response:`, response.data); // Debug log
+      // Debug log
       
       // Check if response is successful (200-299 status codes are already handled by axios)
       if (response.data) {
@@ -184,8 +182,6 @@ export function WeatherSchedulerTable() {
         setTimeout(() => fetchSchedulerStatus(), 1000);
       }
     } catch (error: any) {
-      console.error(`Failed to ${action} scheduler:`, error);
-      
       // Handle different HTTP status codes
       if (error.response?.status === 501) {
         toast.error(`Weather Scheduler Controller not implemented`);

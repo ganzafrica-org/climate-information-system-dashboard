@@ -34,7 +34,6 @@ export function UsersTable() {
       const data = await api.listUsers();
       setUsers(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      console.error(e);
       toast.error("Failed to load users");
     } finally {
       setIsLoading(false);
@@ -70,7 +69,6 @@ export function UsersTable() {
       toast.success("User deleted");
       fetchUsers(true);
     } catch (e: any) {
-      console.error(e);
       toast.error("Failed to delete user");
     }
   };
@@ -81,7 +79,6 @@ export function UsersTable() {
       toast.success("Role updated");
       fetchUsers(true);
     } catch (e: any) {
-      console.error(e);
       toast.error("Failed to update role");
     }
   };

@@ -80,8 +80,7 @@ function MapUpdater({ sectors, selectedSector, onSectorSelect }: {
         }
       }
     } catch (error) {
-      console.error('Error updating map bounds:', error);
-    }
+      }
   }, [map, sectors, selectedSector]);
 
   return null;
@@ -137,7 +136,6 @@ export default function SoilSuitabilityMap({
         color: 'transparent'
       };
     } catch (error) {
-      console.error('Error getting suitability style:', error);
       return {
         fillColor: '#CCCCCC',
         weight: 0,
@@ -161,7 +159,6 @@ export default function SoilSuitabilityMap({
         color: 'transparent'
       };
     } catch (error) {
-      console.error('Error getting susceptibility style:', error);
       return {
         fillColor: '#CCCCCC',
         weight: 0,
@@ -206,8 +203,7 @@ export default function SoilSuitabilityMap({
         onSectorSelect(selectedSector === sectorName ? '' : sectorName);
       }
     } catch (error) {
-      console.error('Error handling sector click:', error);
-    }
+      }
   };
 
   const createTooltipContent = (properties: any, type: 'suitability' | 'susceptibility') => {
@@ -226,7 +222,6 @@ export default function SoilSuitabilityMap({
         </div>
       `;
     } catch (error) {
-      console.error('Error creating tooltip content:', error);
       return '<div class="font-medium">Error loading data</div>';
     }
   };
@@ -272,9 +267,7 @@ export default function SoilSuitabilityMap({
         ref={mapRef}
         whenReady={() => {
           try {
-            console.log('Map is ready');
-          } catch (error) {
-            console.error('Map ready error:', error);
+            } catch (error) {
             setMapError('Failed to initialize map');
           }
         }}

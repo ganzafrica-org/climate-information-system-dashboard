@@ -94,16 +94,11 @@ export function MessageLogsTable() {
                 }
             );
             const data = response as any;
-            console.log('Logs API raw payload:', data);
-            
             const { logs: extractedLogs, summary: extractedSummary } = extractData(data);
             const logsArray = Array.isArray(extractedLogs) ? extractedLogs : [];
             setLogs(logsArray);
             setSummary(extractedSummary);
-            console.log('Parsed logs count:', logsArray.length);
-            
-        } catch (error: any) {
-            console.error('Failed to fetch message logs:', error);
+            } catch (error: any) {
             toast.error(t('failedToLoadLogs') || 'Failed to load logs');
         } finally {
             setIsLoading(false);

@@ -37,8 +37,6 @@ const getWeatherIcon = (condition: string, isActive = false): React.ReactElement
 };
 
 const handleApiError = (error: any, t: any) => {
-  console.error('API Error:', error);
-
   if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
     toast.error(t('requestTimeout') || 'Request timed out. Please try again.');
     return 'timeout';
@@ -189,7 +187,6 @@ const Forecasts: NextPage = () => {
 
       toast.success(t('forecastExportedSuccessfully') || 'Forecast exported successfully.');
     } catch (error) {
-      console.error('Export error:', error);
       toast.error(t('failedToExportForecast') || 'Failed to export forecast.');
     }
   };
@@ -208,7 +205,7 @@ const Forecasts: NextPage = () => {
         navigator.share({
           title: `Weather Forecast - ${selectedLocation.name}`,
           text: shareText,
-        }).catch(err => console.log('Error sharing:', err));
+        }).catch(err => );
       } else {
         navigator.clipboard.writeText(shareText).then(() => {
           toast.success(t('forecastCopiedToClipboard') || 'Forecast copied to clipboard.');
@@ -217,7 +214,6 @@ const Forecasts: NextPage = () => {
         });
       }
     } catch (error) {
-      console.error('Share error:', error);
       toast.error(t('failedToShareForecast') || 'Failed to share forecast.');
     }
   };
