@@ -208,12 +208,6 @@ const Dashboard: NextPage = () => {
                     0
                 );
                 
-                console.log('Message logs extraction:', {
-                    messagesTotal: messagesTotalFromLogs,
-                    totalMessages: totalMessagesCount,
-                    summary: summaryNode,
-                    pagination: paginationNode
-                });
             }
 
             // Display the exact total from logs on the card
@@ -238,18 +232,7 @@ const Dashboard: NextPage = () => {
                 totalLocationsCount,
             });
 
-            console.log('Dashboard stats updated:', { 
-                totalFarmers, 
-                totalFarmersCount,
-                messagesSent, 
-                totalMessages,
-                activeAlerts, 
-                totalAlertsCount,
-                activeLocations,
-                totalLocationsCount 
-            });
         } catch (error: any) {
-            console.error('Failed to fetch dashboard stats:', error);
             setDashboardStats({
                 totalFarmers: 0,
                 messagesSent: 0,
@@ -274,7 +257,6 @@ const Dashboard: NextPage = () => {
                 setSelectedLocation(response.data.locations[0]);
             }
         } catch (error: any) {
-            console.error('Byanze kubona ahantu:', error);
             toast.error(t('failedToLoadLocations'));
         } finally {
             setIsLoading(false);
@@ -296,7 +278,6 @@ const Dashboard: NextPage = () => {
             setTodayWeather(today);
 
         } catch (error: any) {
-            console.error('Byanze kubona amakuru y\'ibihe:', error);
             toast.error(t('failedToLoadWeather'));
         }
     };
@@ -334,7 +315,6 @@ const Dashboard: NextPage = () => {
                 setAllLocationsWeather(processedWeatherData);
             }
         } catch (error: any) {
-            console.error('Byanze kubona ibihe by\'ahantu hose:', error);
             toast.error(t('failedToLoadAllWeather'));
         } finally {
             setIsLoadingAllWeather(false);

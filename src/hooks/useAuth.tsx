@@ -90,7 +90,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 toast.error('Session expired. Please login again.');
             }
         } catch (error) {
-            console.error('Error fetching user profile:', error);
             localStorage.removeItem('token');
             setToken(null);
             setUser(null);

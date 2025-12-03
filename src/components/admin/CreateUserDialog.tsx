@@ -34,7 +34,6 @@ const inviteUser = async (data: InviteUserInput): Promise<User> => {
     const response = await api.post<User>('/api/admin/users/invite', sanitized);
     return response;
   } catch (error: any) {
-    console.error('Invite user error:', error);
     // Provide clearer messages based on common API responses
     const status = error?.response?.status;
     const backendMessage = error?.response?.data?.message;
@@ -106,7 +105,6 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
         role: "agronomist"
       });
     } catch (e: any) {
-      console.error(e);
       toast.error(e.message || "Failed to create user");
     } finally {
       setIsLoading(false);

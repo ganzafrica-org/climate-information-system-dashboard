@@ -24,7 +24,6 @@ const getUserById = async (userId: string | number): Promise<User> => {
     // Extract the user data from the response.data property
     return response.data;
   } catch (error: any) {
-    console.error('Get user error:', error);
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
     } else if (error.message) {
@@ -41,7 +40,6 @@ const updateUser = async (userId: string | number, data: UpdateUserInput): Promi
     // Extract the user data from the response.data property
     return response.data;
   } catch (error: any) {
-    console.error('Update user error:', error);
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
     } else if (error.message) {
@@ -87,7 +85,6 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
         role: getValidRole(userData.role)
       });
     } catch (error: any) {
-      console.error('Failed to fetch user details:', error);
       toast.error(error.message || "Failed to load user details");
       // Fallback to the passed user data
       setForm({
@@ -125,7 +122,6 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
       toast.success("User updated successfully");
       onSuccess();
     } catch (error: any) {
-      console.error(error);
       toast.error(error.message || "Failed to update user");
     } finally {
       setIsLoading(false);

@@ -39,8 +39,15 @@ A localized weather and farming advisory system for farmers in Musanze region, R
 3. Set up environment variables:
    Create a `.env.local` file in the root directory with the following variables:
    ```
-   NEXT_PUBLIC_API_URL=your_api_url_here
+   NEXT_PUBLIC_API_URL=http://10.10.100.52:3002
    ```
+   
+   **Important**: Make sure to include the full URL with the port number. Example:
+   - ✅ Correct: `http://10.10.100.52:3002`
+   - ❌ Wrong: `http://10.10.100.52` (missing port)
+   - ❌ Wrong: `10.10.100.52:3002` (missing protocol)
+   
+   The `/api` path is automatically added by the API client, so only include the base URL.
 
 4. Run the development server:
    ```bash

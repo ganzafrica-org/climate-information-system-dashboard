@@ -236,8 +236,7 @@ const RainfallHeatmap: React.FC<RainfallHeatmapProps> = ({ className = "" }) => 
 
                 setWeatherData(mappedData);
             } catch (error) {
-                console.error("Error fetching data:", error);
-            } finally {
+                } finally {
                 setIsLoadingWeather(false);
             }
         };

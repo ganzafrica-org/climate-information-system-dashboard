@@ -69,7 +69,6 @@ const Farmers: NextPage = () => {
       });
       setLocations(response.data.locations);
     } catch (error: any) {
-      console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));
     }
   };
@@ -100,7 +99,6 @@ const Farmers: NextPage = () => {
       setFarmers(response.data.farmers);
       setTotalCount(response.data.count);
     } catch (error: any) {
-      console.error('Failed to fetch farmers:', error);
       toast.error(t('failedToLoadFarmers'));
     } finally {
       setIsLoading(false);
@@ -151,7 +149,6 @@ const Farmers: NextPage = () => {
 
       return response.data.farmers;
     } catch (error) {
-      console.error('Failed to fetch all farmers for export:', error);
       throw error;
     }
   };
@@ -189,7 +186,6 @@ const Farmers: NextPage = () => {
 
       toast.success(t('farmersExportedSuccessfully') + ` (${allFarmers.length} ${t('farmers')})`);
     } catch (error: any) {
-      console.error('Export error:', error);
       toast.error(t('failedToExportFarmers'));
     } finally {
       setIsExporting(false);

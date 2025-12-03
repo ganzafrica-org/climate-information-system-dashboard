@@ -297,7 +297,7 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
         setError(null);
         try {
             const response = await api.get(`/api/admin/locations/${id}`);
-            console.log('API Response:', response.data); // Debug log
+            // Debug log
             
             // Handle different possible response structures
             let locationData = null;
