@@ -21,8 +21,8 @@ interface InviteUserInput {
 const inviteUser = async (data: InviteUserInput): Promise<User> => {
   try {
     // Sanitize payload: trim fields, lowercase email, omit empty optional fields
-    const sanitized: Partial<InviteUserInput> = {
-      username: data.username?.trim(),
+    // Note: Backend doesn't accept 'username' field for invite endpoint
+    const sanitized: any = {
       email: data.email?.trim().toLowerCase(),
       role: data.role,
     };
@@ -87,8 +87,8 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.username.trim() || !form.email.trim()) {
-      toast.error("Username and email are required");
+    if (!form.email.trim()) {
+      toast.error("Email is required");
       return;
     }
     setIsLoading(true);
