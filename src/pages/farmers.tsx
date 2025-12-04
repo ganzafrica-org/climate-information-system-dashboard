@@ -282,46 +282,48 @@ const Farmers: NextPage = () => {
           <Card className="shadow-sm border border-gray-200 rounded-lg overflow-hidden">
             <CardContent className="p-0">
               {/* Header with Add Farmer, All Locations dropdown, and Search */}
-              <div className="p-4 bg-white border-b border-gray-200 flex justify-end items-center gap-4">
-                {user?.role === 'admin' && (
-                  <Button 
-                    variant="primary" 
-                    onClick={() => setCreateDialogOpen(true)} 
-                    style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
-                    className="hover:opacity-90 text-white"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    {t("addFarmer")}
-                  </Button>
-                )}
-
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="outline"
-                      style={{ borderColor: '#66a9e3', color: '#66a9e3' }}
-                      className="hover:bg-blue-50"
+              <div className="p-3 md:p-4 bg-white border-b border-gray-200 flex flex-col sm:flex-row justify-between sm:justify-end items-stretch sm:items-center gap-3 md:gap-4">
+                <div className="flex flex-col sm:flex-row gap-3 md:gap-4 w-full sm:w-auto">
+                  {user?.role === 'admin' && (
+                    <Button 
+                      variant="primary" 
+                      onClick={() => setCreateDialogOpen(true)} 
+                      style={{ backgroundColor: '#147677', borderColor: '#147677' }}
+                      className="hover:opacity-90 text-white hover:bg-[#147677] w-full sm:w-auto"
                     >
-                      <MapPin className="h-4 w-4 mr-2" />
-                      <span>{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
-                      {/* <ChevronDown className="ml-2 h-4 w-4" /> */}
+                      <Plus className="h-4 w-4 mr-2" />
+                      <span className="hidden sm:inline">{t("addFarmer")}</span>
+                      <span className="sm:hidden">{t("addFarmer")}</span>
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    {locations.map((location) => (
-                      <DropdownMenuItem key={location.id} onClick={() => setSelectedLocation(location.name)}>
-                        {location.name}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  )}
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        style={{ borderColor: '#66a9e3', color: '#66a9e3' }}
+                        className="hover:bg-blue-50 w-full sm:w-auto"
+                      >
+                        <MapPin className="h-4 w-4 mr-2" />
+                        <span className="truncate">{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      {locations.map((location) => (
+                        <DropdownMenuItem key={location.id} onClick={() => setSelectedLocation(location.name)}>
+                          {location.name}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
                 
-                <div className="relative">
+                <div className="relative w-full sm:w-auto">
                   <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                   <Input
                     type="search"
                     placeholder={t("searchFarmers") || "Search farmers..."}
-                    className="pl-10 w-[300px] bg-gray-50 border-gray-200"
+                    className="pl-10 w-full sm:w-[250px] md:w-[300px] bg-gray-50 border-gray-200"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -346,19 +348,19 @@ const Farmers: NextPage = () => {
                         <th className="py-4 px-6 text-left font-semibold text-sm">
                           {t("name") || "Farmer Name"}
                         </th>
-                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                        <th className="py-4 px-3 md:px-6 text-left font-semibold text-sm hidden sm:table-cell">
                           {t("phone") || "Phone"}
                         </th>
-                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                        <th className="py-4 px-3 md:px-6 text-left font-semibold text-sm">
                           {t("locations") || "Location"}
                         </th>
-                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                        <th className="py-4 px-3 md:px-6 text-left font-semibold text-sm hidden md:table-cell">
                           {t("status") || "Status"}
                         </th>
-                        <th className="py-4 px-6 text-left font-semibold text-sm">
+                        <th className="py-4 px-3 md:px-6 text-left font-semibold text-sm hidden lg:table-cell">
                           {t("joinedDate") || "Joined Date"}
                         </th>
-                        <th className="py-4 px-6 text-center font-semibold text-sm">
+                        <th className="py-4 px-3 md:px-6 text-center font-semibold text-sm">
                           {t("actions") || "Actions"}
                         </th>
                       </tr>
@@ -366,7 +368,7 @@ const Farmers: NextPage = () => {
                       <tbody className="bg-white">
                       {farmers.length === 0 ? (
                           <tr>
-                            <td colSpan={7} className="py-16 text-center">
+                            <td colSpan={7} className="py-16 text-center px-4">
                               <div className="flex flex-col items-center space-y-3">
                                 <User className="h-12 w-12 text-gray-300" />
                                 <div className="text-gray-500 font-medium">{t("noFarmersFound") || "No farmers found"}</div>
@@ -383,16 +385,17 @@ const Farmers: NextPage = () => {
                                   }`}
                                   onClick={() => handleViewFarmer(farmer.id)}
                               >
-                                <td className="py-4 px-6 text-sm text-gray-900">
+                                <td className="py-4 px-3 md:px-6 text-sm text-gray-900">
                                   {(currentPage - 1) * limit + index + 1}
                                 </td>
-                                <td className="py-4 px-6">
+                                <td className="py-4 px-3 md:px-6">
                                   <div className="font-medium text-gray-900">{farmer.name}</div>
+                                  <div className="text-xs text-gray-500 sm:hidden mt-1">{farmer.phone}</div>
                                 </td>
-                                <td className="py-4 px-6">
+                                <td className="py-4 px-3 md:px-6 hidden sm:table-cell">
                                   <div className="text-sm text-gray-600 font-mono">{farmer.phone}</div>
                                 </td>
-                                <td className="py-4 px-6">
+                                <td className="py-4 px-3 md:px-6">
                                   <div className="flex flex-wrap gap-1">
                                     {farmer.locations.map((location, idx) => (
                                         <span key={idx} className="text-sm text-gray-700">
@@ -402,15 +405,15 @@ const Farmers: NextPage = () => {
                                     ))}
                                   </div>
                                 </td>
-                                <td className="py-4 px-6">
+                                <td className="py-4 px-3 md:px-6 hidden md:table-cell">
                                   <StatusBadge isActive={farmer.isActive} />
                                 </td>
-                                <td className="py-4 px-6">
+                                <td className="py-4 px-3 md:px-6 hidden lg:table-cell">
                                   <div className="text-sm text-gray-600">
                                     {new Date(farmer.createdAt).toLocaleDateString()}
                                   </div>
                                 </td>
-                                <td className="py-4 px-6 text-center">
+                                <td className="py-4 px-3 md:px-6 text-center">
                                   <DropdownMenu>
                                     <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
                                       <Button 
@@ -482,27 +485,33 @@ const Farmers: NextPage = () => {
 
               {/* Pagination Footer - Matching the provided design exactly */}
               {totalCount > 0 && (
-                <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-gray-200">
-                  <div className="flex items-center text-sm text-gray-600 gap-2">
-                    <span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-3 md:px-6 py-4 bg-white border-t border-gray-200 gap-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center text-sm text-gray-600 gap-2 w-full sm:w-auto">
+                    <span className="whitespace-nowrap">
                       {farmers.length === 0 ? "0" : `${Math.min((currentPage - 1) * limit + 1, totalCount)}-${Math.min(currentPage * limit, totalCount)}`} of {totalCount} row(s) selected.
                     </span>
-                    <span>Rows per page</span>
-                    <select 
-                      className="border border-gray-300 rounded px-2 py-1 text-sm bg-white ml-2"
-                      value={limit}
-                      onChange={(e) => handleLimitChange(parseInt(e.target.value))}
-                    >
-                      <option value="10">10</option>
-                      <option value="20">20</option>
-                      <option value="50">50</option>
-                      <option value="100">100</option>
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <span className="hidden sm:inline">Rows per page</span>
+                      <span className="sm:hidden">Per page</span>
+                      <select 
+                        className="border border-gray-300 rounded px-2 py-1 text-sm bg-white"
+                        value={limit}
+                        onChange={(e) => handleLimitChange(parseInt(e.target.value))}
+                      >
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                      </select>
+                    </div>
                   </div>
                   
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm text-gray-600">
+                  <div className="flex items-center space-x-2 md:space-x-4 w-full sm:w-auto justify-between sm:justify-end">
+                    <span className="text-sm text-gray-600 hidden sm:inline">
                       Page {currentPage} of {totalPages}
+                    </span>
+                    <span className="text-sm text-gray-600 sm:hidden">
+                      {currentPage}/{totalPages}
                     </span>
                     
                     <div className="flex items-center space-x-1">
