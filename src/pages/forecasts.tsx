@@ -44,6 +44,12 @@ const handleApiError = (error: any, t: any) => {
     toast.error(t('dataNotFound') || 'Data not found for this location.');
     return 'not_found';
   } else if (error.response?.status >= 500) {
+    // Check if it's a weather API configuration error
+    const errorMessage = error.response?.data?.message || '';
+    if (errorMessage.includes('Weather API key not configured') || errorMessage.includes('Weather API request failed')) {
+      toast.error(t('weatherApiNotConfigured') || 'Weather API is not configured on the server.');
+      return 'api_not_configured';
+    }
     toast.error(t('serverError') || 'Server error. Please try again later.');
     return 'server_error';
   } else if (error.code === 'ERR_NETWORK' || !navigator.onLine) {

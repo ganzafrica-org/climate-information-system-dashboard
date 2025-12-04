@@ -335,7 +335,19 @@ const Dashboard: NextPage = () => {
             }
         } catch (error: any) {
             console.error('Byanze kubona ibihe by\'ahantu hose:', error);
-            toast.error(t('failedToLoadAllWeather'));
+            // Handle weather API configuration errors gracefully
+            if (error.response?.status === 404 || error.response?.status === 500) {
+                const errorMessage = error.response?.data?.message || '';
+                if (errorMessage.includes('Weather API key not configured') || errorMessage.includes('Weather data retrieved for 0')) {
+                    // Weather API not configured - show warning but don't block the UI
+                    console.warn('Weather API not configured on backend');
+                    setAllLocationsWeather([]);
+                } else {
+                    toast.error(t('failedToLoadAllWeather'));
+                }
+            } else {
+                toast.error(t('failedToLoadAllWeather'));
+            }
         } finally {
             setIsLoadingAllWeather(false);
         }

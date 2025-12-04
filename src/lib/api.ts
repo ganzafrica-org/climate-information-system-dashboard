@@ -103,14 +103,19 @@ class ApiClient {
 
                 // Clean URL path - remove double slashes but keep leading slash for axios
                 if (config.url) {
+                    // Remove all leading slashes first
+                    config.url = config.url.replace(/^\/+/, '');
+                    // Ensure URL starts with exactly one slash for proper axios baseURL handling
+                    config.url = '/' + config.url;
+                    // Remove any remaining double slashes in the path
                     config.url = config.url.replace(/\/+/g, '/');
-                    // Ensure URL starts with / for proper axios baseURL handling
-                    if (!config.url.startsWith('/')) {
-                        config.url = '/' + config.url;
-                    }
                 }
 
-                console.log(`Making ${config.method?.toUpperCase()} request to:`, `${config.baseURL}/${config.url}`);
+                // Log the actual URL that will be used (axios combines baseURL + url)
+                const fullUrl = config.baseURL && config.url 
+                    ? `${config.baseURL.replace(/\/$/, '')}${config.url}` 
+                    : config.url;
+                console.log(`Making ${config.method?.toUpperCase()} request to:`, fullUrl);
                 return config;
             },
             (error) => {
