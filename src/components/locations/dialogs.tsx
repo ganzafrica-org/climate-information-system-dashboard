@@ -79,7 +79,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
         setIsLoading(true);
         setLocationValidation(null);
         try {
-            const response = await api.post<ApiResponse<CreateLocationResponse>>('/api/admin/locations', formData);
+            const response = await api.post<ApiResponse<CreateLocationResponse>>('/api/users/locations', formData);
             
             // Check for validation warnings
             if (response.data?.validation && !response.data.validation.exactMatch) {
@@ -296,7 +296,7 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
         setIsLoading(true);
         setError(null);
         try {
-            const response = await api.get(`/api/admin/locations/${id}`);
+            const response = await api.get(`/api/users/locations/${id}`);
             // Debug log
             
             // Handle different possible response structures
