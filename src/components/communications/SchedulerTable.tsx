@@ -111,6 +111,13 @@ export function WeatherSchedulerTable() {
         throw new Error('No data received from API');
       }
     } catch (error: any) {
+      // Handle 404 error (endpoint not found on hosted version)
+      if (error.response?.status === 404) {
+        // Silently handle 404 - scheduler endpoint might not be available on hosted version
+        console.warn('Scheduler endpoint not available:', error.response?.data?.message || 'Endpoint not found');
+        setSchedulerStatus(null);
+        return;
+      }
       // Handle 501 error (controller not implemented)
       if (error.response?.status === 501) {
         toast.error('Weather Scheduler Controller not implemented');
