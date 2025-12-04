@@ -114,7 +114,9 @@ export function WeatherSchedulerTable() {
       // Handle 404 error (endpoint not found on hosted version)
       if (error.response?.status === 404) {
         // Silently handle 404 - scheduler endpoint might not be available on hosted version
-        console.warn('Scheduler endpoint not available:', error.response?.data?.message || 'Endpoint not found');
+        // Suppress console errors for missing endpoints
+        const errorMessage = error.response?.data?.message || 'Endpoint not found';
+        console.warn('Scheduler status endpoint not available:', errorMessage);
         setSchedulerStatus(null);
         return;
       }
@@ -190,12 +192,17 @@ export function WeatherSchedulerTable() {
       }
     } catch (error: any) {
       // Handle different HTTP status codes
-      if (error.response?.status === 501) {
+      if (error.response?.status === 404) {
+        // Scheduler endpoints not available on this server - suppress error logs
+        const errorMessage = error.response?.data?.message || 'Scheduler endpoint not available';
+        console.warn(`Scheduler ${action} endpoint not available:`, errorMessage);
+        toast.error('Scheduler feature is not available on this server.');
+        setIsActionLoading(null);
+        return; // Don't refresh status if endpoint doesn't exist
+      } else if (error.response?.status === 501) {
         toast.error(`Weather Scheduler Controller not implemented`);
       } else if (error.response?.status === 403) {
         toast.error('Admin access required for this action');
-      } else if (error.response?.status === 404) {
-        toast.error(`${action} endpoint not found`);
       } else if (error.response?.status >= 500) {
         toast.error(`Server error: Unable to ${action} scheduler`);
       } else if (error.response?.data?.message) {
@@ -209,8 +216,10 @@ export function WeatherSchedulerTable() {
         toast.error(`Unable to ${action} scheduler. Please try again.`);
       }
       
-      // Refresh status even after errors to get current state
-      setTimeout(() => fetchSchedulerStatus(), 1000);
+      // Refresh status even after errors to get current state (only if endpoint exists)
+      if (error.response?.status !== 404) {
+        setTimeout(() => fetchSchedulerStatus(), 1000);
+      }
     } finally {
       setIsActionLoading(null);
     }
