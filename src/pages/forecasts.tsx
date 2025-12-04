@@ -206,7 +206,12 @@ const Forecasts: NextPage = () => {
           title: `Weather Forecast - ${selectedLocation.name}`,
           text: shareText,
         }).catch(() => {
-          toast.error(t('failedToShareForecast') || 'Failed to share forecast.');
+          // Share failed, fallback to clipboard
+          navigator.clipboard.writeText(shareText).then(() => {
+            toast.success(t('forecastCopiedToClipboard') || 'Forecast copied to clipboard.');
+          }).catch(() => {
+            toast.error(t('failedToCopyForecast') || 'Failed to copy forecast.');
+          });
         });
       } else {
         navigator.clipboard.writeText(shareText).then(() => {

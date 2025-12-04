@@ -1,5 +1,4 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
-import { getApiBaseUrl } from './apiConfig';
 
 interface ApiClientConfig {
     baseURL?: string;
@@ -59,7 +58,7 @@ class ApiClient {
         this.retryDelay = config.retryDelay || 500;
         
         // Ensure baseURL ends without trailing slash
-        const baseURL = config.baseURL || getApiBaseUrl();
+        const baseURL = config.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
         const cleanBaseURL = baseURL.replace(/\/$/, '');
         
         this.instance = axios.create({
@@ -102,27 +101,32 @@ class ApiClient {
                     // no-op if localStorage is unavailable
                 }
 
-                // Clean URL path - remove double slashes
+                // Clean URL path - remove double slashes but keep leading slash for axios
                 if (config.url) {
                     config.url = config.url.replace(/\/+/g, '/');
-                    if (config.url.startsWith('/')) {
-                        config.url = config.url.substring(1);
+                    // Ensure URL starts with / for proper axios baseURL handling
+                    if (!config.url.startsWith('/')) {
+                        config.url = '/' + config.url;
                     }
                 }
 
+                console.log(`Making ${config.method?.toUpperCase()} request to:`, `${config.baseURL}/${config.url}`);
                 return config;
             },
             (error) => {
+                console.error('Request interceptor error:', error);
                 return Promise.reject(error);
             }
         );
 
         this.instance.interceptors.response.use(
             (response: AxiosResponse) => {
+                console.log(`✓ ${response.config.method?.toUpperCase()} ${response.config.url}:`, response.status);
                 return response;
             },
             async (error) => {
                 if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                    console.error('Request timeout:', error.message);
 
                     const timeoutError = new Error('Request timeout');
                     timeoutError.name = 'TimeoutError';
@@ -131,6 +135,15 @@ class ApiClient {
                     return Promise.reject(timeoutError);
                 }
 
+                // Log the full error details for debugging
+                console.error(`✗ API Error:`, {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    data: error.response?.data,
+                    message: error.message
+                });
 
                 // Handle 429 rate limiting with bounded retries here (in addition to service-level retries)
                 if (error.response?.status === 429 && !error.config.skipRetry) {
@@ -142,6 +155,7 @@ class ApiClient {
                         const backoff = baseDelay * Math.pow(2, retryCount);
                         const jitter = Math.floor(Math.random() * 150);
                         const wait = backoff + jitter;
+                        console.log(`Rate limited (429). Interceptor retry ${retryCount + 1}/${maxInterceptorRetries} in ${wait}ms`);
                         error.config._retryCount = retryCount + 1;
                         await this.delay(wait);
                         return this.instance(error.config);
@@ -149,7 +163,12 @@ class ApiClient {
                 }
 
                 if (error.response?.status === 401) {
+                    console.error('Unauthorized access - token may be expired');
                     this.setAuthToken(null);
+                }
+
+                if (error.response?.status === 403) {
+                    console.error('Forbidden - insufficient permissions');
                 }
 
                 // Don't transform the error here - let the service layer handle it
@@ -186,6 +205,7 @@ class ApiClient {
                 const base = retryAfter ? parseInt(retryAfter) * 1000 : delay;
                 const jitter = Math.floor(Math.random() * 200);
                 const waitTime = base + jitter;
+                console.log(`Retrying request in ${waitTime}ms... (${retries} retries left)`);
                 await this.delay(waitTime);
                 return this.retryRequest(requestFn, retries - 1, Math.min(delay * 2, 8000)); // Cap backoff
             }
@@ -195,9 +215,10 @@ class ApiClient {
 
     // Helper method to build clean URLs
     private buildUrl(url: string): string {
-        // Remove leading slash if present
-        const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
-        return cleanUrl;
+        // Clean double slashes but keep leading slash for axios baseURL handling
+        const cleanUrl = url.replace(/\/+/g, '/');
+        // Ensure URL starts with / for proper axios baseURL handling
+        return cleanUrl.startsWith('/') ? cleanUrl : '/' + cleanUrl;
     }
 
     async get<T = any>(url: string, options: RequestOptions = {}): Promise<T> {

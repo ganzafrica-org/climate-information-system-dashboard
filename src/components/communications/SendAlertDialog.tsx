@@ -87,7 +87,7 @@ export function SendAlertDialog({
   onOpenChange, 
   alert, 
   onSuccess 
-}: SendAlertDialogProps): React.JSX.Element | null {
+}: SendAlertDialogProps) {
   const { t } = useLanguage();
   const [isActionLoading, setIsActionLoading] = useState(false);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
@@ -136,8 +136,9 @@ export function SendAlertDialog({
         const locationId = typeof locationValue === 'string' ? parseInt(locationValue) : locationValue;
         if (!isNaN(locationId)) {
           filters.locationId = locationId;
-        }
-        // If it's not a number, we'll get all farmers and filter client-side
+        } else {
+          // If it's not a number, we'll get all farmers and filter client-side
+          }
       }
   
       const response = await api.get('/api/admin/farmers', {
@@ -147,7 +148,7 @@ export function SendAlertDialog({
       // Handle different response formats based on the API structure
       let farmersData: any[] = [];
       
-      // Check for the actual structure
+      // Check for the actual structure based on your console output
       if (response.data && response.data.farmers && Array.isArray(response.data.farmers)) {
         farmersData = response.data.farmers;
       } else if (response.data && response.data.data && response.data.data.farmers) {
@@ -155,6 +156,8 @@ export function SendAlertDialog({
       } else if (Array.isArray(response.data)) {
         // Fallback: direct array
         farmersData = response.data;
+      } else {
+        // No farmers data found, keep empty array
       }
   
       // Ensure we have an array
@@ -183,7 +186,7 @@ export function SendAlertDialog({
         finalFarmers = finalFarmers.filter(f => 
           f.location.toLowerCase().includes(locationValue.toLowerCase())
         );
-        }
+      }
   
       setFarmers(finalFarmers);
       
@@ -499,6 +502,11 @@ export function SendAlertDialog({
                       : (alert.location || 'All Locations')
                   }
                 </span>
+              </div>
+
+              {/* Debug info */}
+              <div className="text-xs text-blue-600">
+                Debug: {farmers.length} total farmers, {filteredFarmers.length} filtered, loading: {isLoadingFarmers.toString()}
               </div>
 
               {/* Farmers list */}

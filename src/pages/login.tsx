@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Loader2, User, Lock, Globe } from 'lucide-react';
+import { Eye, EyeOff, Loader2, User, Lock, Globe, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/router';
-import { toast } from 'sonner';
 
 const useLanguage = () => {
     const [locale, setLocale] = useState('en');
@@ -247,6 +246,7 @@ const LoginPage = () => {
     const { t, locale, changeLanguage } = useLanguage();
     const { login, isLoading } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
+    const [error, setError] = useState('');
     const [formData, setFormData] = useState({
         username: '',
         password: '',
@@ -258,31 +258,23 @@ const LoginPage = () => {
             ...prev,
             [name]: value,
         }));
+        if (error) setError('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError('');
 
         if (!formData.username || !formData.password) {
-            let errorMsg = '';
-            if (!formData.username && !formData.password) {
-                errorMsg = t('pleaseEnterUsernameAndPassword') || 'Please enter both your username and password to continue.';
-            } else if (!formData.username) {
-                errorMsg = 'Please enter your username to continue.';
-            } else {
-                errorMsg = 'Please enter your password to continue.';
-            }
-            toast.error(errorMsg);
+            setError(t('pleaseEnterUsernameAndPassword') || 'Please enter username and password');
             return;
         }
 
         try {
             await login(formData.username, formData.password);
             // The AuthProvider will automatically redirect to dashboard after successful login
-            // Toast notification is handled in useAuth hook
         } catch (err: any) {
-            // Toast notification is already shown in useAuth hook for all errors
-            // No need to do anything here
+            setError(err.message || t('loginFailed') || 'Login failed');
         }
     };
 
@@ -292,7 +284,7 @@ const LoginPage = () => {
             style={{ background: 'linear-gradient(135deg, #e5f3ff 0%, #d6e8fc 100%)' }}
         >
             {/* Centered Container with Two Sections */}
-            <div className="w-full max-w-4xl flex rounded-3xl shadow-2xl overflow-hidden bg-white">
+            <div className="w-full max-w-6xl flex rounded-3xl shadow-2xl overflow-hidden bg-white">
                 {/* Left Panel - Teal Section */}
                 <div className="flex-1 bg-[#147677] relative overflow-hidden flex items-center justify-center p-12">
                     {/* Background decorative elements with different weather icons */}
@@ -349,7 +341,7 @@ const LoginPage = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 13C7 13 3 10 3 7C3 7 8.5 5 12 3C12 3 12.5 8.5 7 13Z" />
                                 </svg>
                             </div>
-                            <h2 className="text-white text-2xl font-bold mb-2">TeganyaMuhinzi</h2>
+                            <h2 className="text-white text-2xl font-bold mb-2">Menya System </h2>
                         </div>
 
                        <h1 className="text-white text-4xl font-bold mb-6 leading-tight">
@@ -393,6 +385,14 @@ const LoginPage = () => {
                             </div>
 
                             <div className="space-y-4">
+                                {/* Error Message */}
+                                {error && (
+                                    <Alert variant="destructive" className="flex items-center">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertDescription className="ml-2">{error}</AlertDescription>
+                                    </Alert>
+                                )}
+
                                 {/* Username Field */}
                                 <div className="space-y-2">
                                     <Label htmlFor="username">{t('username')}</Label>
