@@ -81,22 +81,22 @@ class ApiClient {
                 }
 
                 // Attach language preference from localStorage
+                // Using only Accept-Language header (standard HTTP header) to avoid CORS issues
                 try {
                     const locale = typeof window !== 'undefined' ? (localStorage.getItem('locale') || '') : '';
                     const normalizedLang = (locale === 'rw' || locale === 'en') ? locale : undefined;
 
-                    // Prefer explicit header if caller didn't set it
-                    if (normalizedLang && !(config.headers && ('x-language' in config.headers || 'x-lang' in config.headers))) {
+                    // Only use Accept-Language header (standard HTTP header, avoids CORS issues)
+                    if (normalizedLang && !(config.headers && 'Accept-Language' in config.headers)) {
                         (config.headers as any) = {
                             ...(config.headers || {}),
-                            'x-language': normalizedLang,
                             'Accept-Language': normalizedLang,
                         };
                     }
 
                     // Do NOT append a lang query param globally to avoid 400s on endpoints
                     // that don't allow extra params. If needed, callers can pass params.lang
-                    // explicitly or backend can read from headers above.
+                    // explicitly or backend can read from Accept-Language header above.
                 } catch (_) {
                     // no-op if localStorage is unavailable
                 }
