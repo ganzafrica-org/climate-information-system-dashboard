@@ -140,15 +140,21 @@ class ApiClient {
                     return Promise.reject(timeoutError);
                 }
 
-                // Log the full error details for debugging
-                console.error(`✗ API Error:`, {
-                    status: error.response?.status,
-                    statusText: error.response?.statusText,
-                    url: error.config?.url,
-                    method: error.config?.method,
-                    data: error.response?.data,
-                    message: error.message
-                });
+                // Suppress console errors for known missing endpoints (404s on scheduler endpoints)
+                const isSchedulerEndpoint = error.config?.url?.includes('/api/weather/scheduler/');
+                const is404 = error.response?.status === 404;
+                
+                // Only log errors that aren't 404s on scheduler endpoints (these are expected)
+                if (!(is404 && isSchedulerEndpoint)) {
+                    console.error(`✗ API Error:`, {
+                        status: error.response?.status,
+                        statusText: error.response?.statusText,
+                        url: error.config?.url,
+                        method: error.config?.method,
+                        data: error.response?.data,
+                        message: error.message
+                    });
+                }
 
                 // Handle 429 rate limiting with bounded retries here (in addition to service-level retries)
                 if (error.response?.status === 429 && !error.config.skipRetry) {
