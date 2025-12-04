@@ -208,12 +208,6 @@ const Dashboard: NextPage = () => {
                     0
                 );
                 
-                console.log('Message logs extraction:', {
-                    messagesTotal: messagesTotalFromLogs,
-                    totalMessages: totalMessagesCount,
-                    summary: summaryNode,
-                    pagination: paginationNode
-                });
             }
 
             // Display the exact total from logs on the card
@@ -238,18 +232,7 @@ const Dashboard: NextPage = () => {
                 totalLocationsCount,
             });
 
-            console.log('Dashboard stats updated:', { 
-                totalFarmers, 
-                totalFarmersCount,
-                messagesSent, 
-                totalMessages,
-                activeAlerts, 
-                totalAlertsCount,
-                activeLocations,
-                totalLocationsCount 
-            });
         } catch (error: any) {
-            console.error('Failed to fetch dashboard stats:', error);
             setDashboardStats({
                 totalFarmers: 0,
                 messagesSent: 0,
@@ -274,7 +257,6 @@ const Dashboard: NextPage = () => {
                 setSelectedLocation(response.data.locations[0]);
             }
         } catch (error: any) {
-            console.error('Byanze kubona ahantu:', error);
             toast.error(t('failedToLoadLocations'));
         } finally {
             setIsLoading(false);
@@ -296,7 +278,6 @@ const Dashboard: NextPage = () => {
             setTodayWeather(today);
 
         } catch (error: any) {
-            console.error('Byanze kubona amakuru y\'ibihe:', error);
             toast.error(t('failedToLoadWeather'));
         }
     };
@@ -334,13 +315,11 @@ const Dashboard: NextPage = () => {
                 setAllLocationsWeather(processedWeatherData);
             }
         } catch (error: any) {
-            console.error('Byanze kubona ibihe by\'ahantu hose:', error);
             // Handle weather API configuration errors gracefully
             if (error.response?.status === 404 || error.response?.status === 500) {
                 const errorMessage = error.response?.data?.message || '';
                 if (errorMessage.includes('Weather API key not configured') || errorMessage.includes('Weather data retrieved for 0')) {
                     // Weather API not configured - show warning but don't block the UI
-                    console.warn('Weather API not configured on backend');
                     setAllLocationsWeather([]);
                 } else {
                     toast.error(t('failedToLoadAllWeather'));

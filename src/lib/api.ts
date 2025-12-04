@@ -111,28 +111,19 @@ class ApiClient {
                     config.url = config.url.replace(/\/+/g, '/');
                 }
 
-                // Log the actual URL that will be used (axios combines baseURL + url)
-                const fullUrl = config.baseURL && config.url 
-                    ? `${config.baseURL.replace(/\/$/, '')}${config.url}` 
-                    : config.url;
-                console.log(`Making ${config.method?.toUpperCase()} request to:`, fullUrl);
                 return config;
             },
             (error) => {
-                console.error('Request interceptor error:', error);
                 return Promise.reject(error);
             }
         );
 
         this.instance.interceptors.response.use(
             (response: AxiosResponse) => {
-                console.log(`✓ ${response.config.method?.toUpperCase()} ${response.config.url}:`, response.status);
                 return response;
             },
             async (error) => {
                 if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-                    console.error('Request timeout:', error.message);
-
                     const timeoutError = new Error('Request timeout');
                     timeoutError.name = 'TimeoutError';
                     (timeoutError as any).code = 'ECONNABORTED';
@@ -148,29 +139,8 @@ class ApiClient {
                 // Suppress errors for admin logs endpoints (might require admin role or not be accessible)
                 const isAdminLogsEndpoint = error.config?.url?.includes('/api/weather/admin/logs/');
                 
-                // Only log errors that aren't expected failures
-                if (!(is404 && isSchedulerEndpoint) && !(isAdminLogsEndpoint && (is404 || isNetworkError))) {
-                    // Log the error with proper handling for network errors
-                    const errorDetails: any = {
-                        url: error.config?.url,
-                        method: error.config?.method,
-                        message: error.message,
-                    };
-                    
-                    if (error.response) {
-                        errorDetails.status = error.response.status;
-                        errorDetails.statusText = error.response.statusText;
-                        errorDetails.data = error.response.data;
-                    } else {
-                        errorDetails.code = error.code;
-                        errorDetails.isNetworkError = true;
-                    }
-                    
-                    console.error(`✗ API Error:`, errorDetails);
-                } else if (isAdminLogsEndpoint && (is404 || isNetworkError)) {
-                    // Silently handle errors for admin logs endpoints (might not be accessible to all users)
-                    console.debug(`Admin logs endpoint not accessible:`, error.config?.url, is404 ? '404' : 'Network error');
-                }
+                // Silently handle expected errors (scheduler endpoints, admin logs endpoints)
+                // No console logging to avoid exposing data in production
 
                 // Handle 429 rate limiting with bounded retries here (in addition to service-level retries)
                 if (error.response?.status === 429 && !error.config.skipRetry) {
@@ -182,7 +152,6 @@ class ApiClient {
                         const backoff = baseDelay * Math.pow(2, retryCount);
                         const jitter = Math.floor(Math.random() * 150);
                         const wait = backoff + jitter;
-                        console.log(`Rate limited (429). Interceptor retry ${retryCount + 1}/${maxInterceptorRetries} in ${wait}ms`);
                         error.config._retryCount = retryCount + 1;
                         await this.delay(wait);
                         return this.instance(error.config);
@@ -190,12 +159,11 @@ class ApiClient {
                 }
 
                 if (error.response?.status === 401) {
-                    console.error('Unauthorized access - token may be expired');
                     this.setAuthToken(null);
                 }
 
                 if (error.response?.status === 403) {
-                    console.error('Forbidden - insufficient permissions');
+                    // Forbidden - insufficient permissions
                 }
 
                 // Handle network errors (no response received)
@@ -241,7 +209,6 @@ class ApiClient {
                 const base = retryAfter ? parseInt(retryAfter) * 1000 : delay;
                 const jitter = Math.floor(Math.random() * 200);
                 const waitTime = base + jitter;
-                console.log(`Retrying request in ${waitTime}ms... (${retries} retries left)`);
                 await this.delay(waitTime);
                 return this.retryRequest(requestFn, retries - 1, Math.min(delay * 2, 8000)); // Cap backoff
             }

@@ -327,7 +327,6 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
             // Handle 404 errors gracefully - endpoint might not exist
             if (error.response?.status === 404) {
                 const errorMessage = error.response?.data?.message || 'Location endpoint not found';
-                console.warn('Location endpoint not available:', errorMessage);
                 setError(t('locationNotFound') || 'Location not found');
                 toast.error(t('locationNotFound') || 'Location not found');
             } else {

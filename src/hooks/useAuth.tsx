@@ -86,7 +86,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 setUser(null);
             }
         } catch (error) {
-            console.error('Error fetching user profile:', error);
             localStorage.removeItem('token');
             setToken(null);
             setUser(null);

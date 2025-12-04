@@ -116,7 +116,6 @@ export function WeatherSchedulerTable() {
         // Silently handle 404 - scheduler endpoint might not be available on hosted version
         // Suppress console errors for missing endpoints
         const errorMessage = error.response?.data?.message || 'Endpoint not found';
-        console.warn('Scheduler status endpoint not available:', errorMessage);
         setSchedulerStatus(null);
         return;
       }
@@ -195,7 +194,6 @@ export function WeatherSchedulerTable() {
       if (error.response?.status === 404) {
         // Scheduler endpoints not available on this server - suppress error logs
         const errorMessage = error.response?.data?.message || 'Scheduler endpoint not available';
-        console.warn(`Scheduler ${action} endpoint not available:`, errorMessage);
         toast.error('Scheduler feature is not available on this server.');
         setIsActionLoading(null);
         return; // Don't refresh status if endpoint doesn't exist
