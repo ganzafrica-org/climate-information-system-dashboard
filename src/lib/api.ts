@@ -143,17 +143,33 @@ class ApiClient {
                 // Suppress console errors for known missing endpoints (404s on scheduler endpoints)
                 const isSchedulerEndpoint = error.config?.url?.includes('/api/weather/scheduler/');
                 const is404 = error.response?.status === 404;
+                const isNetworkError = !error.response && (error.code === 'ERR_NETWORK' || error.message?.includes('ERR_FAILED') || error.code === 'ERR_FAILED');
                 
-                // Only log errors that aren't 404s on scheduler endpoints (these are expected)
-                if (!(is404 && isSchedulerEndpoint)) {
-                    console.error(`✗ API Error:`, {
-                        status: error.response?.status,
-                        statusText: error.response?.statusText,
+                // Suppress errors for admin logs endpoints (might require admin role or not be accessible)
+                const isAdminLogsEndpoint = error.config?.url?.includes('/api/weather/admin/logs/');
+                
+                // Only log errors that aren't expected failures
+                if (!(is404 && isSchedulerEndpoint) && !(isAdminLogsEndpoint && (is404 || isNetworkError))) {
+                    // Log the error with proper handling for network errors
+                    const errorDetails: any = {
                         url: error.config?.url,
                         method: error.config?.method,
-                        data: error.response?.data,
-                        message: error.message
-                    });
+                        message: error.message,
+                    };
+                    
+                    if (error.response) {
+                        errorDetails.status = error.response.status;
+                        errorDetails.statusText = error.response.statusText;
+                        errorDetails.data = error.response.data;
+                    } else {
+                        errorDetails.code = error.code;
+                        errorDetails.isNetworkError = true;
+                    }
+                    
+                    console.error(`✗ API Error:`, errorDetails);
+                } else if (isAdminLogsEndpoint && (is404 || isNetworkError)) {
+                    // Silently handle errors for admin logs endpoints (might not be accessible to all users)
+                    console.debug(`Admin logs endpoint not accessible:`, error.config?.url, is404 ? '404' : 'Network error');
                 }
 
                 // Handle 429 rate limiting with bounded retries here (in addition to service-level retries)
@@ -182,9 +198,18 @@ class ApiClient {
                     console.error('Forbidden - insufficient permissions');
                 }
 
-                // Don't transform the error here - let the service layer handle it
-                // Just ensure we have the response data attached for proper error handling
-                if (error.response) {
+                // Handle network errors (no response received)
+                if (!error.response) {
+                    // Network error - request never reached server or server didn't respond
+                    error.isNetworkError = true;
+                    error.status = 0;
+                    error.data = {
+                        status: 'error',
+                        message: error.message || 'Network error - request failed',
+                        code: error.code
+                    };
+                } else {
+                    // HTTP error - server responded with error status
                     error.status = error.response.status;
                     error.data = error.response.data;
                 }
