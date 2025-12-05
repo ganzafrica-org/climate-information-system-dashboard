@@ -208,6 +208,12 @@ const Dashboard: NextPage = () => {
                     0
                 );
                 
+                console.log('Message logs extraction:', {
+                    messagesTotal: messagesTotalFromLogs,
+                    totalMessages: totalMessagesCount,
+                    summary: summaryNode,
+                    pagination: paginationNode
+                });
             }
 
             // Display the exact total from logs on the card
@@ -232,7 +238,18 @@ const Dashboard: NextPage = () => {
                 totalLocationsCount,
             });
 
+            console.log('Dashboard stats updated:', { 
+                totalFarmers, 
+                totalFarmersCount,
+                messagesSent, 
+                totalMessages,
+                activeAlerts, 
+                totalAlertsCount,
+                activeLocations,
+                totalLocationsCount 
+            });
         } catch (error: any) {
+            console.error('Failed to fetch dashboard stats:', error);
             setDashboardStats({
                 totalFarmers: 0,
                 messagesSent: 0,
@@ -248,51 +265,16 @@ const Dashboard: NextPage = () => {
 
     const fetchLocations = async () => {
         try {
-            // Try different possible endpoints
-            const possibleEndpoints = [
-                '/api/users/locations/all',
-                '/api/locations/all',
-                '/api/locations',
-                '/api/users/locations',
-                '/api/admin/locations'
-            ];
+            const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
+                params: { limit: 100 }
+            });
+            setLocations(response.data.locations);
 
-            let response = null;
-            for (const endpoint of possibleEndpoints) {
-                try {
-                    response = await api.get<ApiResponse<LocationsResponse>>(endpoint, {
-                        params: { limit: 100 }
-                    });
-                    break;
-                } catch (error: any) {
-                    if (error.response?.status === 404) {
-                        continue;
-                    } else {
-                        throw error;
-                    }
-                }
-            }
-
-            if (!response) {
-                throw new Error('No valid API endpoint found for locations');
-            }
-
-            // Handle different response structures
-            let locationsData: Location[] = [];
-            if (response.data?.locations) {
-                locationsData = response.data.locations;
-            } else if (Array.isArray(response.data)) {
-                locationsData = response.data;
-            } else if (Array.isArray(response)) {
-                locationsData = response;
-            }
-
-            setLocations(locationsData);
-
-            if (locationsData.length > 0) {
-                setSelectedLocation(locationsData[0]);
+            if (response.data.locations.length > 0) {
+                setSelectedLocation(response.data.locations[0]);
             }
         } catch (error: any) {
+            console.error('Byanze kubona ahantu:', error);
             toast.error(t('failedToLoadLocations'));
         } finally {
             setIsLoading(false);
@@ -314,6 +296,7 @@ const Dashboard: NextPage = () => {
             setTodayWeather(today);
 
         } catch (error: any) {
+            console.error('Byanze kubona amakuru y\'ibihe:', error);
             toast.error(t('failedToLoadWeather'));
         }
     };
@@ -351,18 +334,8 @@ const Dashboard: NextPage = () => {
                 setAllLocationsWeather(processedWeatherData);
             }
         } catch (error: any) {
-            // Handle weather API configuration errors gracefully
-            if (error.response?.status === 404 || error.response?.status === 500) {
-                const errorMessage = error.response?.data?.message || '';
-                if (errorMessage.includes('Weather API key not configured') || errorMessage.includes('Weather data retrieved for 0')) {
-                    // Weather API not configured - show warning but don't block the UI
-                    setAllLocationsWeather([]);
-                } else {
-                    toast.error(t('failedToLoadAllWeather'));
-                }
-            } else {
-                toast.error(t('failedToLoadAllWeather'));
-            }
+            console.error('Byanze kubona ibihe by\'ahantu hose:', error);
+            toast.error(t('failedToLoadAllWeather'));
         } finally {
             setIsLoadingAllWeather(false);
         }

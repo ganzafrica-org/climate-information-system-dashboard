@@ -33,53 +33,18 @@ export default function Communications() {
 
   const fetchLocations = async () => {
     try {
-      // Try different possible endpoints
-      const possibleEndpoints = [
-        '/api/users/locations/all',
-        '/api/locations/all',
-        '/api/locations',
-        '/api/users/locations',
-        '/api/admin/locations'
-      ];
-
-      let response = null;
-      for (const endpoint of possibleEndpoints) {
-        try {
-          response = await api.get<ApiResponse<LocationsResponse>>(endpoint, {
-            params: { limit: 100 }
-          });
-          break;
-        } catch (error: any) {
-          if (error.response?.status === 404) {
-            continue;
-          } else {
-            throw error;
-          }
-        }
-      }
-
-      if (!response) {
-        throw new Error('No valid API endpoint found for locations');
-      }
-
-      // Handle different response structures
-      let locationsData: Location[] = [];
-      if (response.data?.locations) {
-        locationsData = response.data.locations;
-      } else if (Array.isArray(response.data)) {
-        locationsData = response.data;
-      } else if (Array.isArray(response)) {
-        locationsData = response;
-      }
-
-      setLocations(locationsData);
+      const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
+        params: { limit: 100 }
+      });
+      setLocations(response.data.locations);
 
       // Auto-select first location or set to "all"
-      if (locationsData.length > 0) {
+      if (response.data.locations.length > 0) {
         // Don't auto-select, let user choose or default to "all"
         setSelectedLocation(null);
       }
     } catch (error: any) {
+      console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));
     } finally {
       setIsLoading(false);

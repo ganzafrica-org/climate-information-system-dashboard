@@ -94,6 +94,8 @@ type SeasonalData = {
 type ComparisonData = WeeklyData | MonthlyData | SeasonalData;
 
 const handleApiError = (error: any, t: any) => {
+    console.error('API Error:', error);
+
     if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
         toast.error(t('requestTimeout') || 'Request timed out. Please try again.');
         return 'timeout';
@@ -436,6 +438,7 @@ const Historical: NextPage = () => {
 
             toast.success(t('dataExportedSuccessfully') || 'Data exported successfully.');
         } catch (error) {
+            console.error('Export error:', error);
             toast.error(t('failedToExportData') || 'Failed to export data.');
         }
     };

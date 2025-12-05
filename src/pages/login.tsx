@@ -341,7 +341,7 @@ const LoginPage = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 13C7 13 3 10 3 7C3 7 8.5 5 12 3C12 3 12.5 8.5 7 13Z" />
                                 </svg>
                             </div>
-                            <h2 className="text-white text-2xl font-bold mb-2">TeganyaMuhinzi</h2>
+                            <h2 className="text-white text-2xl font-bold mb-2">Menya System </h2>
                         </div>
 
                        <h1 className="text-white text-4xl font-bold mb-6 leading-tight">
