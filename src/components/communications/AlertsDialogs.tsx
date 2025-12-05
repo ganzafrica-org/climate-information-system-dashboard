@@ -53,7 +53,7 @@ interface Alert {
   targetAudience?: string;
   deliveryMethod?: string;
   recipientCount?: number;
-  status?: 'draft' | 'scheduled' | 'sent' | 'failed';
+  status?: 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending';
 }
 
 interface ViewAlertDialogProps {
@@ -145,7 +145,7 @@ export function ViewAlertDialog({
     }
   };
 
-  const currentStatus = alert.status || (alert.isSent ? 'sent' : 'draft');
+  const currentStatus: 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending' = (alert.status as 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending' | undefined) || (alert.isSent ? 'sent' : 'draft');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
