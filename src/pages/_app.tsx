@@ -16,8 +16,8 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     return (
         <main className={dmSans.className}>
             <Head>
-                <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
-                <link rel="alternate icon" type="image/x-icon" href="/favicon.ico?v=3" />
+                <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4" />
+                <link rel="alternate icon" type="image/x-icon" href="/favicon.ico?v=4" />
             </Head>
             <QueryProvider>
                 <AuthProvider>
