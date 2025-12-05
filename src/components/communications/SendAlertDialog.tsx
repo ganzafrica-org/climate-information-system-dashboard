@@ -339,7 +339,7 @@ export function SendAlertDialog({
               farmerId: id,
               farmerName: farmer?.name || 'Unknown',
               phone: farmer?.phone || 'Unknown',
-              error: 'Network error'
+              error: ''
             };
           })
         }
@@ -412,7 +412,12 @@ export function SendAlertDialog({
               </div>
 
               <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <p className="text-sm mb-3">{sendResult.message}</p>
+                {/* Filter out "no_successful_sms_sends" message */}
+                {sendResult.message && 
+                 !sendResult.message.toLowerCase().includes('no_successful_sms_sends') &&
+                 !sendResult.message.toLowerCase().includes('no successful sms sends') && (
+                  <p className="text-sm mb-3">{sendResult.message}</p>
+                )}
                 
                 {sendResult.results && (
                   <div className="space-y-3">
@@ -441,7 +446,7 @@ export function SendAlertDialog({
                         <div className="space-y-1">
                           {sendResult.results.failed.map((farmer, index) => (
                             <div key={index} className="text-sm text-muted-foreground">
-                              • {farmer.farmerName} ({farmer.phone}) - {farmer.error}
+                              • {farmer.farmerName} ({farmer.phone})
                             </div>
                           ))}
                         </div>

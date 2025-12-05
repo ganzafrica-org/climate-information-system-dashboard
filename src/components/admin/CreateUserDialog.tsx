@@ -20,16 +20,27 @@ interface InviteUserInput {
 // Use the existing API client instead of fetch
 const inviteUser = async (data: InviteUserInput): Promise<User> => {
   try {
-    // Sanitize payload: trim fields, lowercase email, omit empty optional fields
-    // Note: Backend doesn't accept 'username' field for invite endpoint
+    // Sanitize payload: trim fields, lowercase email
+    // Try including username in case backend requires it
     const sanitized: any = {
       email: data.email?.trim().toLowerCase(),
       role: data.role,
     };
+    
+    // Include username if provided (some backends might require it)
+    const usernameTrimmed = data.username?.trim();
+    if (usernameTrimmed) {
+      sanitized.username = usernameTrimmed;
+    }
+    
+    // Include phone if provided
     const phoneTrimmed = data.phone?.trim();
     if (phoneTrimmed) {
       sanitized.phone = phoneTrimmed;
     }
+
+    // Log the payload for debugging
+    console.log('Inviting user with payload:', sanitized);
 
     const response = await api.post<User>('/api/admin/users/invite', sanitized);
     return response;
@@ -38,6 +49,16 @@ const inviteUser = async (data: InviteUserInput): Promise<User> => {
     const status = error?.response?.status;
     const backendMessage = error?.response?.data?.message;
     const backendErrors = error?.response?.data?.errors;
+    const backendData = error?.response?.data;
+
+    // Log full error for debugging
+    console.error('Invite user error:', {
+      status,
+      backendMessage,
+      backendErrors,
+      backendData,
+      fullError: error
+    });
 
     if (status === 409) {
       throw new Error(backendMessage || 'A user with this email or username already exists.');
@@ -46,12 +67,17 @@ const inviteUser = async (data: InviteUserInput): Promise<User> => {
     if (status === 400 || status === 422) {
       // Aggregate validation errors if present
       if (Array.isArray(backendErrors) && backendErrors.length > 0) {
-        const msg = backendErrors.map((e: any) => e?.message || e).join('\n');
-        throw new Error(msg);
+        const msg = backendErrors.map((e: any) => {
+          if (typeof e === 'string') return e;
+          return e?.message || e?.msg || JSON.stringify(e);
+        }).join('\n');
+        throw new Error(msg || 'Validation error: Please check your input fields.');
       }
       if (backendMessage) {
         throw new Error(backendMessage);
       }
+      // If no specific message, provide a generic one with status
+      throw new Error(backendData?.error || backendData?.message || `Bad Request (${status}): Please check your input fields.`);
     }
 
     if (backendMessage) {
@@ -91,6 +117,10 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
       toast.error("Email is required");
       return;
     }
+    if (!form.role) {
+      toast.error("Role is required");
+      return;
+    }
     setIsLoading(true);
     try {
       const created = await inviteUser(form);
@@ -105,7 +135,10 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
         role: "agronomist"
       });
     } catch (e: any) {
-      toast.error(e.message || "Failed to create user");
+      // Show detailed error message
+      const errorMessage = e.message || e.response?.data?.message || "Failed to create user";
+      console.error("Create user error details:", e);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -113,13 +146,13 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[560px]">
+      <DialogContent className="sm:max-w-[560px]" aria-describedby="create-user-description">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Plus className="h-5 w-5" />
             Create User
           </DialogTitle>
-          <DialogDescription>Fill in details to create a new user account.</DialogDescription>
+          <DialogDescription id="create-user-description">Fill in details to create a new user account.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 gap-4">
@@ -176,7 +209,7 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Button type="submit" disabled={isLoading} className="bg-[#147677] hover:bg-[#147677]/90 text-white">
               {isLoading ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
