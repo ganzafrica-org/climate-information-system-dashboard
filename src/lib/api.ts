@@ -7,6 +7,23 @@ interface ApiClientConfig {
     retryDelay?: number;
 }
 
+/**
+ * Get the API base URL, automatically converting HTTP to HTTPS when page is loaded over HTTPS
+ */
+function getApiBaseURL(): string {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+    
+    // If we're in the browser and the page is loaded over HTTPS, convert HTTP URLs to HTTPS
+    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+        // Convert http:// to https:// to avoid mixed content errors
+        if (envUrl.startsWith('http://')) {
+            return envUrl.replace('http://', 'https://');
+        }
+    }
+    
+    return envUrl;
+}
+
 interface RequestOptions {
     params?: Record<string, any>;
     headers?: Record<string, string>;
@@ -58,7 +75,7 @@ class ApiClient {
         this.retryDelay = config.retryDelay || 500;
         
         // Ensure baseURL ends without trailing slash
-        const baseURL = config.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+        const baseURL = config.baseURL || getApiBaseURL();
         const cleanBaseURL = baseURL.replace(/\/$/, '');
         
         this.instance = axios.create({

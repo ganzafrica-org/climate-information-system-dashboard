@@ -38,7 +38,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const [isInitialized, setIsInitialized] = useState(false);
     const router = useRouter();
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+    // Get API URL, automatically converting HTTP to HTTPS when page is loaded over HTTPS
+    const getApiBaseURL = () => {
+        const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
+        
+        // If we're in the browser and the page is loaded over HTTPS, convert HTTP URLs to HTTPS
+        if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+            // Convert http:// to https:// to avoid mixed content errors
+            if (envUrl.startsWith('http://')) {
+                return envUrl.replace('http://', 'https://');
+            }
+        }
+        
+        return envUrl;
+    };
+
+    const API_BASE_URL = getApiBaseURL();
 
     const isAuthenticated = !!user && !!token;
 
