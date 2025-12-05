@@ -1,5 +1,6 @@
 import { DM_Sans } from "next/font/google";
 import { AppProps } from 'next/app';
+import Head from 'next/head';
 import { ThemeProvider } from '@/components/theme-provider';
 import { Toaster } from '@/components/ui/sonner';
 import QueryProvider from '@/lib/queryProvider';
@@ -14,6 +15,10 @@ const dmSans = DM_Sans({
 export default function MyApp({ Component, pageProps }: AppProps) {
     return (
         <main className={dmSans.className}>
+            <Head>
+                <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+                <link rel="alternate icon" type="image/x-icon" href="/favicon.ico?v=3" />
+            </Head>
             <QueryProvider>
                 <AuthProvider>
                     <ThemeProvider

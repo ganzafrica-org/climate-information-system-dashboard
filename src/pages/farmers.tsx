@@ -291,7 +291,7 @@ const Farmers: NextPage = () => {
                   <Button 
                     variant="primary" 
                     onClick={() => setCreateDialogOpen(true)} 
-                    style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                    style={{ backgroundColor: '#147677', borderColor: '#147677' }}
                     className="hover:opacity-90 text-white"
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -303,10 +303,10 @@ const Farmers: NextPage = () => {
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
-                      style={{ borderColor: '#66a9e3', color: '#66a9e3' }}
-                      className="hover:bg-blue-50"
+                      style={{ borderColor: '#147677', color: '#147677' }}
+                      className="hover:bg-[#147677]/10"
                     >
-                      <MapPin className="h-4 w-4 mr-2" />
+                      <MapPin className="h-4 w-4 mr-2 text-[#147677]" />
                       <span>{selectedLocation === "all" ? t("allLocations") : selectedLocation}</span>
                       {/* <ChevronDown className="ml-2 h-4 w-4" /> */}
                     </Button>
