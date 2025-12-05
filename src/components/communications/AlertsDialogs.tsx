@@ -127,9 +127,10 @@ export function ViewAlertDialog({
     switch (status?.toLowerCase()) {
       case 'sent': return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'scheduled': return <Clock className="h-4 w-4 text-[#147677]" />;
-      case 'draft': return <FileText className="h-4 w-4 text-gray-500" />;
+      case 'draft': return <FileText className="h-4 w-4 text-[#147677]" />;
+      case 'pending': return <Clock className="h-4 w-4 text-[#147677]" />;
       case 'failed': return <XCircle className="h-4 w-4 text-red-500" />;
-      default: return <FileText className="h-4 w-4 text-gray-500" />;
+      default: return <FileText className="h-4 w-4 text-[#147677]" />;
     }
   };
 
@@ -138,6 +139,7 @@ export function ViewAlertDialog({
       case 'sent': return 'default';
       case 'scheduled': return 'secondary';
       case 'draft': return 'outline';
+      case 'pending': return 'outline';
       case 'failed': return 'destructive';
       default: return 'outline';
     }
@@ -174,7 +176,7 @@ export function ViewAlertDialog({
                 </p>
               )}
               <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                <MapPin className="h-4 w-4 text-blue-600" />
+                <MapPin className="h-4 w-4 text-[#147677]" />
                 <span>
                   {typeof alert.location === 'object' && alert.location !== null 
                     ? alert.location.name 
@@ -182,17 +184,29 @@ export function ViewAlertDialog({
                 </span>
               </div>
               <div className="flex items-center gap-2 text-muted-foreground mt-1">
-                <Calendar className="h-4 w-4 text-blue-600" />
+                <Calendar className="h-4 w-4 text-[#147677]" />
                 <span>{t('createdOn')} {new Date(alert.createdAt).toLocaleDateString()}</span>
-                <Clock className="h-4 w-4 ml-2 text-blue-600" />
+                <Clock className="h-4 w-4 ml-2 text-[#147677]" />
                 <span>{new Date(alert.createdAt).toLocaleTimeString()}</span>
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <Badge variant={getPriorityColor(alert.priority)}>
+              <Badge 
+                variant={getPriorityColor(alert.priority)}
+                className={
+                  alert.priority === 'medium' || alert.priority === 'low'
+                    ? 'border-[#147677] text-[#147677]' : ''
+                }
+              >
                 {alert.priority || 'medium'} priority
               </Badge>
-              <Badge variant={getStatusColor(currentStatus)} className="flex items-center gap-1">
+              <Badge 
+                variant={getStatusColor(currentStatus)} 
+                className={`flex items-center gap-1 ${
+                  currentStatus === 'draft' || currentStatus === 'pending' || currentStatus === 'scheduled'
+                    ? 'border-[#147677] text-[#147677]' : ''
+                }`}
+              >
                 {getStatusIcon(currentStatus)}
                 {currentStatus}
               </Badge>
@@ -205,11 +219,11 @@ export function ViewAlertDialog({
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold flex items-center gap-2">
-                <MessageSquare className="h-4 w-4 text-blue-600" />
+                <MessageSquare className="h-4 w-4 text-[#147677]" />
                 {t('alertMessage')}
               </h3>
-              <Button variant="outline" size="sm" onClick={handleCopyMessage} className="border-[#147677] text-blue-600 hover:bg-[#147677]/10">
-                <Copy className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={handleCopyMessage} className="border-[#147677] text-[#147677] hover:bg-[#147677]/10">
+                <Copy className="h-4 w-4 mr-2 text-[#147677]" />
                 {t('copy')}
               </Button>
             </div>
@@ -225,7 +239,7 @@ export function ViewAlertDialog({
             {/* Message Details */}
             <div>
               <h4 className="font-bold mb-3 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-blue-600" />
+                <FileText className="h-4 w-4 text-[#147677]" />
                 {t('messageDetails')}
               </h4>
               <div className="space-y-3 text-sm">
@@ -253,13 +267,19 @@ export function ViewAlertDialog({
             {/* Delivery Info */}
             <div>
               <h4 className="font-bold mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-blue-600" />
+                <Activity className="h-4 w-4 text-[#147677]" />
                 {t('deliveryInfo')}
               </h4>
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                   <span className="text-muted-foreground">{t('status')}:</span>
-                  <Badge variant={getStatusColor(currentStatus)} className="flex items-center gap-1">
+                  <Badge 
+                    variant={getStatusColor(currentStatus)} 
+                    className={`flex items-center gap-1 ${
+                      currentStatus === 'draft' || currentStatus === 'pending' || currentStatus === 'scheduled'
+                        ? 'border-[#147677] text-[#147677]' : ''
+                    }`}
+                  >
                     {getStatusIcon(currentStatus)}
                     {currentStatus}
                   </Badge>
@@ -287,7 +307,7 @@ export function ViewAlertDialog({
                   <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                     <span className="text-muted-foreground">{t('recipients')}:</span>
                     <span className="font-medium flex items-center gap-1">
-                      <Users className="h-3 w-3 text-blue-600" />
+                      <Users className="h-3 w-3 text-[#147677]" />
                       {alert.recipientCount}
                     </span>
                   </div>
@@ -308,7 +328,7 @@ export function ViewAlertDialog({
               <Separator />
               <div>
                 <h4 className="font-bold mb-3 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-blue-600" />
+                  <Clock className="h-4 w-4 text-[#147677]" />
                   {t('timeline')}
                 </h4>
                 <div className="space-y-2">
@@ -338,7 +358,7 @@ export function ViewAlertDialog({
                 onClick={handleSendAlert}
                 className="flex-1 bg-[#147677] hover:bg-[#147677]/90 text-white"
               >
-                <Send className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 mr-2 text-white" />
                 {t('sendToFarmers')}
               </Button>
             )}
@@ -346,9 +366,9 @@ export function ViewAlertDialog({
               <Button
                 variant="outline"
                 onClick={handleEditAlert}
-                className="border-[#147677] text-blue-600 hover:bg-[#147677]/10"
+                className="border-[#147677] text-[#147677] hover:bg-[#147677]/10"
               >
-                <Edit className="h-4 w-4 mr-2" />
+                <Edit className="h-4 w-4 mr-2 text-[#147677]" />
                 {t('editAlert')}
               </Button>
             )}
@@ -455,7 +475,7 @@ export function EditAlertDialog({
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Edit className="h-5 w-5 text-blue-600" />
+            <Edit className="h-5 w-5 text-[#147677]" />
             {t('editAlert')} #{alert.id}
           </DialogTitle>
           <DialogDescription>
@@ -466,7 +486,7 @@ export function EditAlertDialog({
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Alert Type */}
           <div className="space-y-2">
-            <Label htmlFor="type" className="text-blue-600 font-medium">{t('alertType') || 'Alert Type'}</Label>
+            <Label htmlFor="type" className="text-[#147677] font-medium">{t('alertType') || 'Alert Type'}</Label>
             <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
               <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectAlertType') || 'Select alert type'} />
@@ -482,7 +502,7 @@ export function EditAlertDialog({
 
           {/* Priority */}
           <div className="space-y-2">
-            <Label htmlFor="priority" className="text-blue-600 font-medium">{t('priority') || 'Priority'}</Label>
+            <Label htmlFor="priority" className="text-[#147677] font-medium">{t('priority') || 'Priority'}</Label>
             <Select value={formData.priority} onValueChange={(value) => handleInputChange('priority', value)}>
               <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectPriority') || 'Select priority'} />
@@ -498,7 +518,7 @@ export function EditAlertDialog({
 
           {/* Category */}
           <div className="space-y-2">
-            <Label htmlFor="category" className="text-blue-600 font-medium">{t('category') || 'Category'}</Label>
+            <Label htmlFor="category" className="text-[#147677] font-medium">{t('category') || 'Category'}</Label>
             <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
               <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectCategory') || 'Select category'} />
@@ -514,7 +534,7 @@ export function EditAlertDialog({
 
           {/* Message */}
           <div className="space-y-2">
-            <Label htmlFor="message" className="text-blue-600 font-medium">{t('message') || 'Message'}</Label>
+            <Label htmlFor="message" className="text-[#147677] font-medium">{t('message') || 'Message'}</Label>
             <textarea
               id="message"
               rows={4}
@@ -523,14 +543,14 @@ export function EditAlertDialog({
               placeholder={t('enterAlertMessage') || 'Enter alert message...'}
               className="flex min-h-[100px] w-full rounded-md border border-[#147677]/50 focus:border-[#147677] bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#147677] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
             />
-            <div className="text-xs text-blue-600">
+            <div className="text-xs text-[#147677]">
               {formData.message.length} characters
             </div>
           </div>
 
           {/* Target Audience */}
           <div className="space-y-2">
-            <Label htmlFor="targetAudience" className="text-blue-600 font-medium">{t('targetAudience') || 'Target Audience'}</Label>
+            <Label htmlFor="targetAudience" className="text-[#147677] font-medium">{t('targetAudience') || 'Target Audience'}</Label>
             <Input
               id="targetAudience"
               value={formData.targetAudience}
@@ -542,7 +562,7 @@ export function EditAlertDialog({
 
           {/* Delivery Method */}
           <div className="space-y-2">
-            <Label htmlFor="deliveryMethod" className="text-blue-600 font-medium">{t('deliveryMethod') || 'Delivery Method'}</Label>
+            <Label htmlFor="deliveryMethod" className="text-[#147677] font-medium">{t('deliveryMethod') || 'Delivery Method'}</Label>
             <Select value={formData.deliveryMethod} onValueChange={(value) => handleInputChange('deliveryMethod', value)}>
               <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectDeliveryMethod') || 'Select delivery method'} />
@@ -578,7 +598,7 @@ export function EditAlertDialog({
                 </>
               ) : (
                 <>
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-4 w-4 mr-2 text-white" />
                   {t('updateAlert') || 'Update Alert'}
                 </>
               )}
