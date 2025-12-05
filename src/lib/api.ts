@@ -236,9 +236,17 @@ class ApiClient {
     // Helper method to build clean URLs
     private buildUrl(url: string): string {
         // Clean double slashes but keep leading slash for axios baseURL handling
-        const cleanUrl = url.replace(/\/+/g, '/');
+        let cleanUrl = url.replace(/\/+/g, '/');
         // Ensure URL starts with / for proper axios baseURL handling
-        return cleanUrl.startsWith('/') ? cleanUrl : '/' + cleanUrl;
+        cleanUrl = cleanUrl.startsWith('/') ? cleanUrl : '/' + cleanUrl;
+        
+        // If baseURL ends with /api and endpoint starts with /api, remove duplicate
+        const baseURL = this.instance.defaults.baseURL || '';
+        if (baseURL.endsWith('/api') && cleanUrl.startsWith('/api/')) {
+            cleanUrl = cleanUrl.replace(/^\/api/, '');
+        }
+        
+        return cleanUrl;
     }
 
     async get<T = any>(url: string, options: RequestOptions = {}): Promise<T> {
