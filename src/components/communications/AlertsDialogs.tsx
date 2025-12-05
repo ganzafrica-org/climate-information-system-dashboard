@@ -107,9 +107,9 @@ export function ViewAlertDialog({
     switch (priority.toLowerCase()) {
       case 'critical': return <AlertTriangle className="h-5 w-5 text-red-500" />;
       case 'high': return <AlertCircle className="h-5 w-5 text-orange-500" />;
-      case 'medium': return <Info className="h-5 w-5 text-blue-600" />;
-      case 'low': return <CheckCircle className="h-5 w-5 text-blue-600" />;
-      default: return <Info className="h-5 w-5 text-blue-600" />;
+      case 'medium': return <Info className="h-5 w-5 text-[#147677]" />;
+      case 'low': return <CheckCircle className="h-5 w-5 text-[#147677]" />;
+      default: return <Info className="h-5 w-5 text-[#147677]" />;
     }
   };
 
@@ -126,7 +126,7 @@ export function ViewAlertDialog({
   const getStatusIcon = (status: string) => {
     switch (status?.toLowerCase()) {
       case 'sent': return <CheckCircle className="h-4 w-4 text-green-500" />;
-      case 'scheduled': return <Clock className="h-4 w-4 text-blue-600" />;
+      case 'scheduled': return <Clock className="h-4 w-4 text-[#147677]" />;
       case 'draft': return <FileText className="h-4 w-4 text-gray-500" />;
       case 'failed': return <XCircle className="h-4 w-4 text-red-500" />;
       default: return <FileText className="h-4 w-4 text-gray-500" />;
@@ -161,7 +161,7 @@ export function ViewAlertDialog({
         <div className="space-y-6">
           {/* Alert Header */}
           <div className="flex items-start gap-4">
-            <div className="bg-blue-50 rounded-full h-16 w-16 flex items-center justify-center">
+            <div className="bg-[#147677]/10 rounded-full h-16 w-16 flex items-center justify-center">
               {getPriorityIcon(alert.priority)}
             </div>
             <div className="flex-1">
@@ -208,12 +208,12 @@ export function ViewAlertDialog({
                 <MessageSquare className="h-4 w-4 text-blue-600" />
                 {t('alertMessage')}
               </h3>
-              <Button variant="outline" size="sm" onClick={handleCopyMessage} className="border-blue-600 text-blue-600 hover:bg-blue-50">
+              <Button variant="outline" size="sm" onClick={handleCopyMessage} className="border-[#147677] text-blue-600 hover:bg-[#147677]/10">
                 <Copy className="h-4 w-4 mr-2" />
                 {t('copy')}
               </Button>
             </div>
-            <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+            <div className="bg-[#147677]/10 rounded-lg p-4 border border-[#147677]/30">
               <p className="text-sm leading-relaxed">
                 {typeof alert.message === 'string' ? alert.message : 'No message content available'}
               </p>
@@ -229,20 +229,20 @@ export function ViewAlertDialog({
                 {t('messageDetails')}
               </h4>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                   <span className="text-muted-foreground">{t('messageLength')}:</span>
                   <span className="font-medium">{alert.messageLength} characters</span>
                 </div>
-                <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                   <span className="text-muted-foreground">{t('segments')}:</span>
                   <span className="font-medium">{alert.messageSegments}</span>
                 </div>
-                <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                   <span className="text-muted-foreground">{t('alertId')}:</span>
                   <span className="font-medium">#{alert.id}</span>
                 </div>
                 {alert.targetAudience && (
-                  <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                     <span className="text-muted-foreground">{t('targetAudience')}:</span>
                     <span className="font-medium">{alert.targetAudience}</span>
                   </div>
@@ -257,7 +257,7 @@ export function ViewAlertDialog({
                 {t('deliveryInfo')}
               </h4>
               <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                   <span className="text-muted-foreground">{t('status')}:</span>
                   <Badge variant={getStatusColor(currentStatus)} className="flex items-center gap-1">
                     {getStatusIcon(currentStatus)}
@@ -265,17 +265,17 @@ export function ViewAlertDialog({
                   </Badge>
                 </div>
                 {alert.sentAt ? (
-                  <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                     <span className="text-muted-foreground">{t('sentAt')}:</span>
                     <span className="font-medium">{new Date(alert.sentAt).toLocaleString()}</span>
                   </div>
                 ) : (
-                  <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                     <span className="text-muted-foreground">{t('status')}:</span>
                     <span className="font-medium">{t('pending')}</span>
                   </div>
                 )}
-                <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                   <span className="text-muted-foreground">{t('location')}:</span>
                   <span className="font-medium">
                     {typeof alert.location === 'object' && alert.location !== null 
@@ -284,7 +284,7 @@ export function ViewAlertDialog({
                   </span>
                 </div>
                 {alert.recipientCount && (
-                  <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                     <span className="text-muted-foreground">{t('recipients')}:</span>
                     <span className="font-medium flex items-center gap-1">
                       <Users className="h-3 w-3 text-blue-600" />
@@ -293,7 +293,7 @@ export function ViewAlertDialog({
                   </div>
                 )}
                 {alert.deliveryMethod && (
-                  <div className="flex justify-between items-center p-2 bg-blue-50 rounded border border-blue-200">
+                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                     <span className="text-muted-foreground">{t('deliveryMethod')}:</span>
                     <span className="font-medium">{alert.deliveryMethod}</span>
                   </div>
@@ -313,14 +313,14 @@ export function ViewAlertDialog({
                 </h4>
                 <div className="space-y-2">
                   <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                    <div className="w-2 h-2 bg-[#147677] rounded-full"></div>
                     <span className="text-muted-foreground">
                       {t('created')}: {new Date(alert.createdAt).toLocaleString()}
                     </span>
                   </div>
                   {alert.updatedAt !== alert.createdAt && (
                     <div className="flex items-center gap-3 text-sm">
-                      <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                      <div className="w-2 h-2 bg-[#147677] rounded-full"></div>
                       <span className="text-muted-foreground">
                         {t('updated')}: {new Date(alert.updatedAt).toLocaleString()}
                       </span>
@@ -336,7 +336,7 @@ export function ViewAlertDialog({
             {!alert.isSent && onSend && (
               <Button
                 onClick={handleSendAlert}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-[#147677] hover:bg-[#147677]/90 text-white"
               >
                 <Send className="h-4 w-4 mr-2" />
                 {t('sendToFarmers')}
@@ -346,7 +346,7 @@ export function ViewAlertDialog({
               <Button
                 variant="outline"
                 onClick={handleEditAlert}
-                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                className="border-[#147677] text-blue-600 hover:bg-[#147677]/10"
               >
                 <Edit className="h-4 w-4 mr-2" />
                 {t('editAlert')}
@@ -468,7 +468,7 @@ export function EditAlertDialog({
           <div className="space-y-2">
             <Label htmlFor="type" className="text-blue-600 font-medium">{t('alertType') || 'Alert Type'}</Label>
             <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
-              <SelectTrigger className="border-blue-300 focus:border-blue-600">
+              <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectAlertType') || 'Select alert type'} />
               </SelectTrigger>
               <SelectContent>
@@ -484,7 +484,7 @@ export function EditAlertDialog({
           <div className="space-y-2">
             <Label htmlFor="priority" className="text-blue-600 font-medium">{t('priority') || 'Priority'}</Label>
             <Select value={formData.priority} onValueChange={(value) => handleInputChange('priority', value)}>
-              <SelectTrigger className="border-blue-300 focus:border-blue-600">
+              <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectPriority') || 'Select priority'} />
               </SelectTrigger>
               <SelectContent>
@@ -500,7 +500,7 @@ export function EditAlertDialog({
           <div className="space-y-2">
             <Label htmlFor="category" className="text-blue-600 font-medium">{t('category') || 'Category'}</Label>
             <Select value={formData.category} onValueChange={(value) => handleInputChange('category', value)}>
-              <SelectTrigger className="border-blue-300 focus:border-blue-600">
+              <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectCategory') || 'Select category'} />
               </SelectTrigger>
               <SelectContent>
@@ -521,7 +521,7 @@ export function EditAlertDialog({
               value={formData.message}
               onChange={(e) => handleInputChange('message', e.target.value)}
               placeholder={t('enterAlertMessage') || 'Enter alert message...'}
-              className="flex min-h-[100px] w-full rounded-md border border-blue-300 focus:border-blue-600 bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
+              className="flex min-h-[100px] w-full rounded-md border border-[#147677]/50 focus:border-[#147677] bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#147677] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 resize-none"
             />
             <div className="text-xs text-blue-600">
               {formData.message.length} characters
@@ -536,7 +536,7 @@ export function EditAlertDialog({
               value={formData.targetAudience}
               onChange={(e) => handleInputChange('targetAudience', e.target.value)}
               placeholder={t('enterTargetAudience') || 'e.g., All farmers, Specific sector...'}
-              className="border-blue-300 focus:border-blue-600"
+              className="border-[#147677]/50 focus:border-[#147677]"
             />
           </div>
 
@@ -544,7 +544,7 @@ export function EditAlertDialog({
           <div className="space-y-2">
             <Label htmlFor="deliveryMethod" className="text-blue-600 font-medium">{t('deliveryMethod') || 'Delivery Method'}</Label>
             <Select value={formData.deliveryMethod} onValueChange={(value) => handleInputChange('deliveryMethod', value)}>
-              <SelectTrigger className="border-blue-300 focus:border-blue-600">
+              <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectDeliveryMethod') || 'Select delivery method'} />
               </SelectTrigger>
               <SelectContent>
@@ -569,7 +569,7 @@ export function EditAlertDialog({
             <Button
               type="submit"
               disabled={isLoading || !formData.message.trim()}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-[#147677] hover:bg-[#147677]/90 text-white"
             >
               {isLoading ? (
                 <>

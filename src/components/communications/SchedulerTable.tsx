@@ -267,7 +267,7 @@ export function WeatherSchedulerTable() {
     <div className="space-y-6">  
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Status Card */}
-        <Card className="bg-blue-50 border-t">
+        <Card className="bg-white border-t">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -320,7 +320,7 @@ export function WeatherSchedulerTable() {
         </Card>
 
         {/* Schedule Times Card */}
-        <Card className="bg-orange-50 border-t ">
+        <Card className="bg-white border-t ">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#F89D2D]">
@@ -357,10 +357,10 @@ export function WeatherSchedulerTable() {
         </Card>
 
         {/* Manual Trigger Card */}
-        <Card className="bg-[#E7E9EF] border-t ">
+        <Card className="bg-white border-t ">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#2563EB]" >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#147677]" >
                 <Zap className="h-5 w-5 text-white" />
               </div>
               Manual Broadcast
@@ -379,7 +379,7 @@ export function WeatherSchedulerTable() {
                 onClick={() => handleSchedulerAction('trigger')}
                 disabled={isActionLoading !== null}
                 variant="secondary"
-                className="w-full flex items-center gap-2 bg-[#2563EB] hover:bg-[#2825AE] text-white hover:text-white-50"
+                className="w-full flex items-center gap-2 bg-[#147677] hover:bg-[#147677]/90 text-white"
                 size="sm"
               >
                 {isActionLoading === 'trigger' ? (

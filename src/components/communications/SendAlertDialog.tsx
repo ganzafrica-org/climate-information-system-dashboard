@@ -110,7 +110,6 @@ export function SendAlertDialog({
   // Fetch farmers when dialog opens
   useEffect(() => {
     if (open && alert) {
-      console.log('Dialog opened, fetching farmers for alert:', alert);
       fetchFarmers();
     }
   }, [open, alert]);
@@ -132,9 +131,6 @@ export function SendAlertDialog({
         }
       }
   
-      console.log('Alert location:', alert?.location);
-      console.log('Location value:', locationValue);
-  
       if (locationValue && locationValue !== 'all') {
         // Try to find location by name first, then use as ID if it's a number
         const locationId = typeof locationValue === 'string' ? parseInt(locationValue) : locationValue;
@@ -142,49 +138,57 @@ export function SendAlertDialog({
           filters.locationId = locationId;
         } else {
           // If it's not a number, we'll get all farmers and filter client-side
-          console.warn('Location is not a valid ID, fetching all farmers');
         }
       }
   
-      const response = await api.get('/api/admin/farmers', {
-        params: filters
-      });
-  
-      console.log('Farmers API response:', response);
-      console.log('Response data:', response.data);
-      console.log('Response data type:', typeof response.data);
-      console.log('Response data keys:', Object.keys(response.data || {}));
+      // Try different possible endpoints
+      const possibleEndpoints = [
+        '/api/admin/farmers',
+        '/api/farmers',
+        '/api/users/farmers'
+      ];
+
+      let response = null;
+      for (const endpoint of possibleEndpoints) {
+        try {
+          response = await api.get(endpoint, {
+            params: filters
+          });
+          break;
+        } catch (error: any) {
+          if (error.response?.status === 404) {
+            continue;
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (!response) {
+        throw new Error('No valid API endpoint found for farmers');
+      }
   
       // Handle different response formats based on the API structure
       let farmersData: any[] = [];
       
-      // Check for the actual structure based on your console output
       if (response.data && response.data.farmers && Array.isArray(response.data.farmers)) {
         farmersData = response.data.farmers;
-        console.log('Found farmers in response.data.farmers:', farmersData.length, 'farmers');
       } else if (response.data && response.data.data && response.data.data.farmers) {
         farmersData = response.data.data.farmers;
-        console.log('Found farmers in response.data.data.farmers:', farmersData.length, 'farmers');
       } else if (Array.isArray(response.data)) {
         // Fallback: direct array
         farmersData = response.data;
-        console.log('Found farmers in response.data array:', farmersData.length, 'farmers');
       } else {
-        console.log('No farmers found in response, response structure:', JSON.stringify(response.data, null, 2));
+        // No farmers data found, keep empty array
       }
-  
-      console.log('Raw farmers data:', farmersData);
   
       // Ensure we have an array
       if (!Array.isArray(farmersData)) {
-        console.error('Farmers data is not an array:', farmersData);
         farmersData = [];
       }
   
       // Transform farmers data to ensure consistent structure
       const transformedFarmers = farmersData.map((farmer: any, index: number) => {
-        console.log(`Transforming farmer ${index}:`, farmer);
-        
         return {
           id: farmer.id || farmer.farmerId,
           name: farmer.name || farmer.fullName || `${farmer.firstName || ''} ${farmer.lastName || ''}`.trim() || 'Unknown Farmer',
@@ -197,21 +201,16 @@ export function SendAlertDialog({
         };
       });
   
-      console.log('Transformed farmers:', transformedFarmers);
-  
       // Filter by location if needed (client-side filtering)
       let finalFarmers = transformedFarmers.filter(f => f.isActive);
-      console.log('After active filter:', finalFarmers);
       
       if (locationValue && locationValue !== 'all' && typeof locationValue === 'string' && isNaN(parseInt(locationValue))) {
         // If location is a string name, filter client-side
         finalFarmers = finalFarmers.filter(f => 
           f.location.toLowerCase().includes(locationValue.toLowerCase())
         );
-        console.log('After location filter:', finalFarmers);
       }
   
-      console.log('Final farmers to set:', finalFarmers);
       setFarmers(finalFarmers);
       
       if (finalFarmers.length === 0) {
@@ -220,9 +219,6 @@ export function SendAlertDialog({
         toast.success(`Loaded ${finalFarmers.length} farmers`);
       }
     } catch (error: any) {
-      console.error('Failed to fetch farmers:', error);
-      console.error('Error details:', error.response?.data);
-      
       // Use fallback farmers for development/testing
       const fallbackFarmers: Farmer[] = [
         {
@@ -297,8 +293,6 @@ export function SendAlertDialog({
         farmerIds: selectedFarmers
       });
 
-      console.log('Send alert response:', response);
-
       // Handle different response formats
       let result: SendResult;
       
@@ -356,8 +350,6 @@ export function SendAlertDialog({
       }
 
     } catch (error: any) {
-      console.error('Failed to send alert:', error);
-      
       // Create error result
       const errorResult: SendResult = {
         success: false,
@@ -370,7 +362,7 @@ export function SendAlertDialog({
               farmerId: id,
               farmerName: farmer?.name || 'Unknown',
               phone: farmer?.phone || 'Unknown',
-              error: 'Network error'
+              error: ''
             };
           })
         }
@@ -412,8 +404,6 @@ export function SendAlertDialog({
   };
 
   const filteredFarmers = getFilteredFarmers();
-  console.log('Current farmers state:', farmers);
-  console.log('Filtered farmers for display:', filteredFarmers);
 
   if (!alert) return null;
 
@@ -446,7 +436,12 @@ export function SendAlertDialog({
               </div>
 
               <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <p className="text-sm mb-3">{sendResult.message}</p>
+                {/* Filter out "no_successful_sms_sends" message */}
+                {sendResult.message && 
+                 !sendResult.message.toLowerCase().includes('no_successful_sms_sends') &&
+                 !sendResult.message.toLowerCase().includes('no successful sms sends') && (
+                  <p className="text-sm mb-3">{sendResult.message}</p>
+                )}
                 
                 {sendResult.results && (
                   <div className="space-y-3">
@@ -475,7 +470,7 @@ export function SendAlertDialog({
                         <div className="space-y-1">
                           {sendResult.results.failed.map((farmer, index) => (
                             <div key={index} className="text-sm text-muted-foreground">
-                              • {farmer.farmerName} ({farmer.phone}) - {farmer.error}
+                              • {farmer.farmerName} ({farmer.phone})
                             </div>
                           ))}
                         </div>
