@@ -25,6 +25,7 @@ const inviteUser = async (data: InviteUserInput): Promise<User> => {
     const sanitized: any = {
       email: data.email?.trim().toLowerCase(),
       role: data.role,
+      dashboardUrl: 'https://www.teganyamuhinzi.rw/dashboard', // Include dashboard link for email
     };
     
     // Include username if provided (some backends might require it)

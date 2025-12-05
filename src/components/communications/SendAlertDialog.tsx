@@ -141,9 +141,32 @@ export function SendAlertDialog({
           }
       }
   
-      const response = await api.get('/api/admin/farmers', {
-        params: filters
-      });
+      // Try different possible endpoints
+      const possibleEndpoints = [
+        '/api/admin/farmers',
+        '/api/farmers',
+        '/api/users/farmers'
+      ];
+
+      let response = null;
+      for (const endpoint of possibleEndpoints) {
+        try {
+          response = await api.get(endpoint, {
+            params: filters
+          });
+          break;
+        } catch (error: any) {
+          if (error.response?.status === 404) {
+            continue;
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (!response) {
+        throw new Error('No valid API endpoint found for farmers');
+      }
   
       // Handle different response formats based on the API structure
       let farmersData: any[] = [];

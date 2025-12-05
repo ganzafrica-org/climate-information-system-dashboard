@@ -156,7 +156,34 @@ class ApiClient {
                 // Suppress errors for admin logs endpoints (might require admin role or not be accessible)
                 const isAdminLogsEndpoint = error.config?.url?.includes('/api/weather/admin/logs/');
                 
-                // Silently handle expected errors (scheduler endpoints, admin logs endpoints)
+                // Suppress errors for location endpoints that may not exist (fallback endpoints)
+                const isLocationEndpoint = error.config?.url?.includes('/api/users/locations') || 
+                                          error.config?.url?.includes('/api/locations') ||
+                                          error.config?.url?.includes('/api/admin/locations');
+                
+                // Suppress errors for farmers endpoint that may not exist
+                const isFarmersEndpoint = error.config?.url?.includes('/api/admin/farmers');
+                
+                // Suppress errors for weather endpoints that may not exist
+                const isWeatherEndpoint = error.config?.url?.includes('/api/weather/alerts') ||
+                                        error.config?.url?.includes('/api/weather/all');
+                
+                // Mark as suppressed if it's a 404 on an expected endpoint
+                const shouldSuppress404 = is404 && (
+                    isSchedulerEndpoint || 
+                    isAdminLogsEndpoint || 
+                    isLocationEndpoint || 
+                    isFarmersEndpoint ||
+                    isWeatherEndpoint
+                );
+                
+                // Mark error as suppressed to prevent unnecessary logging
+                if (shouldSuppress404) {
+                    (error as any).isSuppressed = true;
+                    (error as any).isExpected404 = true;
+                }
+                
+                // Silently handle expected errors (scheduler endpoints, admin logs endpoints, fallback endpoints)
                 // No console logging to avoid exposing data in production
 
                 // Handle 429 rate limiting with bounded retries here (in addition to service-level retries)

@@ -248,13 +248,49 @@ const Dashboard: NextPage = () => {
 
     const fetchLocations = async () => {
         try {
-            const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
-                params: { limit: 100 }
-            });
-            setLocations(response.data.locations);
+            // Try different possible endpoints
+            const possibleEndpoints = [
+                '/api/users/locations/all',
+                '/api/locations/all',
+                '/api/locations',
+                '/api/users/locations',
+                '/api/admin/locations'
+            ];
 
-            if (response.data.locations.length > 0) {
-                setSelectedLocation(response.data.locations[0]);
+            let response = null;
+            for (const endpoint of possibleEndpoints) {
+                try {
+                    response = await api.get<ApiResponse<LocationsResponse>>(endpoint, {
+                        params: { limit: 100 }
+                    });
+                    break;
+                } catch (error: any) {
+                    if (error.response?.status === 404) {
+                        continue;
+                    } else {
+                        throw error;
+                    }
+                }
+            }
+
+            if (!response) {
+                throw new Error('No valid API endpoint found for locations');
+            }
+
+            // Handle different response structures
+            let locationsData: Location[] = [];
+            if (response.data?.locations) {
+                locationsData = response.data.locations;
+            } else if (Array.isArray(response.data)) {
+                locationsData = response.data;
+            } else if (Array.isArray(response)) {
+                locationsData = response;
+            }
+
+            setLocations(locationsData);
+
+            if (locationsData.length > 0) {
+                setSelectedLocation(locationsData[0]);
             }
         } catch (error: any) {
             toast.error(t('failedToLoadLocations'));

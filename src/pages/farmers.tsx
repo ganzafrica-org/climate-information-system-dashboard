@@ -64,12 +64,51 @@ const Farmers: NextPage = () => {
 
   const fetchLocations = async () => {
     try {
-      const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
-        params: { limit: 100 }
-      });
-      setLocations(response.data.locations);
+      // Try different possible endpoints
+      const possibleEndpoints = [
+        '/api/users/locations/all',
+        '/api/locations/all',
+        '/api/locations',
+        '/api/users/locations',
+        '/api/admin/locations'
+      ];
+
+      let response = null;
+      for (const endpoint of possibleEndpoints) {
+        try {
+          response = await api.get<ApiResponse<LocationsResponse>>(endpoint, {
+            params: { limit: 100 }
+          });
+          break;
+        } catch (error: any) {
+          if (error.response?.status === 404) {
+            continue;
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (!response) {
+        throw new Error('No valid API endpoint found for locations');
+      }
+
+      // Handle different response structures
+      let locationsData: Location[] = [];
+      if (response.data?.locations) {
+        locationsData = response.data.locations;
+      } else if (Array.isArray(response.data)) {
+        locationsData = response.data;
+      } else if (Array.isArray(response)) {
+        locationsData = response;
+      }
+
+      setLocations(locationsData);
     } catch (error: any) {
-      toast.error(t('failedToLoadLocations'));
+      if (!error.isSuppressed) {
+        toast.error(t('failedToLoadLocations'));
+      }
+      setLocations([]);
     }
   };
 
@@ -92,14 +131,59 @@ const Farmers: NextPage = () => {
         filters.search = searchTerm.trim();
       }
 
-      const response = await api.get<ApiResponse<FarmersResponse>>('/api/admin/farmers', {
-        params: filters
-      });
+      // Try different possible endpoints
+      const possibleEndpoints = [
+        '/api/admin/farmers',
+        '/api/farmers',
+        '/api/users/farmers'
+      ];
 
-      setFarmers(response.data.farmers);
-      setTotalCount(response.data.count);
+      let response = null;
+      for (const endpoint of possibleEndpoints) {
+        try {
+          response = await api.get<ApiResponse<FarmersResponse>>(endpoint, {
+            params: filters
+          });
+          break;
+        } catch (error: any) {
+          if (error.response?.status === 404) {
+            continue;
+          } else {
+            throw error;
+          }
+        }
+      }
+
+      if (!response) {
+        throw new Error('No valid API endpoint found for farmers');
+      }
+
+      // Handle different response structures
+      let farmersData: Farmer[] = [];
+      let count = 0;
+
+      if (response.data?.farmers) {
+        farmersData = response.data.farmers;
+        count = response.data.count || response.data.farmers.length;
+      } else if (response.data?.data?.farmers) {
+        farmersData = response.data.data.farmers;
+        count = response.data.data.count || response.data.data.farmers.length;
+      } else if (Array.isArray(response.data)) {
+        farmersData = response.data;
+        count = response.data.length;
+      } else if (Array.isArray(response)) {
+        farmersData = response;
+        count = response.length;
+      }
+
+      setFarmers(farmersData);
+      setTotalCount(count);
     } catch (error: any) {
-      toast.error(t('failedToLoadFarmers'));
+      if (!error.isSuppressed) {
+        toast.error(t('failedToLoadFarmers'));
+      }
+      setFarmers([]);
+      setTotalCount(0);
     } finally {
       setIsLoading(false);
     }
