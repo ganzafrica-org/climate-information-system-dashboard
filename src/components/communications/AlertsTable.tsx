@@ -166,7 +166,7 @@ interface Alert {
   targetAudience?: string;
   deliveryMethod?: string;
   recipientCount?: number;
-  status?: 'draft' | 'scheduled' | 'sent' | 'failed';
+  status?: 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending';
 }
 
 interface ApiResponse<T> {
