@@ -51,7 +51,6 @@ const Locations: NextPage = () => {
 
     // Allow all authenticated users to view locations; admin will still control mutations
     useEffect(() => {
-        // no-op: viewing is allowed for all authenticated users
     }, [isAuthenticated, user, router, t]);
 
     useEffect(() => {
