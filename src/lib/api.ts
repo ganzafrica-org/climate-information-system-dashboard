@@ -7,23 +7,6 @@ interface ApiClientConfig {
     retryDelay?: number;
 }
 
-/**
- * Get the API base URL, automatically converting HTTP to HTTPS when page is loaded over HTTPS
- */
-function getApiBaseURL(): string {
-    const envUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002';
-    
-    // If we're in the browser and the page is loaded over HTTPS, convert HTTP URLs to HTTPS
-    if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
-        // Convert http:// to https:// to avoid mixed content errors
-        if (envUrl.startsWith('http://')) {
-            return envUrl.replace('http://', 'https://');
-        }
-    }
-    
-    return envUrl;
-}
-
 interface RequestOptions {
     params?: Record<string, any>;
     headers?: Record<string, string>;
@@ -75,7 +58,7 @@ class ApiClient {
         this.retryDelay = config.retryDelay || 500;
         
         // Ensure baseURL ends without trailing slash
-        const baseURL = config.baseURL || getApiBaseURL();
+        const baseURL = config.baseURL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
         const cleanBaseURL = baseURL.replace(/\/$/, '');
         
         this.instance = axios.create({
@@ -98,49 +81,52 @@ class ApiClient {
                 }
 
                 // Attach language preference from localStorage
-                // Using only Accept-Language header (standard HTTP header) to avoid CORS issues
                 try {
                     const locale = typeof window !== 'undefined' ? (localStorage.getItem('locale') || '') : '';
                     const normalizedLang = (locale === 'rw' || locale === 'en') ? locale : undefined;
 
-                    // Only use Accept-Language header (standard HTTP header, avoids CORS issues)
-                    if (normalizedLang && !(config.headers && 'Accept-Language' in config.headers)) {
+                    // Prefer explicit header if caller didn't set it
+                    if (normalizedLang && !(config.headers && ('x-language' in config.headers || 'x-lang' in config.headers))) {
                         (config.headers as any) = {
                             ...(config.headers || {}),
+                            'x-language': normalizedLang,
                             'Accept-Language': normalizedLang,
                         };
                     }
 
                     // Do NOT append a lang query param globally to avoid 400s on endpoints
                     // that don't allow extra params. If needed, callers can pass params.lang
-                    // explicitly or backend can read from Accept-Language header above.
+                    // explicitly or backend can read from headers above.
                 } catch (_) {
                     // no-op if localStorage is unavailable
                 }
 
-                // Clean URL path - remove double slashes but keep leading slash for axios
+                // Clean URL path - remove double slashes
                 if (config.url) {
-                    // Remove all leading slashes first
-                    config.url = config.url.replace(/^\/+/, '');
-                    // Ensure URL starts with exactly one slash for proper axios baseURL handling
-                    config.url = '/' + config.url;
-                    // Remove any remaining double slashes in the path
                     config.url = config.url.replace(/\/+/g, '/');
+                    if (config.url.startsWith('/')) {
+                        config.url = config.url.substring(1);
+                    }
                 }
 
+                console.log(`Making ${config.method?.toUpperCase()} request to:`, `${config.baseURL}/${config.url}`);
                 return config;
             },
             (error) => {
+                console.error('Request interceptor error:', error);
                 return Promise.reject(error);
             }
         );
 
         this.instance.interceptors.response.use(
             (response: AxiosResponse) => {
+                console.log(`✓ ${response.config.method?.toUpperCase()} ${response.config.url}:`, response.status);
                 return response;
             },
             async (error) => {
                 if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+                    console.error('Request timeout:', error.message);
+
                     const timeoutError = new Error('Request timeout');
                     timeoutError.name = 'TimeoutError';
                     (timeoutError as any).code = 'ECONNABORTED';
@@ -148,16 +134,15 @@ class ApiClient {
                     return Promise.reject(timeoutError);
                 }
 
-                // Suppress console errors for known missing endpoints (404s on scheduler endpoints)
-                const isSchedulerEndpoint = error.config?.url?.includes('/api/weather/scheduler/');
-                const is404 = error.response?.status === 404;
-                const isNetworkError = !error.response && (error.code === 'ERR_NETWORK' || error.message?.includes('ERR_FAILED') || error.code === 'ERR_FAILED');
-                
-                // Suppress errors for admin logs endpoints (might require admin role or not be accessible)
-                const isAdminLogsEndpoint = error.config?.url?.includes('/api/weather/admin/logs/');
-                
-                // Silently handle expected errors (scheduler endpoints, admin logs endpoints)
-                // No console logging to avoid exposing data in production
+                // Log the full error details for debugging
+                console.error(`✗ API Error:`, {
+                    status: error.response?.status,
+                    statusText: error.response?.statusText,
+                    url: error.config?.url,
+                    method: error.config?.method,
+                    data: error.response?.data,
+                    message: error.message
+                });
 
                 // Handle 429 rate limiting with bounded retries here (in addition to service-level retries)
                 if (error.response?.status === 429 && !error.config.skipRetry) {
@@ -169,6 +154,7 @@ class ApiClient {
                         const backoff = baseDelay * Math.pow(2, retryCount);
                         const jitter = Math.floor(Math.random() * 150);
                         const wait = backoff + jitter;
+                        console.log(`Rate limited (429). Interceptor retry ${retryCount + 1}/${maxInterceptorRetries} in ${wait}ms`);
                         error.config._retryCount = retryCount + 1;
                         await this.delay(wait);
                         return this.instance(error.config);
@@ -176,25 +162,17 @@ class ApiClient {
                 }
 
                 if (error.response?.status === 401) {
+                    console.error('Unauthorized access - token may be expired');
                     this.setAuthToken(null);
                 }
 
                 if (error.response?.status === 403) {
-                    // Forbidden - insufficient permissions
+                    console.error('Forbidden - insufficient permissions');
                 }
 
-                // Handle network errors (no response received)
-                if (!error.response) {
-                    // Network error - request never reached server or server didn't respond
-                    error.isNetworkError = true;
-                    error.status = 0;
-                    error.data = {
-                        status: 'error',
-                        message: error.message || 'Network error - request failed',
-                        code: error.code
-                    };
-                } else {
-                    // HTTP error - server responded with error status
+                // Don't transform the error here - let the service layer handle it
+                // Just ensure we have the response data attached for proper error handling
+                if (error.response) {
                     error.status = error.response.status;
                     error.data = error.response.data;
                 }
@@ -226,6 +204,7 @@ class ApiClient {
                 const base = retryAfter ? parseInt(retryAfter) * 1000 : delay;
                 const jitter = Math.floor(Math.random() * 200);
                 const waitTime = base + jitter;
+                console.log(`Retrying request in ${waitTime}ms... (${retries} retries left)`);
                 await this.delay(waitTime);
                 return this.retryRequest(requestFn, retries - 1, Math.min(delay * 2, 8000)); // Cap backoff
             }
@@ -235,17 +214,8 @@ class ApiClient {
 
     // Helper method to build clean URLs
     private buildUrl(url: string): string {
-        // Clean double slashes but keep leading slash for axios baseURL handling
-        let cleanUrl = url.replace(/\/+/g, '/');
-        // Ensure URL starts with / for proper axios baseURL handling
-        cleanUrl = cleanUrl.startsWith('/') ? cleanUrl : '/' + cleanUrl;
-        
-        // If baseURL ends with /api and endpoint starts with /api, remove duplicate
-        const baseURL = this.instance.defaults.baseURL || '';
-        if (baseURL.endsWith('/api') && cleanUrl.startsWith('/api/')) {
-            cleanUrl = cleanUrl.replace(/^\/api/, '');
-        }
-        
+        // Remove leading slash if present
+        const cleanUrl = url.startsWith('/') ? url.substring(1) : url;
         return cleanUrl;
     }
 

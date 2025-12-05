@@ -204,8 +204,8 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                                         checked={formData.locationIds.includes(location.id)}
                                         onCheckedChange={() => handleLocationToggle(location.id)}
                                         style={{ 
-                                            backgroundColor: formData.locationIds.includes(location.id) ? '#343a40' : 'transparent',
-                                            borderColor: '#343a40'
+                                            backgroundColor: formData.locationIds.includes(location.id) ? '#3a93f2' : 'transparent',
+                                            borderColor: '#3a93f2'
                                         }}
                                     />
                                     <Label htmlFor={`location-${location.id}`} className="text-sm cursor-pointer">
@@ -219,7 +219,7 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                                 {formData.locationIds.map((locationId) => {
                                     const location = locations.find(l => l.id === locationId);
                                     return location ? (
-                                        <Badge key={locationId} style={{ backgroundColor: '#343a40', color: '#ffffff' }} className="text-xs">
+                                        <Badge key={locationId} style={{ backgroundColor: '#adc9e3', color: '#2580f5' }} className="text-xs">
                                             {location.name}
                                         </Badge>
                                     ) : null;
@@ -234,8 +234,8 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                             checked={formData.isActive}
                             onCheckedChange={(checked) => setFormData(prev => ({ ...prev, isActive: !!checked }))}
                             style={{ 
-                                backgroundColor: formData.isActive ? '#343a40' : 'transparent',
-                                borderColor: '#343a40'
+                                backgroundColor: formData.isActive ? '#3a93f2' : 'transparent',
+                                borderColor: '#3a93f2'
                             }}
                         />
                         <Label htmlFor="isActive">{t('activeFarmer')}</Label>
@@ -248,7 +248,8 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                         <Button 
                             type="submit" 
                             disabled={isLoading}
-                            className="bg-[#343a40] hover:bg-[#2c3034] text-white"
+                            style={{ backgroundColor: '#2580f5', borderColor: '#2580f5' }}
+                            className="hover:opacity-90 text-white"
                         >
                             {isLoading ? t('creating') : t('createFarmer')}
                         </Button>

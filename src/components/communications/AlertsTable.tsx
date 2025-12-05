@@ -229,8 +229,11 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 ...(searchTerm && { search: searchTerm }),
             };
 
+            console.log('Fetching alerts with params:', params);
             const response = await api.get('/api/weather/alerts', { params });
             
+            console.log('API Response:', response.data);
+
             // Handle different response formats
             let alertsData: Alert[] = [];
             let paginationData = {
@@ -300,6 +303,13 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             }
 
         } catch (error: any) {
+            console.error('Failed to fetch alerts:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            
             // More specific error messages
             let errorMessage = t('failedToLoadAlerts') || 'Failed to load alerts';
             if (error.response?.status === 404) {
@@ -358,6 +368,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
     };
 
     const handleEditAlert = (alert: Alert) => {
+        console.log('Edit alert:', alert);
         setSelectedAlert(alert);
         setIsViewDialogOpen(false);
         setIsEditDialogOpen(true);
@@ -369,6 +380,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             toast.success(t('alertDeleted') || 'Alert deleted');
             fetchAlerts(currentPage, true);
         } catch (error: any) {
+            console.error('Failed to delete alert:', error);
             toast.error(t('failedToDeleteAlert') || 'Failed to delete alert');
         }
     };
@@ -426,6 +438,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             setShowDeleteConfirm(false);
             fetchAlerts(currentPage, true);
         } catch (error: any) {
+            console.error('Failed to delete alerts:', error);
             toast.error(t('failedToDeleteAlerts') || 'Failed to delete some alerts');
         }
     };

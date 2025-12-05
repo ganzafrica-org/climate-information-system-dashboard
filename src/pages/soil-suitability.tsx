@@ -153,6 +153,7 @@ export default function SoilSuitabilityPage() {
       }
       return data;
     } catch (err) {
+      console.error(`Error loading ${filename}:`, err);
       throw err;
     }
   };
@@ -182,6 +183,7 @@ export default function SoilSuitabilityPage() {
           setMusanzeData(musanzeGeoData);
         }
       } catch (err: any) {
+        console.error('Error loading initial data:', err);
         if (isMounted) {
           setError(`Failed to load administrative data: ${err.message || 'Unknown error'}`);
         }
@@ -205,13 +207,16 @@ export default function SoilSuitabilityPage() {
     const loadSuitabilityData = async () => {
       try {
         const cropFile = getCropTypes().find(c => c.value === selectedCrop)?.file;
+        console.log('Loading suitability data for crop:', selectedCrop, 'File:', cropFile);
         if (cropFile && isMounted) {
           const data = await loadGeoJsonData(cropFile);
+          console.log('Loaded suitability data:', data?.features?.length, 'features');
           if (isMounted) {
             setSuitabilityData(data);
           }
         }
       } catch (err: any) {
+        console.error('Error loading suitability data:', err);
         if (isMounted) {
           setError(`Failed to load suitability data: ${err.message || 'Unknown error'}`);
         }
@@ -231,13 +236,16 @@ export default function SoilSuitabilityPage() {
     const loadSusceptibilityData = async () => {
       try {
         const hazardFile = getHazardTypes().find(h => h.value === selectedHazard)?.file;
+        console.log('Loading susceptibility data for hazard:', selectedHazard, 'File:', hazardFile);
         if (hazardFile && isMounted) {
           const data = await loadGeoJsonData(hazardFile);
+          console.log('Loaded susceptibility data:', data?.features?.length, 'features');
           if (isMounted) {
             setSusceptibilityData(data);
           }
         }
       } catch (err: any) {
+        console.error('Error loading susceptibility data:', err);
         if (isMounted) {
           setError(`Failed to load susceptibility data: ${err.message || 'Unknown error'}`);
         }

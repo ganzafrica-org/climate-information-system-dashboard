@@ -37,6 +37,8 @@ const getWeatherIcon = (condition: string, isActive = false): React.ReactElement
 };
 
 const handleApiError = (error: any, t: any) => {
+  console.error('API Error:', error);
+
   if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
     toast.error(t('requestTimeout') || 'Request timed out. Please try again.');
     return 'timeout';
@@ -44,12 +46,6 @@ const handleApiError = (error: any, t: any) => {
     toast.error(t('dataNotFound') || 'Data not found for this location.');
     return 'not_found';
   } else if (error.response?.status >= 500) {
-    // Check if it's a weather API configuration error
-    const errorMessage = error.response?.data?.message || '';
-    if (errorMessage.includes('Weather API key not configured') || errorMessage.includes('Weather API request failed')) {
-      toast.error(t('weatherApiNotConfigured') || 'Weather API is not configured on the server.');
-      return 'api_not_configured';
-    }
     toast.error(t('serverError') || 'Server error. Please try again later.');
     return 'server_error';
   } else if (error.code === 'ERR_NETWORK' || !navigator.onLine) {
@@ -193,6 +189,7 @@ const Forecasts: NextPage = () => {
 
       toast.success(t('forecastExportedSuccessfully') || 'Forecast exported successfully.');
     } catch (error) {
+      console.error('Export error:', error);
       toast.error(t('failedToExportForecast') || 'Failed to export forecast.');
     }
   };
@@ -211,14 +208,7 @@ const Forecasts: NextPage = () => {
         navigator.share({
           title: `Weather Forecast - ${selectedLocation.name}`,
           text: shareText,
-        }).catch(() => {
-          // Share failed, fallback to clipboard
-          navigator.clipboard.writeText(shareText).then(() => {
-            toast.success(t('forecastCopiedToClipboard') || 'Forecast copied to clipboard.');
-          }).catch(() => {
-            toast.error(t('failedToCopyForecast') || 'Failed to copy forecast.');
-          });
-        });
+        }).catch(err => console.log('Error sharing:', err));
       } else {
         navigator.clipboard.writeText(shareText).then(() => {
           toast.success(t('forecastCopiedToClipboard') || 'Forecast copied to clipboard.');
@@ -227,6 +217,7 @@ const Forecasts: NextPage = () => {
         });
       }
     } catch (error) {
+      console.error('Share error:', error);
       toast.error(t('failedToShareForecast') || 'Failed to share forecast.');
     }
   };

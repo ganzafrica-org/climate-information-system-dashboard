@@ -44,6 +44,7 @@ export default function Communications() {
         setSelectedLocation(null);
       }
     } catch (error: any) {
+      console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));
     } finally {
       setIsLoading(false);

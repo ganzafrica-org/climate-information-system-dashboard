@@ -4,10 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, MoreHorizontal, RefreshCw, Download, Search, Eye, Copy, X } from 'lucide-react';
+import { Loader2, MoreHorizontal, RefreshCw, Download, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/i18n';
 
@@ -55,8 +54,6 @@ export function MessageLogsTable() {
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [logs, setLogs] = useState<MessageLog[]>([]);
     const [summary, setSummary] = useState<ApiResponse['data']['summary'] | null>(null);
-    const [selectedLog, setSelectedLog] = useState<MessageLog | null>(null);
-    const [isDetailsDialogOpen, setIsDetailsDialogOpen] = useState<boolean>(false);
 
     const extractData = (payload: any): { logs: MessageLog[]; summary: ApiResponse['data']['summary'] | null } => {
         if (!payload) return { logs: [], summary: null };
@@ -92,17 +89,21 @@ export function MessageLogsTable() {
             const response = await api.get<any>(
                 '/api/weather/admin/logs/messages',
                 {
-                    params: { _ts: Date.now() }
-                    // Removed Cache-Control header to avoid CORS issues
-                    // The _ts parameter is sufficient to bypass cache
+                    params: { _ts: Date.now() },
+                    headers: { 'Cache-Control': 'no-cache' }
                 }
             );
             const data = response as any;
+            console.log('Logs API raw payload:', data);
+            
             const { logs: extractedLogs, summary: extractedSummary } = extractData(data);
             const logsArray = Array.isArray(extractedLogs) ? extractedLogs : [];
             setLogs(logsArray);
             setSummary(extractedSummary);
-            } catch (error: any) {
+            console.log('Parsed logs count:', logsArray.length);
+            
+        } catch (error: any) {
+            console.error('Failed to fetch message logs:', error);
             toast.error(t('failedToLoadLogs') || 'Failed to load logs');
         } finally {
             setIsLoading(false);
@@ -306,10 +307,12 @@ export function MessageLogsTable() {
                             <thead className="text-black bg-[#f2f5fa]">
                                 <tr>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">#</th>
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('alertTitle') || 'Alert Title'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('farmerName') || 'Farmer Name'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('phoneNumber') || 'Phone'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('status') || 'Status'}</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('message') || 'Message'}</th>
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('provider') || 'Provider'}</th>
+                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('messageLength') || 'Length'}</th>
                                     <th className="py-4 px-6 text-left font-semibold text-sm">{t('timestamp') || 'Timestamp'}</th>
                                     <th className="py-4 px-6 text-center font-semibold text-sm">{t('actions') || 'Actions'}</th>
                                 </tr>
@@ -317,7 +320,7 @@ export function MessageLogsTable() {
                             <tbody className="bg-white">
                                 {filteredLogs.length === 0 ? (
                                     <tr>
-                                        <td colSpan={7} className="py-16 text-center">
+                                        <td colSpan={9} className="py-16 text-center">
                                             <div className="text-gray-500">{t('noLogsFound') || 'No logs found'}</div>
                                         </td>
                                     </tr>
@@ -329,6 +332,11 @@ export function MessageLogsTable() {
                                         >
                                             <td className="py-4 px-6 text-sm text-gray-900">{index + 1}</td>
                                             <td className="py-4 px-6 text-sm">
+                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                                                    {log.alertTitle || log.alertType || 'N/A'}
+                                                </Badge>
+                                            </td>
+                                            <td className="py-4 px-6 text-sm">
                                                 {log.farmerName || `Farmer ${log.farmerId}`}
                                             </td>
                                             <td className="py-4 px-6 text-sm font-mono">{log.phoneNumber}</td>
@@ -336,10 +344,11 @@ export function MessageLogsTable() {
                                                 <StatusBadge log={log} />
                                             </td>
                                             <td className="py-4 px-6 text-sm">
-                                                <div className="max-w-xs truncate text-gray-700" title={log.message}>
-                                                    {log.message || '—'}
-                                                </div>
+                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                                    {log.provider || 'N/A'}
+                                                </Badge>
                                             </td>
+                                            <td className="py-4 px-6 text-sm">{getMessageLength(log)} chars</td>
                                             <td className="py-4 px-6 text-sm">
                                                 {formatTimestamp(log)}
                                             </td>
@@ -357,33 +366,37 @@ export function MessageLogsTable() {
                                                     <DropdownMenuContent align="end" className="w-56">
                                                         <DropdownMenuItem 
                                                             onClick={() => {
-                                                                setSelectedLog(log);
-                                                                setIsDetailsDialogOpen(true);
+                                                                const details = {
+                                                                    'Alert ID': log.alertId,
+                                                                    'Alert Title': log.alertTitle,
+                                                                    'Farmer': log.farmerName,
+                                                                    'Phone': log.phoneNumber,
+                                                                    'Status': log.status,
+                                                                    'Provider': log.provider,
+                                                                    'Message ID': log.messageId,
+                                                                    'Message': log.message,
+                                                                    'Error': log.error || log.errorMessage || 'None'
+                                                                };
+                                                                toast.info(JSON.stringify(details, null, 2));
                                                             }} 
                                                             className="cursor-pointer hover:bg-blue-50"
                                                         >
-                                                            <Eye className="h-4 w-4 mr-2" />
                                                             View Details
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem 
                                                             onClick={() => {
-                                                                navigator.clipboard.writeText(log.messageId || '');
+                                                                navigator.clipboard.writeText(log.messageId);
                                                                 toast.success('Message ID copied to clipboard');
                                                             }} 
                                                             className="cursor-pointer hover:bg-green-50"
                                                         >
-                                                            <Copy className="h-4 w-4 mr-2" />
                                                             Copy Message ID
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem 
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(log.message || '');
-                                                                toast.success('Message copied to clipboard');
-                                                            }} 
+                                                            onClick={() => toast.info(log.message)} 
                                                             className="cursor-pointer hover:bg-yellow-50"
                                                         >
-                                                            <Copy className="h-4 w-4 mr-2" />
-                                                            Copy Message
+                                                            View Message
                                                         </DropdownMenuItem>
                                                         {(log.error || log.errorMessage) && (
                                                             <DropdownMenuItem 
@@ -412,158 +425,6 @@ export function MessageLogsTable() {
                     </div>
                 )}
             </CardContent>
-            
-            {/* Details Dialog */}
-            <Dialog open={isDetailsDialogOpen} onOpenChange={setIsDetailsDialogOpen}>
-                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center justify-between">
-                            <span>Message Details</span>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-6 w-6"
-                                onClick={() => setIsDetailsDialogOpen(false)}
-                            >
-                                <X className="h-4 w-4" />
-                            </Button>
-                        </DialogTitle>
-                        <DialogDescription>
-                            Complete information about this message log entry
-                        </DialogDescription>
-                    </DialogHeader>
-                    
-                    {selectedLog && (
-                        <div className="space-y-4 mt-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Alert ID</p>
-                                    <p className="text-sm text-gray-900">{selectedLog.alertId || '—'}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Alert Title</p>
-                                    <p className="text-sm text-gray-900">{selectedLog.alertTitle || '—'}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Alert Type</p>
-                                    <p className="text-sm text-gray-900">{selectedLog.alertType || '—'}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Farmer</p>
-                                    <p className="text-sm text-gray-900">{selectedLog.farmerName || `Farmer ${selectedLog.farmerId}`}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Phone Number</p>
-                                    <p className="text-sm text-gray-900 font-mono">{selectedLog.phoneNumber || '—'}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Status</p>
-                                    <div>
-                                        <StatusBadge log={selectedLog} />
-                                    </div>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Provider</p>
-                                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                        {selectedLog.provider || '—'}
-                                    </Badge>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Message ID</p>
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-sm text-gray-900 font-mono">{selectedLog.messageId || 'None'}</p>
-                                        {selectedLog.messageId && (
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                className="h-6 w-6 p-0"
-                                                onClick={() => {
-                                                    navigator.clipboard.writeText(selectedLog.messageId || '');
-                                                    toast.success('Message ID copied');
-                                                }}
-                                            >
-                                                <Copy className="h-3 w-3" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <Separator />
-                            
-                            <div className="space-y-1">
-                                <p className="text-sm font-medium text-gray-500">Message</p>
-                                <div className="bg-gray-50 rounded-md p-3 border border-gray-200">
-                                    <p className="text-sm text-gray-900 whitespace-pre-wrap break-words">
-                                        {selectedLog.message || '—'}
-                                    </p>
-                                </div>
-                                {selectedLog.message && (
-                                    <div className="flex items-center justify-between mt-2">
-                                        <p className="text-xs text-gray-500">
-                                            Length: {selectedLog.message.length} characters
-                                        </p>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={() => {
-                                                navigator.clipboard.writeText(selectedLog.message || '');
-                                                toast.success('Message copied to clipboard');
-                                            }}
-                                        >
-                                            <Copy className="h-3 w-3 mr-1" />
-                                            Copy Message
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                            
-                            {(selectedLog.error || selectedLog.errorMessage) && (
-                                <>
-                                    <Separator />
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium text-red-600">Error</p>
-                                        <div className="bg-red-50 rounded-md p-3 border border-red-200">
-                                            <p className="text-sm text-red-900">
-                                                {selectedLog.error || selectedLog.errorMessage || '—'}
-                                            </p>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                            
-                            {selectedLog.errorReason && (
-                                <>
-                                    <Separator />
-                                    <div className="space-y-1">
-                                        <p className="text-sm font-medium text-red-600">Error Reason</p>
-                                        <div className="bg-red-50 rounded-md p-3 border border-red-200">
-                                            <p className="text-sm text-red-900">{selectedLog.errorReason}</p>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                            
-                            <Separator />
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Created At</p>
-                                    <p className="text-sm text-gray-900">
-                                        {selectedLog.createdAt ? new Date(selectedLog.createdAt).toLocaleString() : '—'}
-                                    </p>
-                                </div>
-                                <div className="space-y-1">
-                                    <p className="text-sm font-medium text-gray-500">Sent At</p>
-                                    <p className="text-sm text-gray-900">
-                                        {selectedLog.sentAt ? new Date(selectedLog.sentAt).toLocaleString() : '—'}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </DialogContent>
-            </Dialog>
         </Card>
     );
 }
