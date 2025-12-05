@@ -307,7 +307,7 @@
   "delete": "Delete",
   "confirmDelete":"Confirm Delete",
   "confirmDeleteMessage": "Are you sure you want to delete this messege?",
-  "menyasystem":"Menyasystem",
+  "menyasystem":"TeganyaMuhinzi",
 
 
   "farmerProfile": "Farmer Profile",
@@ -1027,7 +1027,13 @@
   "alertDeleted": "Alert deleted",
   "failedToDeleteAlert": "Failed to delete alert",
   "alertSent": "Alert sent successfully",
+  "alertSentSuccessfully": "Alert sent successfully",
+  "alertSendFailed": "Alert send failed",
   "failedToSendAlert": "Failed to send alert",
+  "failedToSend": "Failed to Send",
+  "successfullySent": "Successfully Sent",
+  "sendResults": "Send Results",
+  "no_successful_sms_sends": "No successful SMS sends",
   "alertsFound": "alerts found",
   "loadingAlerts": "Loading alerts...",
   "noAlertsFound": "No alerts found",

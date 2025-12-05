@@ -89,7 +89,7 @@ export function WeatherSchedulerTable() {
     try {
       const response = await api.get('/api/weather/scheduler/status');
       
-      console.log('Scheduler API Response:', response.data); // Debug log
+      // Debug log
       
       // Check if the response has the expected structure
       if (response.data && typeof response.data === 'object') {
@@ -111,8 +111,14 @@ export function WeatherSchedulerTable() {
         throw new Error('No data received from API');
       }
     } catch (error: any) {
-      console.error('Failed to fetch scheduler status:', error);
-      
+      // Handle 404 error (endpoint not found on hosted version)
+      if (error.response?.status === 404) {
+        // Silently handle 404 - scheduler endpoint might not be available on hosted version
+        // Suppress console errors for missing endpoints
+        const errorMessage = error.response?.data?.message || 'Endpoint not found';
+        setSchedulerStatus(null);
+        return;
+      }
       // Handle 501 error (controller not implemented)
       if (error.response?.status === 501) {
         toast.error('Weather Scheduler Controller not implemented');
@@ -150,7 +156,7 @@ export function WeatherSchedulerTable() {
 
       const response = await api.post(endpoint);
       
-      console.log(`${action} Response:`, response.data); // Debug log
+      // Debug log
       
       // Check if response is successful (200-299 status codes are already handled by axios)
       if (response.data) {
@@ -184,15 +190,17 @@ export function WeatherSchedulerTable() {
         setTimeout(() => fetchSchedulerStatus(), 1000);
       }
     } catch (error: any) {
-      console.error(`Failed to ${action} scheduler:`, error);
-      
       // Handle different HTTP status codes
-      if (error.response?.status === 501) {
+      if (error.response?.status === 404) {
+        // Scheduler endpoints not available on this server - suppress error logs
+        const errorMessage = error.response?.data?.message || 'Scheduler endpoint not available';
+        toast.error('Scheduler feature is not available on this server.');
+        setIsActionLoading(null);
+        return; // Don't refresh status if endpoint doesn't exist
+      } else if (error.response?.status === 501) {
         toast.error(`Weather Scheduler Controller not implemented`);
       } else if (error.response?.status === 403) {
         toast.error('Admin access required for this action');
-      } else if (error.response?.status === 404) {
-        toast.error(`${action} endpoint not found`);
       } else if (error.response?.status >= 500) {
         toast.error(`Server error: Unable to ${action} scheduler`);
       } else if (error.response?.data?.message) {
@@ -206,8 +214,10 @@ export function WeatherSchedulerTable() {
         toast.error(`Unable to ${action} scheduler. Please try again.`);
       }
       
-      // Refresh status even after errors to get current state
-      setTimeout(() => fetchSchedulerStatus(), 1000);
+      // Refresh status even after errors to get current state (only if endpoint exists)
+      if (error.response?.status !== 404) {
+        setTimeout(() => fetchSchedulerStatus(), 1000);
+      }
     } finally {
       setIsActionLoading(null);
     }
@@ -267,7 +277,7 @@ export function WeatherSchedulerTable() {
     <div className="space-y-6">  
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Status Card */}
-        <Card className="bg-blue-50 border-t">
+        <Card className="bg-white border-t">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -320,7 +330,7 @@ export function WeatherSchedulerTable() {
         </Card>
 
         {/* Schedule Times Card */}
-        <Card className="bg-orange-50 border-t ">
+        <Card className="bg-white border-t ">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#F89D2D]">
@@ -357,10 +367,10 @@ export function WeatherSchedulerTable() {
         </Card>
 
         {/* Manual Trigger Card */}
-        <Card className="bg-[#E7E9EF] border-t ">
+        <Card className="bg-white border-t ">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#2563EB]" >
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#147677]" >
                 <Zap className="h-5 w-5 text-white" />
               </div>
               Manual Broadcast
@@ -379,7 +389,7 @@ export function WeatherSchedulerTable() {
                 onClick={() => handleSchedulerAction('trigger')}
                 disabled={isActionLoading !== null}
                 variant="secondary"
-                className="w-full flex items-center gap-2 bg-[#2563EB] hover:bg-[#2825AE] text-white hover:text-white-50"
+                className="w-full flex items-center gap-2 bg-[#147677] hover:bg-[#147677]/90 text-white"
                 size="sm"
               >
                 {isActionLoading === 'trigger' ? (

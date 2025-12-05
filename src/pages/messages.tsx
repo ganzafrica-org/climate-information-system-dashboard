@@ -29,7 +29,6 @@ const Messages: NextPage = () => {
       });
       setLocations(response.data.locations);
     } catch (error: any) {
-      console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));
     } finally {
       setIsLoading(false);

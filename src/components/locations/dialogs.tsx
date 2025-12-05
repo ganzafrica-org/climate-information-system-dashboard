@@ -79,7 +79,7 @@ export function CreateLocationDialog({ open, onOpenChange, onSuccess }: CreateLo
         setIsLoading(true);
         setLocationValidation(null);
         try {
-            const response = await api.post<ApiResponse<CreateLocationResponse>>('/api/admin/locations', formData);
+            const response = await api.post<ApiResponse<CreateLocationResponse>>('/api/users/locations', formData);
             
             // Check for validation warnings
             if (response.data?.validation && !response.data.validation.exactMatch) {
@@ -296,8 +296,19 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
         setIsLoading(true);
         setError(null);
         try {
-            const response = await api.get(`/api/admin/locations/${id}`);
-            console.log('API Response:', response.data); // Debug log
+            // Try admin endpoint first, fallback to users endpoint
+            let response;
+            try {
+                response = await api.get(`/api/admin/locations/${id}`);
+            } catch (adminError: any) {
+                if (adminError.response?.status === 404) {
+                    // Fallback to users endpoint
+                    response = await api.get(`/api/users/locations/${id}`);
+                } else {
+                    throw adminError;
+                }
+            }
+            // Debug log
             
             // Handle different possible response structures
             let locationData = null;
@@ -313,9 +324,16 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
             
             setLocation(locationData);
         } catch (error: any) {
-            const message = error.response?.data?.message || error.message || t('failedToLoadLocation');
-            setError(message);
-            toast.error(message);
+            // Handle 404 errors gracefully - endpoint might not exist
+            if (error.response?.status === 404) {
+                const errorMessage = error.response?.data?.message || 'Location endpoint not found';
+                setError(t('locationNotFound') || 'Location not found');
+                toast.error(t('locationNotFound') || 'Location not found');
+            } else {
+                const message = error.response?.data?.message || error.message || t('failedToLoadLocation');
+                setError(message);
+                toast.error(message);
+            }
         } finally {
             setIsLoading(false);
         }
