@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -90,6 +90,7 @@ export function SendAlertDialog({
 }: SendAlertDialogProps) {
   const { t } = useLanguage();
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const isSendingRef = useRef(false);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [selectedFarmers, setSelectedFarmers] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -282,11 +283,16 @@ export function SendAlertDialog({
   };
 
   const handleSendAlert = async () => {
+    if (isSendingRef.current || isActionLoading) {
+      return;
+    }
+
     if (selectedFarmers.length === 0) {
       toast.error(t('pleaseSelectFarmers') || 'Please select at least one farmer');
       return;
     }
 
+    isSendingRef.current = true;
     setIsActionLoading(true);
     try {
       const response = await api.post(`/api/weather/alerts/${alert?.id}/send`, {
@@ -372,6 +378,7 @@ export function SendAlertDialog({
       setShowSendResult(true);
       toast.error(errorResult.message);
     } finally {
+      isSendingRef.current = false;
       setIsActionLoading(false);
     }
   };
@@ -586,6 +593,7 @@ export function SendAlertDialog({
               {/* Send actions */}
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   onClick={handleSendAlert}
                   disabled={isActionLoading || selectedFarmers.length === 0}
                   className="flex-1 bg-[#147677] hover:bg-[#147677]/90 text-white"
