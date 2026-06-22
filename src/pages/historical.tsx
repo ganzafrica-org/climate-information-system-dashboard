@@ -29,7 +29,6 @@ import {
     RefreshCw,
     Thermometer,
     TrendingUp,
-    Filter,
     WifiOff,
     AlertTriangle
 } from 'lucide-react';
@@ -641,79 +640,75 @@ const Historical: NextPage = () => {
                     </div>
                 </div>
 
-                
-                <div className="flex flex-wrap items-center gap-3">
-                    <Button
-                        variant="outline"
-                        onClick={handleRefresh}
-                        disabled={isRefreshing || isLoading || !selectedLocation}
-                        className="bg-[#147677] hover:bg-[#147677]/90 text-white border-[#147677]"
-                    >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
-                    </Button>
-
-                    <Button
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                        onClick={handleExportData}
-                        disabled={!historicalData.length}
-                    >
-                        <Download className="h-4 w-4 mr-2" />
-                        {t('exportData') || 'Export Data'}
-                    </Button>
-                </div>
-
-                
                 <Card className="border-0 shadow-md">
-                    <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50 border-b border-slate-200/50">
-                        <CardTitle className="flex items-center gap-2 text-slate-900">
-                            <Filter className="h-5 w-5 text-blue-600" />
-                            {t('dataFilters') || 'Data Filters'}
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            <div className="space-y-2">
-                                <Label className="text-slate-700 font-medium">{t('viewType') || 'View Type'}</Label>
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="outline" className="w-full justify-between border-slate-300 hover:border-slate-400 hover:bg-slate-50">
-                                            <span className="capitalize">{t(viewType) || viewType}</span>
-                                            <ChevronDown className="h-4 w-4" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent className="w-full">
-                                        <DropdownMenuItem onClick={() => setViewType('monthly')}>
-                                            {t('monthly') || 'Monthly'}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setViewType('weekly')}>
-                                            {t('weekly') || 'Weekly'}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={() => setViewType('seasonal')}>
-                                            {t('seasonal') || 'Seasonal'}
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
+                    <CardContent className="p-3 sm:p-4">
+                        <div className="flex flex-col lg:flex-row lg:items-end gap-3 lg:gap-6">
+                            <div className="flex flex-col sm:flex-row flex-1 gap-3 items-end">
+                                <div className="space-y-1 w-full sm:w-36">
+                                    <Label className="text-slate-700 text-sm font-medium">{t('viewType') || 'View Type'}</Label>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="outline" className="w-full h-9 justify-between border-slate-300 hover:border-slate-400 hover:bg-slate-50">
+                                                <span className="capitalize">{t(viewType) || viewType}</span>
+                                                <ChevronDown className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent className="w-full">
+                                            <DropdownMenuItem onClick={() => setViewType('monthly')}>
+                                                {t('monthly') || 'Monthly'}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setViewType('weekly')}>
+                                                {t('weekly') || 'Weekly'}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => setViewType('seasonal')}>
+                                                {t('seasonal') || 'Seasonal'}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+
+                                <div className="space-y-1 w-full sm:w-36">
+                                    <Label className="text-slate-700 text-sm font-medium">{t('startDate') || 'Start Date'}</Label>
+                                    <Input
+                                        type="date"
+                                        value={dateRange.startDate}
+                                        onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
+                                        className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                    />
+                                </div>
+
+                                <div className="space-y-1 w-full sm:w-36">
+                                    <Label className="text-slate-700 text-sm font-medium">{t('endDate') || 'End Date'}</Label>
+                                    <Input
+                                        type="date"
+                                        value={dateRange.endDate}
+                                        onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
+                                        className="h-9 border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                    />
+                                </div>
                             </div>
 
-                            <div className="space-y-2">
-                                <Label className="text-slate-700 font-medium">{t('startDate') || 'Start Date'}</Label>
-                                <Input
-                                    type="date"
-                                    value={dateRange.startDate}
-                                    onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-                                    className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
-                                />
-                            </div>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0 lg:ml-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleRefresh}
+                                    disabled={isRefreshing || isLoading || !selectedLocation}
+                                    className="h-9 bg-[#147677] hover:bg-[#147677]/90 text-white border-[#147677]"
+                                >
+                                    <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                    {isRefreshing ? (t('updating') || 'Updating...') : (t('updateData') || 'Update Data')}
+                                </Button>
 
-                            <div className="space-y-2">
-                                <Label className="text-slate-700 font-medium">{t('endDate') || 'End Date'}</Label>
-                                <Input
-                                    type="date"
-                                    value={dateRange.endDate}
-                                    onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-                                    className="border-slate-300 focus:border-blue-500 focus:ring-blue-500"
-                                />
+                                <Button
+                                    size="sm"
+                                    className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    onClick={handleExportData}
+                                    disabled={!historicalData.length}
+                                >
+                                    <Download className="h-4 w-4 mr-2" />
+                                    {t('exportData') || 'Export Data'}
+                                </Button>
                             </div>
                         </div>
                     </CardContent>
@@ -1211,16 +1206,6 @@ const Historical: NextPage = () => {
                     renderEmptyState()
                 )}
 
-                
-                <div className="text-center p-6 bg-gradient-to-r from-slate-50 to-blue-50 rounded-xl border border-slate-200">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                        <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-                        <p className="text-sm font-medium text-slate-600">Historical Data Analysis</p>
-                    </div>
-                    <p className="text-xs text-slate-500">
-                        {t("dataLastUpdated") || "Data last updated"}: {new Date().toLocaleString()}
-                    </p>
-                </div>
             </div>
         </AppLayout>
     );
