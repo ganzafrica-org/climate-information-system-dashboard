@@ -117,6 +117,21 @@ export function useSortableRows<T>({
   return { sort: current, ordered, toggle, ariaSort };
 }
 
+function SheetSortIcon({ direction }: { direction: "ascending" | "descending" | "none" }) {
+  return (
+    <svg width="8" height="12" viewBox="0 0 8 12" aria-hidden="true" className="shrink-0">
+      <path
+        d="M4 1.2 7.2 5H.8Z"
+        fill={direction === "ascending" ? "#1e293b" : "#9ca3af"}
+      />
+      <path
+        d="M4 10.8.8 7h6.4Z"
+        fill={direction === "descending" ? "#1e293b" : "#9ca3af"}
+      />
+    </svg>
+  );
+}
+
 export type SortableTableProps<T> = {
   rows: T[];
   columns: SortableColumn<T>[];
@@ -131,6 +146,7 @@ export type SortableTableProps<T> = {
   onMarkChange?: (id: string | null) => void;
   getRowLabel?: (row: T) => string;
   className?: string;
+  variant?: "default" | "sheet";
 };
 
 export function SortableTable<T>({
@@ -147,6 +163,7 @@ export function SortableTable<T>({
   onMarkChange,
   getRowLabel,
   className = "",
+  variant = "default",
 }: SortableTableProps<T>) {
   const reduced = useReducedMotion();
   const [marked, setMarked] = useState<string | null>(null);
@@ -213,9 +230,15 @@ export function SortableTable<T>({
         }. ${rows.length} rows.`
       : `Original order restored. ${rows.length} rows.`;
 
+  const isSheet = variant === "sheet";
+
   return (
     <div
-      className={`overflow-hidden rounded-[14px] border border-border bg-card shadow-sm    ${className}`}
+      className={
+        isSheet
+          ? `overflow-hidden ${className}`
+          : `overflow-hidden rounded-[14px] border border-border bg-card shadow-sm    ${className}`
+      }
     >
       <div
         role="table"
@@ -227,7 +250,11 @@ export function SortableTable<T>({
           <div
             role="row"
             aria-rowindex={1}
-            className="grid h-9 items-center gap-x-2 border-b border-border px-2 "
+            className={
+              isSheet
+                ? "grid h-12 items-center gap-x-3 bg-[#F3F4F6] px-5"
+                : "grid h-9 items-center gap-x-2 border-b border-border px-2 "
+            }
             style={{ gridTemplateColumns: template }}
           >
             {markable && (
@@ -240,6 +267,8 @@ export function SortableTable<T>({
               const state = ariaSort(column.id);
               const active = state !== "none";
               const end = column.align === "end";
+              const sheetHeader = `flex w-full items-center gap-1.5 px-1 ${end ? "flex-row-reverse" : ""}`;
+              const sheetLabel = "truncate text-sm font-semibold text-slate-800";
 
               return (
                 <div
@@ -249,51 +278,70 @@ export function SortableTable<T>({
                   className="min-w-0"
                 >
                   {column.sortable === false ? (
-                    <span
-                      className={`block truncate px-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground dark:text-muted-foreground ${
-                        end ? "text-right" : ""
-                      }`}
-                    >
-                      {column.header}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => onToggle(column.id)}
-                      className={`group flex h-7 w-full items-center gap-1.5 rounded-[6px] px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
-                        end ? "flex-row-reverse" : ""
-                      }`}
-                    >
+                    isSheet ? (
+                      <span className={sheetHeader}>
+                        <span className={sheetLabel}>{column.header}</span>
+                        <SheetSortIcon direction="none" />
+                      </span>
+                    ) : (
                       <span
-                        className={`truncate text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                          active
-                            ? "text-foreground "
-                            : "text-muted-foreground group-hover:text-foreground"
+                        className={`block truncate px-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground dark:text-muted-foreground ${
+                          end ? "text-right" : ""
                         }`}
                       >
                         {column.header}
                       </span>
-                      <motion.span
-                        aria-hidden
-                        className="shrink-0 text-foreground "
-                        initial={false}
-                        animate={{
-                          rotate: state === "descending" ? 180 : 0,
-                          opacity: active ? 1 : 0,
-                          scale: active ? 1 : 0.72,
-                        }}
-                        transition={reduced ? { duration: 0 } : SMALL}
+                    )
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onToggle(column.id)}
+                      className={
+                        isSheet
+                          ? `group ${sheetHeader} outline-none`
+                          : `group flex h-7 w-full items-center gap-1.5 rounded-[6px] px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
+                              end ? "flex-row-reverse" : ""
+                            }`
+                      }
+                    >
+                      <span
+                        className={
+                          isSheet
+                            ? sheetLabel
+                            : `truncate text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                                active
+                                  ? "text-foreground "
+                                  : "text-muted-foreground group-hover:text-foreground"
+                              }`
+                        }
                       >
-                        <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
-                          <path
-                            d="M5 8.6V1.6M5 1.6 2.2 4.4M5 1.6l2.8 2.8"
-                            stroke="currentColor"
-                            strokeWidth="1.4"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                          />
-                        </svg>
-                      </motion.span>
+                        {column.header}
+                      </span>
+                      {isSheet ? (
+                        <SheetSortIcon direction={state} />
+                      ) : (
+                        <motion.span
+                          aria-hidden
+                          className="shrink-0 text-foreground "
+                          initial={false}
+                          animate={{
+                            rotate: state === "descending" ? 180 : 0,
+                            opacity: active ? 1 : 0,
+                            scale: active ? 1 : 0.72,
+                          }}
+                          transition={reduced ? { duration: 0 } : SMALL}
+                        >
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none">
+                            <path
+                              d="M5 8.6V1.6M5 1.6 2.2 4.4M5 1.6l2.8 2.8"
+                              stroke="currentColor"
+                              strokeWidth="1.4"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </motion.span>
+                      )}
                     </button>
                   )}
                 </div>
@@ -342,7 +390,9 @@ export function SortableTable<T>({
                     ? { duration: 0 }
                     : { ...CELL, delay: Math.min(index, STEP_CAP) * STEP }
                 }
-                className={`absolute inset-x-0 top-0 grid items-center gap-x-2 px-2 transition-colors duration-150 ${
+                className={`absolute inset-x-0 top-0 grid items-center gap-x-2 transition-colors duration-150 ${
+                  isSheet ? "px-5" : "px-2"
+                } ${
                   isMarked ? "bg-muted dark:bg-card/[0.06]" : ""
                 }`}
                 style={{ height: rowHeight, gridTemplateColumns: template }}
@@ -394,12 +444,20 @@ export function SortableTable<T>({
                     <div
                       key={column.id}
                       role="cell"
-                      className={`min-w-0 truncate px-1.5 text-[13px] ${
+                      className={`min-w-0 px-1.5 ${
+                        column.cell ? "overflow-visible" : "truncate"
+                      } ${
+                        isSheet ? "text-sm" : "text-[13px]"
+                      } ${
                         column.align === "end" ? "text-right" : ""
                       } ${column.numeric ? "tabular-nums" : ""} ${
-                        c === 0
-                          ? "font-medium text-foreground "
-                          : "text-muted-foreground dark:text-muted-foreground"
+                        isSheet
+                          ? c === 1
+                            ? "font-semibold text-slate-900"
+                            : "text-slate-600"
+                          : c === 0
+                            ? "font-medium text-foreground "
+                            : "text-muted-foreground dark:text-muted-foreground"
                       }`}
                     >
                       {content}
@@ -420,7 +478,7 @@ export function SortableTable<T>({
             {Array.from({ length: Math.max(0, rows.length - 1) }, (_, i) => (
               <div
                 key={i}
-                className="absolute inset-x-0 border-t border-border "
+                className={`absolute inset-x-0 ${isSheet ? "border-t border-gray-200" : "border-t border-border "}`}
                 style={{ top: (i + 1) * rowHeight }}
               />
             ))}

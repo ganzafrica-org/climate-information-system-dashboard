@@ -37,6 +37,7 @@ export type DataTableProps<T> = {
   rowHeight?: number
   maxHeight?: number
   className?: string
+  variant?: "default" | "sheet"
 }
 
 /**
@@ -61,6 +62,7 @@ export function DataTable<T>({
   rowHeight,
   maxHeight,
   className,
+  variant = "default",
 }: DataTableProps<T>) {
   const [page, setPage] = useState(1)
 
@@ -85,16 +87,18 @@ export function DataTable<T>({
     return (
       <div
         className={cn(
-          "overflow-hidden rounded-[14px] border border-border bg-card shadow-sm",
+          variant === "sheet"
+            ? "overflow-hidden"
+            : "overflow-hidden rounded-[14px] border border-border bg-card shadow-sm",
           className
         )}
       >
-        <div className="grid h-9 items-center border-b border-border px-3">
+        <div className={cn("grid items-center px-5", variant === "sheet" ? "h-12 bg-[#F3F4F6]" : "h-9 border-b border-border px-3")}>
           <Skeleton className="h-3 w-40" />
         </div>
         <div className="divide-y divide-border">
           {Array.from({ length: skeletonRows }, (_, i) => (
-            <div key={i} className="flex items-center gap-4 px-3 py-3">
+            <div key={i} className="flex items-center gap-4 px-5 py-3">
               <Skeleton className="h-3.5 w-6" />
               <Skeleton className="h-3.5 flex-1" style={{ maxWidth: `${70 - (i % 3) * 8}%` }} />
               <Skeleton className="h-3.5 w-20" />
@@ -107,13 +111,16 @@ export function DataTable<T>({
 
   if (total === 0) {
     return (
-      <div
-        className={cn(
-          "flex min-h-40 items-center justify-center rounded-[14px] border border-border bg-card p-8 text-center text-sm text-muted-foreground shadow-sm",
-          className
-        )}
-      >
-        {emptyState ?? "No records found."}
+      <div className={cn("space-y-3", className)}>
+        <div
+          className={cn(
+            "flex min-h-40 items-center justify-center p-8 text-center text-sm text-muted-foreground",
+            variant !== "sheet" && "rounded-[14px] border border-border bg-card shadow-sm"
+          )}
+        >
+          {emptyState ?? "No records found."}
+        </div>
+        {footer}
       </div>
     )
   }
@@ -130,6 +137,7 @@ export function DataTable<T>({
         onSortChange={onSortChange}
         rowHeight={rowHeight}
         maxHeight={maxHeight}
+        variant={variant}
       />
       {footer}
       {pagination && pageCount > 1 && (

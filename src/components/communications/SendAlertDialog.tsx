@@ -82,6 +82,60 @@ interface SendAlertDialogProps {
   onSuccess: () => void;
 }
 
+function buildFarmerSendResults(
+  farmerIds: number[],
+  farmers: Farmer[],
+  includeError = false
+) {
+  return farmerIds.map(id => {
+    const farmer = farmers.find(f => f.id === id);
+    return {
+      farmerId: id,
+      farmerName: farmer?.name || 'Unknown',
+      phone: farmer?.phone || 'Unknown',
+      ...(includeError ? { error: '' } : {}),
+    };
+  });
+}
+
+function parseSendAlertResponse(
+  response: any,
+  selectedFarmers: number[],
+  farmers: Farmer[]
+): SendResult {
+  const inner = response?.data && typeof response.data === 'object' ? response.data : response;
+  const resultsNode = inner?.results ?? inner?.data?.results ?? inner?.data ?? {};
+  const successful = resultsNode?.successful ?? inner?.successful ?? [];
+  const failed = resultsNode?.failed ?? inner?.failed ?? [];
+  const hasSuccessfulSends = Array.isArray(successful) && successful.length > 0;
+  const apiStatus = response?.status ?? inner?.status;
+  const explicitSuccess = response?.success ?? inner?.success;
+
+  const success =
+    explicitSuccess === true ||
+    apiStatus === 'success' ||
+    apiStatus === 'warning' ||
+    (explicitSuccess !== false && hasSuccessfulSends);
+
+  const message =
+    response?.message ||
+    inner?.message ||
+    (success ? 'Alert sent successfully' : 'Failed to send alert');
+
+  return {
+    success,
+    message,
+    results: {
+      successful: hasSuccessfulSends
+        ? successful
+        : success
+          ? buildFarmerSendResults(selectedFarmers, farmers)
+          : [],
+      failed: Array.isArray(failed) ? failed : [],
+    },
+  };
+}
+
 export function SendAlertDialog({ 
   open, 
   onOpenChange, 
@@ -295,53 +349,13 @@ export function SendAlertDialog({
     isSendingRef.current = true;
     setIsActionLoading(true);
     try {
-      const response = await api.post(`/api/weather/alerts/${alert?.id}/send`, {
-        farmerIds: selectedFarmers
-      });
+      const response = await api.post(
+        `/api/weather/alerts/${alert?.id}/send`,
+        { farmerIds: selectedFarmers },
+        { timeout: 120000 }
+      );
 
-      // Handle different response formats
-      let result: SendResult;
-      
-      if (response.success !== undefined) {
-        result = response as SendResult;
-      } else if (response.data) {
-        result = response.data as SendResult;
-      } else {
-        // Default success response
-        result = {
-          success: true,
-          message: 'Alert sent successfully',
-          results: {
-            successful: selectedFarmers.map(id => {
-              const farmer = farmers.find(f => f.id === id);
-              return {
-                farmerId: id,
-                farmerName: farmer?.name || 'Unknown',
-                phone: farmer?.phone || 'Unknown'
-              };
-            }),
-            failed: []
-          }
-        };
-      }
-
-      // Ensure results structure is properly initialized
-      if (result.results) {
-        result.results.successful = result.results.successful || [];
-        result.results.failed = result.results.failed || [];
-      } else {
-        result.results = {
-          successful: selectedFarmers.map(id => {
-            const farmer = farmers.find(f => f.id === id);
-            return {
-              farmerId: id,
-              farmerName: farmer?.name || 'Unknown',
-              phone: farmer?.phone || 'Unknown'
-            };
-          }),
-          failed: []
-        };
-      }
+      const result = parseSendAlertResponse(response, selectedFarmers, farmers);
 
       setSendResult(result);
       setShowSendResult(true);
@@ -356,21 +370,21 @@ export function SendAlertDialog({
       }
 
     } catch (error: any) {
-      // Create error result
+      const isTimeout =
+        error.code === 'ECONNABORTED' ||
+        error.isTimeout ||
+        error.message?.toLowerCase().includes('timeout');
+
+      const errorMessage = isTimeout
+        ? (t('alertSendTimeout') || 'Request timed out. Messages may still have been sent — please check the alerts list.')
+        : (error.response?.data?.message || error.message || 'Failed to send alert');
+
       const errorResult: SendResult = {
         success: false,
-        message: error.response?.data?.message || error.message || 'Failed to send alert',
+        message: errorMessage,
         results: {
           successful: [],
-          failed: selectedFarmers.map(id => {
-            const farmer = farmers.find(f => f.id === id);
-            return {
-              farmerId: id,
-              farmerName: farmer?.name || 'Unknown',
-              phone: farmer?.phone || 'Unknown',
-              error: ''
-            };
-          })
+          failed: buildFarmerSendResults(selectedFarmers, farmers, true) as SendResult['results']['failed'],
         }
       };
 

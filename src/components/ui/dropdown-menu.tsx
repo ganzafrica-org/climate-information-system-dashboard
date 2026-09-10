@@ -15,6 +15,8 @@ import {
 } from "react"
 import { AnimatePresence, motion, useReducedMotion } from "motion/react"
 
+import { createPortal } from "react-dom"
+
 import { cn } from "@/lib/utils"
 
 // A motion-based ACTION menu in the interior.dev aesthetic (open animation,
@@ -34,6 +36,7 @@ type MenuCtx = {
   align: Align
   rootRef: React.RefObject<HTMLDivElement>
   triggerRef: React.RefObject<HTMLButtonElement>
+  contentRef: React.RefObject<HTMLDivElement>
   contentId: string
   registerItem: (el: HTMLButtonElement | null, index: number) => void
   focusItem: (index: number) => void
@@ -52,6 +55,7 @@ export function DropdownMenu({ children }: { children: ReactNode }) {
   const [align, setAlign] = useState<Align>("start")
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
   const items = useRef<(HTMLButtonElement | null)[]>([])
   const contentId = `menu-${useId()}`
 
@@ -75,6 +79,7 @@ export function DropdownMenu({ children }: { children: ReactNode }) {
       const t = e.target as Node | null
       if (!t) return
       if (rootRef.current?.contains(t)) return
+      if (contentRef.current?.contains(t)) return
       setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
@@ -104,6 +109,7 @@ export function DropdownMenu({ children }: { children: ReactNode }) {
     align,
     rootRef,
     triggerRef,
+    contentRef,
     contentId,
     registerItem,
     focusItem,
@@ -137,8 +143,9 @@ export function DropdownMenuTrigger({
 }) {
   const { open, setOpen, triggerRef, contentId } = useMenu("DropdownMenuTrigger")
   const toggle = (e: React.MouseEvent) => {
-    onClick?.(e)
     e.preventDefault()
+    e.stopPropagation()
+    onClick?.(e)
     setOpen(!open)
   }
   const shared = {
@@ -176,9 +183,13 @@ export function DropdownMenuContent({
   align?: Align
   className?: string
 }) {
-  const { open, align, contentId, focusItem } = useMenu("DropdownMenuContent")
+  const { open, align, contentId, focusItem, triggerRef, contentRef } = useMenu("DropdownMenuContent")
   const reduced = useReducedMotion()
   const resolvedAlign = alignProp ?? align
+  const triggerRect = triggerRef.current?.getBoundingClientRect()
+  const top = triggerRect ? triggerRect.bottom + 6 : 0
+  const left = triggerRect?.left ?? 0
+  const right = triggerRect ? window.innerWidth - triggerRect.right : 0
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     const focusables = Array.from(
@@ -202,10 +213,13 @@ export function DropdownMenuContent({
     }
   }
 
-  return (
+  if (typeof document === "undefined") return null
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
+          ref={contentRef}
           id={contentId}
           role="menu"
           initial={reduced ? { opacity: 0 } : { opacity: 0, scale: 0.94, y: -8 }}
@@ -220,17 +234,22 @@ export function DropdownMenuContent({
             reduced ? { duration: 0 } : { ...OPEN, opacity: { duration: 0.12, ease: EASE } }
           }
           onKeyDown={onKeyDown}
-          style={{ transformOrigin: resolvedAlign === "end" ? "top right" : "top left" }}
+          style={{
+            position: "fixed",
+            top,
+            transformOrigin: resolvedAlign === "end" ? "top right" : "top left",
+            ...(resolvedAlign === "end" ? { right } : { left }),
+          }}
           className={cn(
-            "absolute top-[calc(100%+6px)] z-50 min-w-[200px] whitespace-nowrap rounded-[11px] border border-border bg-popover p-[5px] text-popover-foreground shadow-lg",
-            resolvedAlign === "end" ? "right-0" : "left-0",
+            "z-[200] min-w-[200px] whitespace-nowrap rounded-[11px] border border-border bg-popover p-[5px] text-popover-foreground shadow-lg",
             className
           )}
         >
           {children}
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 
