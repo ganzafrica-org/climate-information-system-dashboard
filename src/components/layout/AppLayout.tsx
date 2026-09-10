@@ -19,7 +19,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipGroup } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
@@ -94,80 +94,71 @@ export function AppLayout({ children }: AppLayoutProps) {
         >
             <div className="flex flex-col h-full overflow-y-auto py-4">
                 <nav className="flex-1 px-2 space-y-1">
-                    <TooltipProvider delayDuration={300}>
+                    <TooltipGroup openDelay={300}>
                         {navItems.map((item) => {
                             const isActive = router.pathname === item.href;
                             return (
-                                <Tooltip key={item.href}>
-                                    <TooltipTrigger asChild>
-                                        <Link href={item.href}>
-                                            <Button
-                                                variant="ghost"
-                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${isActive ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
-                                            >
-                                                {item.icon}
-                                                {(sidebarOpen || isMobile) && <span className="ml-3">{item.label}</span>}
-                                            </Button>
-                                        </Link>
-                                    </TooltipTrigger>
-                                    {!sidebarOpen && !isMobile && (
-                                        <TooltipContent side="right">
-                                            {item.label}
-                                        </TooltipContent>
-                                    )}
+                                <Tooltip
+                                    key={item.href}
+                                    label={item.label}
+                                    side="right"
+                                    disabled={sidebarOpen || isMobile}
+                                    className="w-full"
+                                >
+                                    <Link href={item.href}>
+                                        <Button
+                                            variant="ghost"
+                                            className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${isActive ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                        >
+                                            {item.icon}
+                                            {(sidebarOpen || isMobile) && <span className="ml-3">{item.label}</span>}
+                                        </Button>
+                                    </Link>
                                 </Tooltip>
                             );
                         })}
-                    </TooltipProvider>
+                    </TooltipGroup>
                 </nav>
                 <div className="mt-auto px-2 py-4">
                     {/* Admin section */}
                     {user?.role === 'admin' && (
                         <div className="mb-4">
                             <Separator className="mb-3" />
-                            <TooltipProvider delayDuration={300}>
-                                <Tooltip>
-                                    <TooltipTrigger asChild>
-                                        <Link href="/admin/users">
-                                            <Button
-                                                variant="ghost"
-                                                className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${router.pathname === '/admin/users' ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
-                                            >
-                                                <Users size={20} />
-                                                {(sidebarOpen || isMobile) && <span className="ml-3">Admin</span>}
-                                            </Button>
-                                        </Link>
-                                    </TooltipTrigger>
-                                    {!sidebarOpen && !isMobile && (
-                                        <TooltipContent side="right">
-                                            Admin
-                                        </TooltipContent>
-                                    )}
-                                </Tooltip>
-                            </TooltipProvider>
+                            <Tooltip
+                                label="Admin"
+                                side="right"
+                                disabled={sidebarOpen || isMobile}
+                                className="w-full"
+                            >
+                                <Link href="/admin/users">
+                                    <Button
+                                        variant="ghost"
+                                        className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${router.pathname === '/admin/users' ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                    >
+                                        <Users size={20} />
+                                        {(sidebarOpen || isMobile) && <span className="ml-3">Admin</span>}
+                                    </Button>
+                                </Link>
+                            </Tooltip>
                         </div>
                     )}
                     
                     {/* Logout section */}
-                    <TooltipProvider delayDuration={300}>
-                        <Tooltip>
-                            <TooltipTrigger asChild>
-                                <Button
-                                    variant="ghost"
-                                    className={`w-full justify-start text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
-                                    onClick={handleLogout}
-                                >
-                                    <LogOut size={20} />
-                                    {(sidebarOpen || isMobile) && <span className="ml-3">{t('logout')}</span>}
-                                </Button>
-                            </TooltipTrigger>
-                            {!sidebarOpen && !isMobile && (
-                                <TooltipContent side="right">
-                                    {t('logout')}
-                                </TooltipContent>
-                            )}
-                        </Tooltip>
-                    </TooltipProvider>
+                    <Tooltip
+                        label={t('logout')}
+                        side="right"
+                        disabled={sidebarOpen || isMobile}
+                        className="w-full"
+                    >
+                        <Button
+                            variant="ghost"
+                            className={`w-full justify-start text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                            onClick={handleLogout}
+                        >
+                            <LogOut size={20} />
+                            {(sidebarOpen || isMobile) && <span className="ml-3">{t('logout')}</span>}
+                        </Button>
+                    </Tooltip>
                 </div>
             </div>
         </div>

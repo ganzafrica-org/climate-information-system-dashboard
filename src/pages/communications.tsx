@@ -12,7 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs } from "@/components/ui/tabs";
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { Location, LocationsResponse } from '@/types/farmer';
@@ -128,59 +128,29 @@ export default function Communications() {
                 </div>
             </div>
             
-            <Tabs defaultValue="alerts" onValueChange={setActiveTab}>
-                <TabsList>
-                    <TabsTrigger 
-                        value="alerts"
-                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
-                    >
-                      <AlertTriangle className="h-4 w-4 mr-2" />
-                      {t("alerts")}
-                    </TabsTrigger>
-                    <TabsTrigger 
-                        value="messages"
-                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
-                    >
-                      <MessageSquare className="h-4 w-4 mr-2" />
-                      {t("customMessages")}
-                    </TabsTrigger>
-                    <TabsTrigger 
-                        value="scheduler"
-                        className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
-                    >
-                      <Clock className="h-4 w-4 mr-2" />
-                      Weather Scheduler
-                    </TabsTrigger>
-                    {user?.role === 'admin' && (
-                      <TabsTrigger 
-                          value="logs"
-                          className="data-[state=active]:bg-[#147677] data-[state=active]:text-white"
-                      >
-                        <Clock className="h-4 w-4 mr-2" />
-                        Logs
-                      </TabsTrigger>
-                    )}
-                </TabsList>
-            </Tabs>
-
-            {/* Tab Content */}
-            <div className="transition-all duration-300 ease-in-out">
-                {activeTab === 'alerts' ? (
-                    <AlertsTable 
-                      selectedSector={getSelectedLocationValue()} 
-                      searchTerm={searchTerm} 
-                    />
-                ) : activeTab === 'messages' ? (
-                    <MessagesTable 
-                      selectedSector={getSelectedLocationValue()} 
-                      searchTerm={searchTerm} 
-                    />
-                ) : activeTab === 'scheduler' ? (
-                    <WeatherSchedulerTable />
-                ) : (activeTab === 'logs' && user?.role === 'admin') ? (
-                    <MessageLogsTable />
-                ) : null}
-            </div>
+            <Tabs
+                defaultValue="alerts"
+                onValueChange={setActiveTab}
+                items={[
+                    { value: 'alerts', label: <span className="inline-flex items-center"><AlertTriangle className="h-4 w-4 mr-2" />{t("alerts")}</span> },
+                    { value: 'messages', label: <span className="inline-flex items-center"><MessageSquare className="h-4 w-4 mr-2" />{t("customMessages")}</span> },
+                    { value: 'scheduler', label: <span className="inline-flex items-center"><Clock className="h-4 w-4 mr-2" />{t("weatherScheduler")}</span> },
+                    ...(user?.role === 'admin'
+                        ? [{ value: 'logs', label: <span className="inline-flex items-center"><Clock className="h-4 w-4 mr-2" />{t("logs")}</span> }]
+                        : []),
+                ]}
+                renderPanel={(value) =>
+                    value === 'alerts' ? (
+                        <AlertsTable selectedSector={getSelectedLocationValue()} searchTerm={searchTerm} />
+                    ) : value === 'messages' ? (
+                        <MessagesTable selectedSector={getSelectedLocationValue()} searchTerm={searchTerm} />
+                    ) : value === 'scheduler' ? (
+                        <WeatherSchedulerTable />
+                    ) : value === 'logs' && user?.role === 'admin' ? (
+                        <MessageLogsTable />
+                    ) : null
+                }
+            />
         </div>
     
     </AppLayout>
