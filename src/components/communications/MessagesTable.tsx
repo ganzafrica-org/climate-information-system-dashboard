@@ -24,7 +24,8 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useLanguage } from '@/i18n';
 import { Badge } from '../ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -727,182 +728,54 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
             </div>
           </div>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-16">
-              <div className="flex flex-col items-center space-y-3">
-                <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
-                <span className="text-gray-500">{t("loading") || "Loading..."}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-[#f2f5fa] text-black">
-                  <tr>
-                    <th className="py-4 px-6 text-left font-semibold text-sm w-12">
-                      <BlueCheckbox
-                        checked={(selectedLocations?.length || 0) === (locations?.length || 0) && (locations?.length || 0) > 0}
-                        onCheckedChange={handleSelectAll}
-                      />
-                    </th>
-                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                      <div className="flex items-center gap-1">
-                        <span>{t("locationName") || "Location Name"}</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </th>
+          <div className="p-4">
+            <DataTable<any>
+              label={t("locations") || "Locations"}
+              data={locations || []}
+              getRowId={(l: any) => String(l.id)}
+              loading={isLoading}
+              selectable
+              selectedIds={new Set((selectedLocations || []).map(String))}
+              onSelectionChange={(ids) => setSelectedLocations(Array.from(ids).map(Number))}
+              onRowClick={(l: any) => handleViewLocation(l.id)}
+              emptyState={
+                <div className="flex flex-col items-center space-y-3">
+                  <MapPin className="h-12 w-12 text-gray-300" />
+                  <div className="text-gray-500 font-medium">{apiError ? (t("errorLoadingLocations") || "Error loading locations") : (t("noLocationsFound") || "No locations found")}</div>
+                  <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
+                </div>
+              }
+              columns={[
+                { id: "name", header: t("locationName") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-medium text-gray-900">{l.name}</span> },
+                { id: "status", header: t("status") || "Status", value: (l: any) => (l.isActive ? 1 : 0), cell: (l: any) => <StatusBadge status={l.isActive ? "active" : "inactive"} /> },
+                { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
+                  <span className="text-sm font-mono text-gray-600">
+                    {l.coordinates || (l.latitude && l.longitude) ? `${l.latitude}, ${l.longitude}` : <span className="text-gray-400 italic">{t("noCoordinates") || "No coordinates"}</span>}
+                  </span>
+                ) },
+                { id: "createdAt", header: t("createdAt") || "Created At", value: (l: any) => l.createdAt || "", cell: (l: any) => new Date(l.createdAt).toLocaleDateString() },
+                rowActionsColumn<any>((location: any) => (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem onClick={() => handleViewLocation(location.id)}><Eye className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />{t("viewDetails") || "View Details"}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditLocation(location)}><Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />{t("editLocation") || "Edit Location"}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleOpenCustomMessageDialog(location)}><MessageSquare className="h-4 w-4 mr-2" style={{ color: '#adc9e3' }} />{t("sendCustomMessage") || "Send Custom Message"}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => {
+                        if (location.latitude && location.longitude) window.open(`https://maps.google.com/?q=${location.latitude},${location.longitude}`, '_blank');
+                        else toast.error(t('noCoordinatesAvailable') || 'No coordinates available for this location');
+                      }}><Navigation className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />{t("viewOnMap") || "View on Map"}</DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem destructive onClick={() => handleDeleteLocation(location.id)}><Trash className="h-4 w-4 mr-2" />{t("delete") || "Delete"}</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )),
+              ] as SortableColumn<any>[]}
+            />
+          </div>
 
-                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                      <div className="flex items-center gap-1">
-                        <span>{t("status") || "Status"}</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </th>
-                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                      <div className="flex items-center gap-1">
-                        <Navigation className="h-3 w-3" />
-                        <span>{t("coordinates") || "Coordinates"}</span>
-                      </div>
-                    </th>
-                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                      <div className="flex items-center gap-1">
-                        <span>{t("createdAt") || "Created At"}</span>
-                        <ArrowUpDown className="h-3 w-3" />
-                      </div>
-                    </th>
-                    <th className="py-4 px-6 text-right font-semibold text-sm">{t("actions") || "Actions"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(!locations || locations.length === 0) ? (
-                    <tr>
-                      <td colSpan={6} className="py-16 text-center">
-                        <div className="flex flex-col items-center space-y-3">
-                          <MapPin className="h-12 w-12 text-gray-300" />
-                          <div className="text-gray-500 font-medium">{apiError ? (t("errorLoadingLocations") || "Error loading locations") : (t("noLocationsFound") || "No locations found")}</div>
-                          <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    locations.map((location, index) => (
-                      <tr
-                        key={location.id}
-                        className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors duration-150 ${
-                          index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                        }`}
-                        onClick={() => handleViewLocation(location.id)}
-                      >
-                        <td
-                          className="py-4 px-6"
-                          onClick={(e: React.MouseEvent<HTMLTableCellElement>) => e.stopPropagation()}
-                        >
-                          <BlueCheckbox
-                            checked={selectedLocations?.includes(location.id) || false}
-                            onCheckedChange={(checked: boolean) => handleSelectLocation(location.id, checked)}
-                          />
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="font-medium text-gray-900">{location.name}</div>           
-                        </td>
-
-                        <td className="py-4 px-6">
-                          <StatusBadge status={location.isActive ? "active" : "inactive"} />
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="text-sm font-mono text-gray-600">
-                            {location.coordinates || (location.latitude && location.longitude) 
-                              ? `${location.latitude}, ${location.longitude}`
-                              : (
-                                <span className="text-gray-400 italic">
-                                  {t("noCoordinates") || "No coordinates"}
-                                </span>
-                              )
-                            }
-                          </div>
-                        </td>
-                        <td className="py-4 px-6">
-                          <div className="text-sm text-gray-600">
-                            {new Date(location.createdAt).toLocaleDateString()}
-                          </div>
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
-                              >
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                              <DropdownMenuItem 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleViewLocation(location.id);
-                                }}
-                                className="cursor-pointer hover:bg-blue-50"
-                              >
-                                <Eye className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
-                                {t("viewDetails") || "View Details"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditLocation(location);
-                                }}
-                                className="cursor-pointer hover:bg-green-50"
-                              >
-                                <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
-                                {t("editLocation") || "Edit Location"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleOpenCustomMessageDialog(location);
-                                }}
-                                className="cursor-pointer hover:bg-purple-50"
-                              >
-                                <MessageSquare className="h-4 w-4 mr-2" style={{ color: '#adc9e3' }} />
-                                {t("sendCustomMessage") || "Send Custom Message"}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (location.latitude && location.longitude) {
-                                    window.open(`https://maps.google.com/?q=${location.latitude},${location.longitude}`, '_blank');
-                                  } else {
-                                    toast.error(t('noCoordinatesAvailable') || 'No coordinates available for this location');
-                                  }
-                                }}
-                                className="cursor-pointer hover:bg-blue-50"
-                              >
-                                <Navigation className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
-                                {t("viewOnMap") || "View on Map"}
-                              </DropdownMenuItem>
-                              <Separator className="my-1" />
-                              <DropdownMenuItem
-                                className="cursor-pointer hover:bg-red-50"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteLocation(location.id);
-                                }}
-                              >
-                                <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
-                                <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
 
           {/* Pagination Footer - Matching the provided design exactly */}
           {totalCount > 0 && (
