@@ -147,6 +147,12 @@ export type SortableTableProps<T> = {
   getRowLabel?: (row: T) => string;
   className?: string;
   variant?: "default" | "sheet";
+  /** Multi-select checkbox column. Controlled via selectedIds + onSelectionChange. */
+  selectable?: boolean;
+  selectedIds?: Set<string>;
+  onSelectionChange?: (ids: Set<string>) => void;
+  /** Optional row click (ignored when the click originates from an interactive cell). */
+  onRowClick?: (row: T) => void;
 };
 
 export function SortableTable<T>({
@@ -164,6 +170,10 @@ export function SortableTable<T>({
   getRowLabel,
   className = "",
   variant = "default",
+  selectable = false,
+  selectedIds,
+  onSelectionChange,
+  onRowClick,
 }: SortableTableProps<T>) {
   const reduced = useReducedMotion();
   const [marked, setMarked] = useState<string | null>(null);
@@ -197,10 +207,28 @@ export function SortableTable<T>({
 
   const template = useMemo(
     () =>
+      (selectable ? "40px " : "") +
       (markable ? "28px " : "") +
       columns.map((c) => c.width ?? "minmax(0, 1fr)").join(" "),
-    [columns, markable],
+    [columns, markable, selectable],
   );
+
+  const selected = selectedIds ?? new Set<string>();
+  const allIds = useMemo(() => ordered.map((o) => o.id), [ordered]);
+  const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  const someSelected = allIds.some((id) => selected.has(id)) && !allSelected;
+
+  const toggleAll = () => {
+    if (!onSelectionChange) return;
+    onSelectionChange(allSelected ? new Set() : new Set(allIds));
+  };
+  const toggleOne = (id: string) => {
+    if (!onSelectionChange) return;
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    onSelectionChange(next);
+  };
 
   const onToggle = (columnId: string) => {
     setTouched(true);
@@ -257,6 +285,18 @@ export function SortableTable<T>({
             }
             style={{ gridTemplateColumns: template }}
           >
+            {selectable && (
+              <div role="columnheader" className="flex min-w-0 items-center justify-center">
+                <input
+                  type="checkbox"
+                  aria-label="Select all rows"
+                  className="h-4 w-4 cursor-pointer accent-[hsl(var(--primary))]"
+                  checked={allSelected}
+                  ref={(el) => { if (el) el.indeterminate = someSelected; }}
+                  onChange={toggleAll}
+                />
+              </div>
+            )}
             {markable && (
               <div role="columnheader" className="min-w-0">
                 <span className="sr-only">Follow</span>
@@ -390,13 +430,31 @@ export function SortableTable<T>({
                     ? { duration: 0 }
                     : { ...CELL, delay: Math.min(index, STEP_CAP) * STEP }
                 }
+                onClick={onRowClick ? (e) => {
+                  // ignore clicks that originate from interactive controls in cells
+                  const target = e.target as HTMLElement;
+                  if (target.closest('button, a, input, select, textarea, [role="menu"], [role="menuitem"]')) return;
+                  onRowClick(row);
+                } : undefined}
                 className={`absolute inset-x-0 top-0 grid items-center gap-x-2 transition-colors duration-150 ${
                   isSheet ? "px-5" : "px-2"
-                } ${
-                  isMarked ? "bg-muted dark:bg-card/[0.06]" : ""
+                } ${onRowClick ? "cursor-pointer hover:bg-muted/50" : ""} ${
+                  isMarked || (selectable && selected.has(id)) ? "bg-muted dark:bg-card/[0.06]" : ""
                 }`}
                 style={{ height: rowHeight, gridTemplateColumns: template }}
               >
+                {selectable && (
+                  <div role="cell" className="flex min-w-0 items-center justify-center">
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${nameOf(row)}`}
+                      className="h-4 w-4 cursor-pointer accent-[hsl(var(--primary))]"
+                      checked={selected.has(id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleOne(id)}
+                    />
+                  </div>
+                )}
                 {markable && (
                   <div role="cell" className="min-w-0">
                     <button
