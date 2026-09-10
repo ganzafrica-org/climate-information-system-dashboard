@@ -1089,7 +1089,30 @@
     "searchLogs": "Search logs...",
     "messageLength": "Message Length",
     "timestamp": "Time stamp",
-    "alertTitle": "Alert Title"
-
-
+    "alertTitle": "Alert Title",
+    "totalFarmersReached": "Total Farmers Reached",
+    "totalMessagesSent": "Total Messages Sent",
+    "totalActiveLocations": "Total Active Locations",
+    "updatedDaily": "Updated daily",
+    "noHighPriorityAlerts": "No high priority alerts",
+    "maxTempShort": "Max °C",
+    "minTempShort": "Min °C",
+    "rainAmountMm": "Rain mm",
+    "rainChancePercent": "Chance %",
+    "dry": "Dry",
+    "todayCount": "{{count}} today",
+    "avg": "avg",
+    "clouds": "Clouds",
+    "rain": "Rain",
+    "snow": "Snow",
+    "daySun": "Sun",
+    "dayMon": "Mon",
+    "dayTue": "Tue",
+    "dayWed": "Wed",
+    "dayThu": "Thu",
+    "dayFri": "Fri",
+    "daySat": "Sat",
+    "goodMorning": "Good Morning",
+    "goodAfternoon": "Good Afternoon",
+    "goodEvening": "Good Evening"
 }

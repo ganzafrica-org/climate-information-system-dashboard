@@ -4,9 +4,8 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useLanguage } from '@/i18n';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -14,66 +13,66 @@ import {
     DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import {
-    AlertCircle,
-    ArrowRight,
     Calendar,
     ChevronDown,
     CloudDrizzle,
     CloudRain,
-    Cloud,
-    Sun,
     Droplets,
-    Eye,
     MapPin,
-    Thermometer,
-    Umbrella,
     Loader2,
     RefreshCw,
     Wind,
-    TrendingUp,
     Users,
     MessageSquare,
-    Activity,
     AlertTriangle,
-    Zap,
-    Target,
-    TrendingDown
+    ArrowUpRight,
 } from 'lucide-react';
-import dynamic from "next/dynamic";
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { Location, LocationsResponse } from '@/types/farmer';
-import { ApiResponse, WeatherData, WeatherRequestParams } from '@/types/weather';
-import { RainTimingDisplay } from '@/components/ui/rain-timing';
-import { HourlyForecastDisplay } from '@/components/ui/hourly-forecast';
+import { ApiResponse, DailyWeather, WeatherData, WeatherRequestParams } from '@/types/weather';
+import { cn } from '@/lib/utils';
+import {
+    Area,
+    AreaChart,
+    Bar,
+    BarChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
+import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 
-const RainfallHeatmap = dynamic(
-    () => import('@/components/dashboard-map'),
-    { ssr: false }
+const SoftCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (
+    <div className={cn('bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,40,80,0.06)]', className)}>
+        {children}
+    </div>
 );
 
-const getWeatherIcon = (condition: string): React.ReactElement => {
+const SunCloudIcon = ({ className }: { className?: string }) => (
+    <img
+        src="/images/weather-sun-cloud.png"
+        alt=""
+        className={cn('object-contain', className)}
+    />
+);
+
+const getWeatherIcon = (condition: string, className?: string): React.ReactElement => {
     const iconMap: { [key: string]: React.ReactElement } = {
-        'clear': <Sun className="h-10 w-10 text-yellow-500" />,
-        'clouds': <Cloud className="h-10 w-10 text-gray-500" />,
-        'rain': <CloudRain className="h-10 w-10 text-blue-600" />,
-        'drizzle': <CloudDrizzle className="h-10 w-10 text-blue-400" />,
-        'snow': <CloudDrizzle className="h-10 w-10 text-cyan-400" />,
-        'thunderstorm': <CloudRain className="h-10 w-10 text-purple-600" />,
+        'clear': <SunCloudIcon className={cn('h-10 w-10', className)} />,
+        'clouds': <SunCloudIcon className={cn('h-10 w-10', className)} />,
+        'rain': <CloudRain className={cn('h-10 w-10 text-[#147677]', className)} />,
+        'drizzle': <CloudDrizzle className={cn('h-10 w-10 text-[#147677]', className)} />,
+        'snow': <CloudDrizzle className={cn('h-10 w-10 text-[#147677]', className)} />,
+        'thunderstorm': <CloudRain className={cn('h-10 w-10 text-[#0f5f5f]', className)} />,
     };
 
-    const conditionKey = condition.toLowerCase();
-    return iconMap[conditionKey] || <Cloud className="h-10 w-10 text-gray-500" />;
-};
-
-
-type Alert = {
-    type: string;
-    severity: string;
-    message: string;
-    sectors: string[];
-    color: string;
-    icon: React.ReactNode;
+    const conditionKey = (condition || '').toLowerCase();
+    return iconMap[conditionKey] || <SunCloudIcon className={cn('h-10 w-10', className)} />;
 };
 
 type DashboardStats = {
@@ -85,18 +84,21 @@ type DashboardStats = {
     totalMessagesCount?: number;
     totalAlertsCount?: number;
     totalLocationsCount?: number;
+    farmersToday?: number;
+    messagesToday?: number;
+    alertsToday?: number;
+    locationsToday?: number;
 };
 
 const Dashboard: NextPage = () => {
-    const { t } = useLanguage();
+    const { t, locale } = useLanguage();
+    const { user } = useAuth();
     const router = useRouter();
     const [locations, setLocations] = useState<Location[]>([]);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
     const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
-    const [, setAllLocationsWeather] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [, setIsLoadingAllWeather] = useState(false);
     const [todayWeather, setTodayWeather] = useState<any>(null);
     const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
         totalFarmers: 0,
@@ -106,7 +108,12 @@ const Dashboard: NextPage = () => {
         totalFarmersCount: 0,
         totalMessagesCount: 0,
         totalAlertsCount: 0,
+        farmersToday: 0,
+        messagesToday: 0,
+        alertsToday: 0,
+        locationsToday: 0,
     });
+    const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
     useEffect(() => {
         fetchLocations();
@@ -119,51 +126,88 @@ const Dashboard: NextPage = () => {
         }
     }, [selectedLocation]);
 
-    useEffect(() => {
-        if (locations.length > 0) {
-            fetchAllLocationsWeather();
+    const isToday = (value?: string | null) => {
+        if (!value) return false;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return false;
+        return date.toDateString() === new Date().toDateString();
+    };
+
+    const parseTimestamp = (value: unknown): number | null => {
+        if (value == null || value === '') return null;
+        if (value instanceof Date) {
+            const time = value.getTime();
+            return Number.isNaN(time) ? null : time;
         }
-    }, [locations]);
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            return value < 1e12 ? value * 1000 : value;
+        }
+        if (typeof value === 'string') {
+            const numeric = Number(value);
+            if (value.trim() !== '' && Number.isFinite(numeric) && numeric > 1e9 && numeric < 1e14) {
+                return numeric < 1e12 ? numeric * 1000 : numeric;
+            }
+            const parsed = Date.parse(value);
+            return Number.isNaN(parsed) ? null : parsed;
+        }
+        return null;
+    };
+
+    const latestTimestamp = (...values: unknown[]): Date | null => {
+        const times = values
+            .map(parseTimestamp)
+            .filter((time): time is number => time != null && time > 0);
+        if (!times.length) return null;
+        return new Date(Math.max(...times));
+    };
+
+    const extractMessageLogs = (raw: any): any[] => {
+        const payload = raw?.data ?? raw;
+        if (Array.isArray(payload?.data?.results)) return payload.data.results;
+        if (Array.isArray(payload?.results)) return payload.results;
+        if (Array.isArray(payload?.data?.logs)) return payload.data.logs;
+        if (Array.isArray(payload?.logs)) return payload.logs;
+        if (Array.isArray(payload?.data)) return payload.data;
+        if (Array.isArray(payload)) return payload;
+        return [];
+    };
 
     const fetchDashboardStats = async () => {
         try {
             const [farmersRes, alertsListRes, messagesLogsRes, locsRes] = await Promise.all([
-                // Farmers
                 api.get('/api/admin/farmers').catch((e: any) => e),
-                // List alerts (with a large limit to approximate totals)
                 api.get('/api/weather/alerts', { params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc' } }).catch((e: any) => e),
-                // Use admin messages logs endpoint to compute total messages sent (bypass cache)
-                api.get('/api/weather/admin/logs/messages', { 
+                api.get('/api/weather/admin/logs/messages', {
                     params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc', _ts: Date.now() },
                 }).catch(() => null),
-                // Locations
                 api.get('/api/admin/locations').catch((e: any) => e),
             ]);
 
-            // Farmers total - extract both count and total
             const farmersData = farmersRes?.data?.data?.farmers || farmersRes?.data?.farmers || farmersRes?.farmers || [];
             const totalFarmers = Array.isArray(farmersData)
                 ? farmersData.length
                 : (farmersRes?.data?.count || farmersRes?.count || 0);
             const totalFarmersCount = farmersRes?.data?.data?.total || farmersRes?.data?.total || farmersRes?.total || totalFarmers;
 
-            // Alerts sent/active counts from alerts list only
-            let sentAlerts = 0;
+            const farmersToday = Array.isArray(farmersData)
+                ? farmersData.filter((farmer: any) => isToday(farmer.createdAt)).length
+                : 0;
+
             let activeAlerts = 0;
             let totalAlertsCount = 0;
 
-            // Parse list response for alerts to compute counts
             const alertsPayload = alertsListRes?.data || alertsListRes;
             let alertsArray: any[] = [];
             if (Array.isArray(alertsPayload)) {
                 alertsArray = alertsPayload;
-            } else if (alertsPayload?.data?.alerts) {
+            } else if (Array.isArray(alertsPayload?.data?.alerts)) {
                 alertsArray = alertsPayload.data.alerts;
-            } else if (alertsPayload?.alerts) {
+            } else if (Array.isArray(alertsPayload?.alerts)) {
                 alertsArray = alertsPayload.alerts;
+            } else if (Array.isArray(alertsPayload?.data)) {
+                alertsArray = alertsPayload.data;
             }
 
-            // Extract total count from pagination metadata
             totalAlertsCount = alertsPayload?.data?.total || alertsPayload?.total || alertsPayload?.pagination?.total || alertsArray.length;
 
             if (alertsArray.length > 0) {
@@ -175,7 +219,6 @@ const Dashboard: NextPage = () => {
                     validUntil: a.validUntil ? Date.parse(a.validUntil) : null,
                 }));
 
-                sentAlerts = parsed.filter(p => p.isSent).length;
                 activeAlerts = parsed.filter(p => {
                     if (p.isActive === true) return true;
                     if (p.isSent && p.validUntil && p.validUntil > now) return true;
@@ -183,49 +226,45 @@ const Dashboard: NextPage = () => {
                 }).length;
             }
 
-            // Messages totals (use summary.total or pagination.total)
+            const alertsToday = alertsArray.filter((alert: any) => isToday(alert.sentAt) || isToday(alert.createdAt)).length;
+
             let messagesTotalFromLogs = 0;
-            let totalMessagesCount = 0; // keep for detailed stats if needed
+            let totalMessagesCount = 0;
             if (messagesLogsRes) {
                 const raw = messagesLogsRes;
                 const payloadRoot = raw?.data ?? raw;
-                
-                // Extract summary and pagination nodes
+
                 const summaryNode = payloadRoot?.data?.summary || payloadRoot?.summary || null;
                 const paginationNode = payloadRoot?.data?.pagination || payloadRoot?.pagination || null;
 
-                // Use total from summary or pagination as the displayed total
                 messagesTotalFromLogs = (
                     (typeof summaryNode?.total === 'number' ? summaryNode.total : undefined) ??
                     (typeof paginationNode?.total === 'number' ? paginationNode.total : undefined) ??
                     0
                 );
-                
-                // Use pagination.total for total messages count
+
                 totalMessagesCount = (
                     (typeof paginationNode?.total === 'number' ? paginationNode.total : undefined) ??
                     (typeof summaryNode?.total === 'number' ? summaryNode.total : undefined) ??
                     0
                 );
-                
-                console.log('Message logs extraction:', {
-                    messagesTotal: messagesTotalFromLogs,
-                    totalMessages: totalMessagesCount,
-                    summary: summaryNode,
-                    pagination: paginationNode
-                });
             }
 
-            // Display the exact total from logs on the card
             const messagesSent = messagesTotalFromLogs;
             const totalMessages = totalMessagesCount;
+            const messageLogs = extractMessageLogs(messagesLogsRes);
+            const messagesToday = messageLogs.filter((log: any) =>
+                isToday(log.sentAt) || isToday(log.timestamp) || isToday(log.createdAt)
+            ).length;
 
-            // Active locations - extract both count and total
             const locationsData = locsRes?.data?.data?.locations || locsRes?.data?.locations || locsRes?.locations || [];
             const activeLocations = Array.isArray(locationsData)
                 ? locationsData.length
                 : (locsRes?.data?.count || locsRes?.count || (locations?.length || 0));
             const totalLocationsCount = locsRes?.data?.data?.total || locsRes?.data?.total || locsRes?.total || locsRes?.pagination?.total || activeLocations;
+            const locationsToday = Array.isArray(locationsData)
+                ? locationsData.filter((location: any) => isToday(location.createdAt)).length
+                : 0;
 
             setDashboardStats({
                 totalFarmers,
@@ -236,17 +275,10 @@ const Dashboard: NextPage = () => {
                 totalMessagesCount: totalMessages,
                 totalAlertsCount,
                 totalLocationsCount,
-            });
-
-            console.log('Dashboard stats updated:', { 
-                totalFarmers, 
-                totalFarmersCount,
-                messagesSent, 
-                totalMessages,
-                activeAlerts, 
-                totalAlertsCount,
-                activeLocations,
-                totalLocationsCount 
+                farmersToday,
+                messagesToday,
+                alertsToday,
+                locationsToday,
             });
         } catch (error: any) {
             console.error('Failed to fetch dashboard stats:', error);
@@ -259,6 +291,10 @@ const Dashboard: NextPage = () => {
                 totalMessagesCount: 0,
                 totalAlertsCount: 0,
                 totalLocationsCount: locations.length || 0,
+                farmersToday: 0,
+                messagesToday: 0,
+                alertsToday: 0,
+                locationsToday: 0,
             });
         }
     };
@@ -295,49 +331,30 @@ const Dashboard: NextPage = () => {
             const today = todayIndex !== -1 ? response.data.weather.daily[todayIndex] : response.data.weather.daily[0];
             setTodayWeather(today);
 
+            const payload = response.data as any;
+            const updated = latestTimestamp(
+                payload.updatedAt,
+                payload.createdAt,
+                payload.storedAt,
+                payload.lastUpdated,
+                payload.lastUpdate,
+                payload.fetchedAt,
+                payload.timestamp,
+                payload.weatherDataUpdatedAt,
+                payload.alert?.createdAt,
+                payload.alert?.updatedAt,
+                payload.weather?.updatedAt,
+                payload.weather?.createdAt,
+                payload.weather?.current?.dt,
+                payload.metadata?.storedAt,
+                payload.metadata?.updatedAt,
+                today?.date,
+            );
+            setLastUpdatedAt(updated);
+
         } catch (error: any) {
             console.error('Byanze kubona amakuru y\'ibihe:', error);
             toast.error(t('failedToLoadWeather'));
-        }
-    };
-
-    const fetchAllLocationsWeather = async () => {
-        setIsLoadingAllWeather(true);
-        try {
-            const response = await api.get('/api/weather/all', {
-                params: { type: 'daily' }
-            });
-
-            if (response.data.status === 'success') {
-                const processedWeatherData = response.data.data.locations.map((location: any) => {
-                    const todayWeather = location.weatherSummary;
-                    const locationData = locations.find(loc => loc.id === location.locationId);
-
-                    return {
-                        id: location.locationId,
-                        name: location.locationName,
-                        sector: location.locationName,
-                        lat: location.coordinates?.lat || locationData?.lat,
-                        lon: location.coordinates?.lon || locationData?.lon,
-                        temperature: todayWeather?.currentTemp || 20,
-                        condition: todayWeather?.condition || 'Bitazwi',
-                        rainChance: todayWeather?.rainChance || 0,
-                        humidity: todayWeather?.currentTemp ? Math.round(Math.random() * 30 + 50) : 65,
-                        windSpeed: todayWeather?.windInfo ? parseFloat(todayWeather.windInfo.split(' ')[0]) || 5 : 5,
-                        alerts: location.intelligentAlerts || [],
-                        hasExtremeConditions: todayWeather?.hasExtremeConditions || false,
-                        farmingAdvice: todayWeather?.farmingAdvice || 'Kora igenzura ry\'ibihingwa buri gihe',
-                        weatherOverview: location.weatherOverview || `Ibihe by\'ikirere bya ${location.locationName}`,
-                    };
-                });
-
-                setAllLocationsWeather(processedWeatherData);
-            }
-        } catch (error: any) {
-            console.error('Byanze kubona ibihe by\'ahantu hose:', error);
-            toast.error(t('failedToLoadAllWeather'));
-        } finally {
-            setIsLoadingAllWeather(false);
         }
     };
 
@@ -347,7 +364,6 @@ const Dashboard: NextPage = () => {
         setIsRefreshing(true);
         try {
             await fetchWeatherData(selectedLocation.id);
-            await fetchAllLocationsWeather();
             await fetchDashboardStats();
             toast.success(t('weatherDataRefreshed'));
         } catch (error) {
@@ -364,86 +380,97 @@ const Dashboard: NextPage = () => {
         return 'seasons.seasonC';
     };
 
-    const getIntelligentAlerts = () => {
-        const alerts = (weatherData as any)?.intelligentAlerts || [];
-        if (!alerts || alerts.length === 0) return [];
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return t('goodMorning');
+        if (hour < 17) return t('goodAfternoon');
+        return t('goodEvening');
+    };
 
-        return alerts.map((alert: any) => ({
-            type: alert.type,
-            severity: alert.level,
-            message: alert.message,
-            sectors: [selectedLocation?.name || ''],
-            color: alert.level === 'critical' ? 'red' :
-                alert.level === 'high' ? 'amber' :
-                    alert.level === 'medium' ? 'blue' : 'green',
-            icon: alert.category === 'rainfall' ? <CloudRain className="h-5 w-5" /> :
-                alert.category === 'pest_management' ? <AlertCircle className="h-5 w-5" /> :
-                    alert.category === 'irrigation' ? <Droplets className="h-5 w-5" /> :
-                        alert.category === 'temperature' ? <Thermometer className="h-5 w-5" /> :
-                            alert.category === 'wind' ? <Wind className="h-5 w-5" /> : <Sun className="h-5 w-5" />
+    const dateLocale = locale === 'rw' ? 'rw-RW' : undefined;
+
+    const shortWeekday = (dayOfWeek?: string) => {
+        const map: Record<string, string> = {
+            sunday: 'daySun',
+            monday: 'dayMon',
+            tuesday: 'dayTue',
+            wednesday: 'dayWed',
+            thursday: 'dayThu',
+            friday: 'dayFri',
+            saturday: 'daySat',
+        };
+        const key = map[(dayOfWeek || '').toLowerCase()];
+        return key ? t(key) : (dayOfWeek || '').slice(0, 3);
+    };
+
+    const translateCondition = (condition?: string) => {
+        if (!condition) return '';
+        const key = condition.toLowerCase();
+        const translated = t(key);
+        return translated !== key ? translated : condition;
+    };
+
+    const weeklyChartConfig = {
+        tempMax: { label: t('maxTempShort'), color: '#147677' },
+        tempMin: { label: t('minTempShort'), color: '#F5A623' },
+        rain: { label: t('rainAmountMm'), color: '#F5A623' },
+        rainChance: { label: t('rainChancePercent'), color: '#147677' },
+    };
+
+    const getWeeklyDays = (): DailyWeather[] => {
+        if (!weatherData?.weather?.daily) return [];
+        return weatherData.weather.daily.slice(0, 7);
+    };
+
+    const getWeeklyChartData = () => {
+        return getWeeklyDays().map((day) => ({
+            day: day.isToday
+                ? t('today')
+                : shortWeekday(day.dayOfWeek) || day.formattedDate,
+            fullDay: day.dayOfWeek || day.formattedDate,
+            tempMax: day.tempMax,
+            tempMin: day.tempMin,
+            rain: Number(day.rainAmount) || 0,
+            humidity: day.humidity,
+            rainChance: day.rainChance,
+            condition: day.conditionMain,
+            isToday: day.isToday,
         }));
     };
 
-    const getWeatherMetrics = () => {
-        if (!todayWeather) return null;
-
-        // Get current weather data if available
-        const currentWeather = weatherData?.weather?.current;
-        
-        // Get average cloud coverage from hourly data if available
-        const avgClouds = todayWeather.hourly && todayWeather.hourly.length > 0
-            ? Math.round(todayWeather.hourly.reduce((sum: number, h: any) => sum + (h.clouds || 0), 0) / todayWeather.hourly.length)
-            : null;
-
-        // Get average visibility from hourly data if available
-        const avgVisibility = todayWeather.hourly && todayWeather.hourly.length > 0
-            ? Math.round(todayWeather.hourly.reduce((sum: number, h: any) => sum + (h.visibility || 10000), 0) / todayWeather.hourly.length)
-            : null;
-
-        // Get max wind gust from hourly data if available
-        const maxWindGust = todayWeather.hourly && todayWeather.hourly.length > 0
-            ? Math.max(...todayWeather.hourly.map((h: any) => h.wind_gust || 0))
-            : null;
-
-        return {
-            uvIndex: todayWeather.uvIndex || currentWeather?.uvIndex || 0,
-            pressure: currentWeather?.pressure || null,
-            windDirection: todayWeather.windDirection || currentWeather?.windDirection || 'N/A',
-            cloudCoverage: avgClouds,
-            visibility: avgVisibility ? (avgVisibility / 1000).toFixed(1) : null, // Convert to km
-            feelsLike: currentWeather?.feelsLike || null,
-            windGust: maxWindGust ? Math.round(maxWindGust * 3.6) : null, // Convert to km/h
-        };
-    };
-
     const getWeeklyForecastSummary = () => {
-        if (!weatherData?.weather?.daily) return null;
-
-        const daily = weatherData.weather.daily;
-        const next7Days = daily.slice(0, 7);
-
+        const next7Days = getWeeklyDays();
         if (next7Days.length === 0) return null;
 
         const avgTemp = Math.round(next7Days.reduce((sum, d) => sum + d.tempMax, 0) / next7Days.length);
         const avgHumidity = Math.round(next7Days.reduce((sum, d) => sum + d.humidity, 0) / next7Days.length);
         const totalRain = next7Days.reduce((sum, d) => sum + d.rainAmount, 0);
-        const avgWindSpeed = Math.round(next7Days.reduce((sum, d) => sum + d.windSpeed, 0) / next7Days.length * 3.6); // Convert to km/h
+        const avgWindSpeed = Math.round(next7Days.reduce((sum, d) => sum + d.windSpeed, 0) / next7Days.length * 3.6);
+        const daysWithRain = next7Days.filter(d => d.hasRain || d.rainChance > 30).length;
 
         return {
             avgTemp,
             avgHumidity,
             totalRain: totalRain.toFixed(1),
             avgWindSpeed,
-            daysWithRain: next7Days.filter(d => d.hasRain || d.rainChance > 30).length,
+            daysWithRain,
+            dryDays: Math.max(next7Days.length - daysWithRain, 0),
         };
     };
 
-    const getUVIndexStatus = (uvIndex: number) => {
-        if (uvIndex <= 2) return { level: 'low', color: 'text-green-600', bg: 'bg-green-100' };
-        if (uvIndex <= 5) return { level: 'moderate', color: 'text-yellow-600', bg: 'bg-yellow-100' };
-        if (uvIndex <= 7) return { level: 'high', color: 'text-orange-600', bg: 'bg-orange-100' };
-        if (uvIndex <= 10) return { level: 'veryHigh', color: 'text-red-600', bg: 'bg-red-100' };
-        return { level: 'extreme', color: 'text-purple-600', bg: 'bg-purple-100' };
+    const getConditionBreakdown = () => {
+        const days = getWeeklyDays();
+        const counts: Record<string, number> = {};
+        days.forEach((day) => {
+            const key = day.conditionMain || 'Clouds';
+            counts[key] = (counts[key] || 0) + 1;
+        });
+        const palette = ['#147677', '#F5A623', '#7AB8B8', '#FDBA74', '#0f5f5f'];
+        return Object.entries(counts).map(([name, value], index) => ({
+            name: translateCondition(name),
+            value,
+            fill: palette[index % palette.length],
+        }));
     };
 
     if (isLoading) {
@@ -451,17 +478,79 @@ const Dashboard: NextPage = () => {
             <AppLayout>
                 <div className="flex items-center justify-center min-h-[400px]">
                     <div className="text-center">
-                        <Loader2 className="animate-spin h-8 w-8 mx-auto text-blue-600" />
-                        <p className="mt-2 text-slate-600">{t('loadingLocations')}</p>
+                        <Loader2 className="animate-spin h-8 w-8 mx-auto text-[#147677]" />
+                        <p className="mt-2 text-slate-500">{t('loadingLocations')}</p>
                     </div>
                 </div>
             </AppLayout>
         );
     }
 
-    const alerts = getIntelligentAlerts();
-    const weatherMetrics = getWeatherMetrics();
     const weeklySummary = getWeeklyForecastSummary();
+    const weeklyChartData = getWeeklyChartData();
+    const conditionBreakdown = getConditionBreakdown();
+    const currentWeather = weatherData?.weather?.current;
+    const displayTemp = currentWeather?.temp ?? todayWeather?.tempMax;
+    const displayCondition = currentWeather?.condition || todayWeather?.condition || '';
+
+    const rainyDonut = weeklySummary ? [
+        { name: t('rainy'), value: weeklySummary.daysWithRain, fill: '#F5A623' },
+        { name: t('dry'), value: weeklySummary.dryDays, fill: '#C5E0E0' },
+    ] : [];
+
+    const stats = [
+        {
+            label: t('totalFarmersReached'),
+            value: dashboardStats.totalFarmers,
+            showToday: false,
+            icon: <Users className="h-5 w-5 text-[#147677]" />,
+            iconBg: 'bg-[#147677]/10',
+        },
+        {
+            label: t('totalMessagesSent'),
+            value: dashboardStats.messagesSent,
+            showToday: false,
+            icon: <MessageSquare className="h-5 w-5 text-[#F5A623]" />,
+            iconBg: 'bg-[#F5A623]/10',
+        },
+        {
+            label: t('activeAlerts'),
+            value: dashboardStats.activeAlerts,
+            showToday: true,
+            today: dashboardStats.alertsToday || 0,
+            icon: <AlertTriangle className="h-5 w-5 text-[#F5A623]" />,
+            iconBg: 'bg-[#F5A623]/10',
+        },
+        {
+            label: t('totalActiveLocations'),
+            value: dashboardStats.activeLocations,
+            showToday: false,
+            icon: <MapPin className="h-5 w-5 text-[#147677]" />,
+            iconBg: 'bg-[#147677]/10',
+        },
+    ];
+
+    const locationMenu = (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-1 text-sm font-medium text-white/90 hover:text-white">
+                    <MapPin className="h-3.5 w-3.5" />
+                    {selectedLocation?.name || t('selectLocation')}
+                    <ChevronDown className="h-3.5 w-3.5" />
+                </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+                {locations.map((location) => (
+                    <DropdownMenuItem
+                        key={location.id}
+                        onClick={() => setSelectedLocation(location)}
+                    >
+                        {location.name}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
 
     return (
         <AppLayout>
@@ -469,31 +558,33 @@ const Dashboard: NextPage = () => {
                 <title>{t('dashboard')} | {t('climateInformationSystem')}</title>
             </Head>
 
-            <div className="space-y-6">
-                {/* Header Section */}
-                <div className="bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] rounded-2xl p-6 text-white shadow-xl">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
-                                <Activity className="h-7 w-7" />
-                            </div>
-                            <div>
-                                <h1 className="text-3xl font-bold">{t('dashboard')}</h1>
-                                <p className="text-white/80 text-lg">{t('climateInformationSystem')}</p>
-                            </div>
+            <div className="space-y-3">
+                <div className="bg-white px-4 py-3 rounded-lg">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                        <div>
+                            <h1 className="text-2xl font-bold text-[#147677] tracking-tight">
+                                {getGreeting()}{user?.username ? `, ${user.username.split(' ')[0]}!` : '!'}
+                            </h1>
+                            <p className="text-slate-400 text-sm">
+                                {new Date().toLocaleDateString(dateLocale, {
+                                    weekday: 'long',
+                                    day: 'numeric',
+                                    month: 'long',
+                                    year: 'numeric',
+                                })}
+                            </p>
                         </div>
 
                         <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-xl border border-white/20">
-                                <Calendar className="h-4 w-4" />
+                            <div className="flex items-center gap-2 bg-[#f9fafb] px-3 py-2 rounded-lg border border-gray-200 text-slate-500">
+                                <Calendar className="h-4 w-4 text-[#147677]" />
                                 <span className="text-sm font-medium">{t(getCurrentSeason())}</span>
                             </div>
-
                             <Button
                                 variant="outline"
                                 onClick={handleRefresh}
                                 disabled={isRefreshing}
-                                className="bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
+                                className="rounded-lg border-gray-200 text-slate-600 hover:bg-[#f9fafb]"
                             >
                                 <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                                 {isRefreshing ? t('refreshing') : t('refresh')}
@@ -502,341 +593,239 @@ const Dashboard: NextPage = () => {
                     </div>
                 </div>
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-blue-50/30 hover:shadow-lg transition-shadow">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-slate-600 text-sm font-medium">Farmers Reached</p>
-                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.totalFarmers.toLocaleString()}</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                    {stats.map((stat) => (
+                        <SoftCard key={stat.label} className="px-4 py-5">
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="text-slate-400 text-xs">{stat.label}</p>
+                                    <p className="text-xl font-bold text-slate-800 tracking-tight">
+                                        {stat.value.toLocaleString()}
+                                    </p>
+                                    {stat.showToday && (
+                                        <div className="mt-1 text-xs">
+                                            <span className="inline-flex items-center gap-0.5 font-medium text-[#F5A623]">
+                                                <ArrowUpRight className="h-3.5 w-3.5" />
+                                                {t('todayCount', { count: (stat.today || 0).toLocaleString() })}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3 rounded-2xl shadow-sm">
-                                    <Users className="h-6 w-6 text-white" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-emerald-50/30 hover:shadow-lg transition-shadow">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-slate-600 text-sm font-medium">Messages Sent</p>
-                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.messagesSent.toLocaleString()}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3 rounded-2xl shadow-sm">
-                                    <MessageSquare className="h-6 w-6 text-white" />
+                                <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center shrink-0', stat.iconBg)}>
+                                    {stat.icon}
                                 </div>
                             </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-amber-50/30 hover:shadow-lg transition-shadow">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-slate-600 text-sm font-medium">Active Alerts</p>
-                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.activeAlerts.toLocaleString()}</p>
-                                    <div className="flex items-center gap-1 mt-2">
-                                        <span className="text-xs text-slate-500">
-                                            Total Alerts:  {(dashboardStats.totalAlertsCount || 0).toLocaleString()}
-                                        </span>
-                                    </div>
-                                </div>
-                                <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-3 rounded-2xl shadow-sm">
-                                    <AlertTriangle className="h-6 w-6 text-white" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card className="border border-gray-100 shadow-md bg-gradient-to-br from-white to-indigo-50/30 hover:shadow-lg transition-shadow">
-                        <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <p className="text-slate-600 text-sm font-medium">Active Locations</p>
-                                    <p className="text-3xl font-bold text-slate-900 mt-1">{dashboardStats.activeLocations.toLocaleString()}</p>
-                                </div>
-                                <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-3 rounded-2xl shadow-sm">
-                                    <MapPin className="h-6 w-6 text-white" />
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        </SoftCard>
+                    ))}
                 </div>
 
-                {/* Map Section */}
-                <RainfallHeatmap />
-
-                {/* Main Content Grid */}
-                <div className="grid gap-6 grid-cols-1 lg:grid-cols-3">
-                    {/* Today's Weather */}
-                    <Card className="border-0 shadow-md bg-white lg:col-span-1">
-                        <CardHeader className="bg-white border-b border-gray-200 pb-4">
-                            <CardTitle className="flex items-center gap-2 text-slate-900">
-                                <Sun className="h-5 w-5 text-yellow-500" />
-                                {t('todayForecast')}
-                            </CardTitle>
-                            <CardDescription className="text-slate-600 flex items-center gap-2">
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" size="sm" className="text-slate-700 hover:text-slate-900 p-0 h-auto">
-                                            <MapPin className="h-4 w-4 mr-1" />
-                                            {selectedLocation?.name || t('selectLocation')}
-                                            <ChevronDown className="ml-1 h-3 w-3" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent>
-                                        {locations.map((location) => (
-                                            <DropdownMenuItem
-                                                key={location.id}
-                                                onClick={() => setSelectedLocation(location)}
-                                            >
-                                                {location.name}
-                                            </DropdownMenuItem>
-                                        ))}
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="p-6 space-y-4">
-                            {todayWeather ? (
-                                <>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-sm font-medium text-slate-600">
-                                                {t('temperature')}
-                                            </p>
-                                            <p className="text-4xl font-bold text-slate-900">{todayWeather.tempMax}°C</p>
-                                            <p className="text-sm text-slate-500">
-                                                {weatherMetrics?.feelsLike 
-                                                    ? `Feels like ${Math.round(weatherMetrics.feelsLike)}°C`
-                                                    : `Feels like ${todayWeather.tempMax + 2}°C`
-                                                }
-                                            </p>
-                                        </div>
-                                        <div className="h-20 w-20 rounded-full bg-gradient-to-br from-sky-100 to-blue-100 flex items-center justify-center shadow-sm">
-                                            {getWeatherIcon(todayWeather.conditionMain)}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="bg-gradient-to-br from-[#147677]/10 to-[#147677]/20 p-4 rounded-xl border border-[#147677]/30 hover:shadow-md transition-shadow">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <CloudRain className="h-4 w-4 text-[#147677]" />
-                                                <p className="text-sm font-medium text-slate-700">Rainfall</p>
-                                            </div>
-                                            <p className="text-2xl font-bold text-slate-900">{todayWeather.rainAmount}mm</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-sky-50/80 to-sky-100/80 p-4 rounded-xl border border-sky-200/50 hover:shadow-md transition-shadow">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Droplets className="h-4 w-4 text-sky-600" />
-                                                <p className="text-sm font-medium text-slate-700">Humidity</p>
-                                            </div>
-                                            <p className="text-2xl font-bold text-slate-900">{todayWeather.humidity}%</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-slate-50/80 to-slate-100/80 p-4 rounded-xl border border-slate-200/50 hover:shadow-md transition-shadow">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Wind className="h-4 w-4 text-slate-600" />
-                                                <p className="text-sm font-medium text-slate-700">Wind</p>
-                                            </div>
-                                            <p className="text-2xl font-bold text-slate-900">{Math.round(todayWeather.windSpeed * 3.6)} km/h</p>
-                                        </div>
-                                        <div className="bg-gradient-to-br from-emerald-50/80 to-emerald-100/80 p-4 rounded-xl border border-emerald-200/50 hover:shadow-md transition-shadow">
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <Eye className="h-4 w-4 text-emerald-600" />
-                                                <p className="text-sm font-medium text-slate-700">Soil</p>
-                                            </div>
-                                            <p className="text-lg font-bold text-slate-900">{todayWeather.soilCondition}</p>
-                                        </div>
-                                    </div>
-
-                                    {/* Rain Timing Display (only for today) - calculated from hourly data */}
-                                    {todayWeather?.hourly && todayWeather.hourly.length > 0 && (
-                                        <div className="mt-4">
-                                            <RainTimingDisplay hourly={todayWeather.hourly} />
-                                        </div>
-                                    )}
-
-                                    {/* Hourly Forecast Display (only for today) */}
-                                    {todayWeather?.hourly && todayWeather.hourly.length > 0 && (
-                                        <div className="mt-4">
-                                            <HourlyForecastDisplay hourly={todayWeather.hourly} />
-                                        </div>
-                                    )}
-                                </>
-                            ) : (
-                                <div className="flex items-center justify-center py-8">
-                                    <Loader2 className="animate-spin h-6 w-6 text-blue-600" />
+                <div className="grid gap-3 grid-cols-1 xl:grid-cols-12">
+                    <SoftCard className="p-3 xl:col-span-8">
+                            <div className="flex items-center justify-between mb-2">
+                                <div>
+                                    <h2 className="text-base font-semibold text-slate-800">
+                                        {t('weeklyForecast')}
+                                    </h2>
+                                    <p className="text-xs text-slate-400">{selectedLocation?.name}</p>
                                 </div>
-                            )}
-                        </CardContent>
-                        <CardFooter className="bg-slate-50 border-t border-slate-100">
-                            <Button className="w-full bg-[#147677] hover:bg-[#147677]/90 h-11" onClick={() => router.push('/forecasts')}>
-                                {t('viewDetails')}
-                                <ArrowRight className="ml-2 h-4 w-4" />
-                            </Button>
-                        </CardFooter>
-                    </Card>
-
-                    {/* Right Column */}
-                    <div className="lg:col-span-2 space-y-6">
-                    
-                        {/* Weather Conditions & Metrics */}
-                        <Card className="border-0 shadow-md bg-white">
-                            <CardHeader className="bg-gradient-to-r from-slate-50 via-blue-50/50 to-slate-50 border-b border-slate-200/50 pb-4">
-                                <CardTitle className="flex items-center gap-2 text-slate-900">
-                                    <Droplets className="h-5 w-5 text-blue-600" />
-                                    {t('weatherConditions') || 'Weather Conditions'}
-                                </CardTitle>
-                                <CardDescription className="text-slate-600">{t('forNextWeek')}</CardDescription>
-                            </CardHeader>
-                            <CardContent className="p-6 space-y-4">
-                                {todayWeather && weatherMetrics ? (
-                                    <>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            {/* UV Index */}
-                                            {weatherMetrics.uvIndex !== null && (
-                                                <div className={`bg-gradient-to-br p-4 rounded-xl border ${getUVIndexStatus(weatherMetrics.uvIndex).bg} border-current`}>
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <Sun className="h-4 w-4 text-yellow-600" />
-                                                        <span className="font-medium text-slate-900">{t('uvIndex') || 'UV Index'}</span>
-                                                    </div>
-                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.uvIndex}</p>
-                                                    <p className={`text-xs font-semibold mt-1 ${getUVIndexStatus(weatherMetrics.uvIndex).color}`}>
-                                                        {t(`uv${getUVIndexStatus(weatherMetrics.uvIndex).level}`) || getUVIndexStatus(weatherMetrics.uvIndex).level}
-                                                    </p>
-                                                </div>
+                                <div className="hidden sm:flex items-center gap-4 text-xs text-slate-500">
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-[#147677]" />
+                                        {t('maxTempShort')}
+                                    </span>
+                                    <span className="flex items-center gap-1.5">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-[#F5A623]" />
+                                        {t('minTempShort')}
+                                    </span>
+                                </div>
+                            </div>
+                            {weeklyChartData.length > 0 ? (
+                                <>
+                                <div className="grid grid-cols-7 gap-1 mb-2">
+                                    {weeklyChartData.map((day) => (
+                                        <div
+                                            key={day.fullDay + day.day}
+                                            className={cn(
+                                                'flex flex-col items-center gap-0.5 py-1.5 px-1 rounded-xl',
+                                                day.isToday ? 'bg-[#147677]/10' : ''
                                             )}
-
-                                            {/* Atmospheric Pressure */}
-                                            {weatherMetrics.pressure !== null && (
-                                                <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 p-4 rounded-xl border border-indigo-200">
-                                                    <div className="flex items-center gap-2 mb-2">
-                                                        <Activity className="h-4 w-4 text-indigo-600" />
-                                                        <span className="font-medium text-slate-900">{t('pressure') || 'Pressure'}</span>
-                                                    </div>
-                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.pressure} hPa</p>
-                                                    <p className="text-xs text-slate-600 mt-1">
-                                                        {weatherMetrics.pressure > 1013 ? t('highPressure') || 'High' : t('lowPressure') || 'Low'}
-                                                    </p>
-                                                </div>
-                                            )}
-
-                                            {/* Wind Direction */}
-                                            <div className="bg-gradient-to-br from-sky-50 to-sky-100 p-4 rounded-xl border border-sky-200">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <Wind className="h-4 w-4 text-sky-600" />
-                                                    <span className="font-medium text-slate-900">{t('windDirection') || 'Wind Direction'}</span>
-                                                </div>
-                                                <p className="text-xl font-bold text-slate-900">{todayWeather.windDirection || weatherMetrics.windDirection}</p>
-                                                <p className="text-xs text-slate-600 mt-1">
-                                                    {todayWeather.windStrength || t('moderate') || 'Moderate'}
-                                                </p>
-                                            </div>
-
-                                            {/* Cloud Coverage */}
-                                            {weatherMetrics.cloudCoverage !== null && (
-                                                <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-4 rounded-xl border border-slate-200">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                        <Cloud className="h-4 w-4 text-slate-600" />
-                                                        <span className="font-medium text-slate-900">{t('cloudCoverage') || 'Cloud Coverage'}</span>
-                                                </div>
-                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.cloudCoverage}%</p>
-                                                    <p className="text-xs text-slate-600 mt-1">
-                                                        {weatherMetrics.cloudCoverage > 75 ? t('overcast') || 'Overcast' :
-                                                         weatherMetrics.cloudCoverage > 50 ? t('mostlyCloudy') || 'Mostly Cloudy' :
-                                                         weatherMetrics.cloudCoverage > 25 ? t('partlyCloudy') || 'Partly Cloudy' :
-                                                         t('clear') || 'Clear'}
-                                                    </p>
-                                            </div>
-                                            )}
-
-                                            {/* Visibility */}
-                                            {weatherMetrics.visibility !== null && (
-                                                <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                        <Eye className="h-4 w-4 text-blue-600" />
-                                                        <span className="font-medium text-slate-900">{t('visibility') || 'Visibility'}</span>
-                                                </div>
-                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.visibility} km</p>
-                                                    <p className="text-xs text-slate-600 mt-1">
-                                                        {parseFloat(weatherMetrics.visibility) > 10 ? t('excellent') || 'Excellent' :
-                                                         parseFloat(weatherMetrics.visibility) > 5 ? t('good') || 'Good' :
-                                                         t('fair') || 'Fair'}
-                                                    </p>
-                                            </div>
-                                            )}
-
-                                            {/* Wind Gust */}
-                                            {weatherMetrics.windGust !== null && weatherMetrics.windGust > 0 && (
-                                                <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl border border-amber-200">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                        <Zap className="h-4 w-4 text-amber-600" />
-                                                        <span className="font-medium text-slate-900">{t('windGust') || 'Wind Gust'}</span>
-                                                </div>
-                                                    <p className="text-2xl font-bold text-slate-900">{weatherMetrics.windGust} km/h</p>
-                                                    <p className="text-xs text-slate-600 mt-1">
-                                                        {weatherMetrics.windGust > 50 ? t('strong') || 'Strong' : t('moderate') || 'Moderate'}
-                                                    </p>
-                                            </div>
-                                            )}
+                                        >
+                                            <span className="text-[11px] text-slate-400">{day.day}</span>
+                                            {getWeatherIcon(day.condition, 'h-5 w-5')}
+                                            <span className="text-sm font-semibold text-slate-700">{day.tempMax}°</span>
                                         </div>
-
-                                        {/* Weekly Forecast Summary */}
-                                        {weeklySummary && (
-                                            <>
-                                        <Separator />
-                                        <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-5 rounded-xl border border-slate-200">
-                                            <h3 className="font-semibold mb-3 text-slate-900 flex items-center gap-2">
-                                                        <Calendar className="h-4 w-4 text-blue-600" />
-                                                        {t('weeklyForecast') || '7-Day Forecast Summary'}
-                                            </h3>
-                                                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                                        <div>
-                                                            <p className="text-xs text-slate-600 mb-1">{t('averageTemperature') || 'Avg Temperature'}</p>
-                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.avgTemp}°C</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs text-slate-600 mb-1">{t('averageHumidity') || 'Avg Humidity'}</p>
-                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.avgHumidity}%</p>
-                                                        </div>
-                                                        <div className="bg-gradient-to-br from-[#147677]/10 to-[#147677]/20 p-4 rounded-xl border border-[#147677]/30 hover:shadow-md transition-shadow">
-                                                            <div className="flex items-center gap-2 mb-2">
-                                                                <CloudRain className="h-4 w-4 text-[#147677]" />
-                                                                <p className="text-xs font-medium text-slate-700">{t('totalRainfall') || 'Total Rainfall'}</p>
-                                                            </div>
-                                                            <p className="text-2xl font-bold text-[#147677]">{weeklySummary.totalRain} mm</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs text-slate-600 mb-1">{t('averageWindSpeed') || 'Avg Wind Speed'}</p>
-                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.avgWindSpeed} km/h</p>
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-xs text-slate-600 mb-1">{t('daysWithRain') || 'Rainy Days'}</p>
-                                                            <p className="text-lg font-bold text-slate-900">{weeklySummary.daysWithRain} {t('days') || 'days'}</p>
-                                                        </div>
-                                                    </div>
+                                    ))}
+                                </div>
+                                <ChartContainer config={weeklyChartConfig} className="h-[110px] w-full aspect-auto">
+                                    <AreaChart data={weeklyChartData} margin={{ top: 10, right: 8, left: -18, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="tempMaxFill" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#147677" stopOpacity={0.25} />
+                                                <stop offset="95%" stopColor="#147677" stopOpacity={0} />
+                                            </linearGradient>
+                                            <linearGradient id="tempMinFill" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#F5A623" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#F5A623" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="4 8" stroke="#E2E8F0" vertical={false} />
+                                        <XAxis dataKey="day" tick={{ fill: '#94A3B8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                                        <YAxis tick={{ fill: '#94A3B8', fontSize: 12 }} axisLine={false} tickLine={false} />
+                                        <Tooltip content={<ChartTooltipContent />} />
+                                        <Area type="monotone" dataKey="tempMax" stroke="#147677" strokeWidth={3} fill="url(#tempMaxFill)" name={t('maxTempShort')} />
+                                        <Area type="monotone" dataKey="tempMin" stroke="#F5A623" strokeWidth={3} fill="url(#tempMinFill)" name={t('minTempShort')} />
+                                    </AreaChart>
+                                </ChartContainer>
+                                {weeklySummary && (
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-1">
+                                        <div className="rounded-xl bg-[#F3F8F8] px-2 py-1 text-center">
+                                            <p className="text-[10px] text-slate-400">{t('averageTemperature')}</p>
+                                            <p className="text-sm font-semibold text-slate-700">{weeklySummary.avgTemp}°C</p>
                                         </div>
-                                            </>
-                                        )}
-                                    </>
-                                ) : (
-                                    <div className="flex items-center justify-center py-8">
-                                        <Loader2 className="animate-spin h-6 w-6 text-green-600" />
+                                        <div className="rounded-xl bg-[#F3F8F8] px-2 py-1 text-center">
+                                            <p className="text-[10px] text-slate-400">{t('averageHumidity')}</p>
+                                            <p className="text-sm font-semibold text-slate-700">{weeklySummary.avgHumidity}%</p>
+                                        </div>
+                                        <div className="rounded-xl bg-[#F3F8F8] px-2 py-1 text-center">
+                                            <p className="text-[10px] text-slate-400">{t('totalRainfall')}</p>
+                                            <p className="text-sm font-semibold text-slate-700">{weeklySummary.totalRain} mm</p>
+                                        </div>
+                                        <div className="rounded-xl bg-[#F3F8F8] px-2 py-1 text-center">
+                                            <p className="text-[10px] text-slate-400">{t('averageWindSpeed')}</p>
+                                            <p className="text-sm font-semibold text-slate-700">{weeklySummary.avgWindSpeed} km/h</p>
+                                        </div>
                                     </div>
                                 )}
-                            </CardContent>
-                        </Card>
+                                </>
+                            ) : (
+                                <div className="flex justify-center py-10">
+                                    <Loader2 className="animate-spin h-6 w-6 text-[#147677]" />
+                                </div>
+                            )}
+                    </SoftCard>
+
+                    <div className="xl:col-span-4 rounded-2xl bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] p-4 text-white shadow-[0_12px_28px_rgba(20,118,119,0.3)] flex flex-col h-full">
+                        <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
+                            {locationMenu}
+                        </div>
+
+                        {todayWeather ? (
+                            <div
+                                className="flex-1 flex flex-col items-center justify-center text-center py-3 cursor-pointer"
+                                onClick={() => router.push('/forecasts')}
+                            >
+                                {getWeatherIcon(todayWeather.conditionMain || currentWeather?.conditionMain, 'h-16 w-16')}
+                                <p className="text-xs text-white/80 mt-2">
+                                    {t('today')}, {new Date().toLocaleDateString(dateLocale, {
+                                        day: 'numeric',
+                                        month: 'long',
+                                        year: 'numeric',
+                                    })}
+                                </p>
+                                <p className="text-5xl font-bold tracking-tight leading-none mt-1">{Math.round(displayTemp)}°</p>
+                                <p className="text-white/90 capitalize text-sm mt-1">{translateCondition(displayCondition) || t('todayForecast')}</p>
+                                <div className="flex items-center gap-3 text-xs text-white/85 mt-3">
+                                    <span className="flex items-center gap-1.5">
+                                        <Wind className="h-3.5 w-3.5" />
+                                        {todayWeather ? `${Math.round(todayWeather.windSpeed * 3.6)} km/h` : '--'}
+                                    </span>
+                                    <span className="text-white/40">|</span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Droplets className="h-3.5 w-3.5" />
+                                        {t('humidity')} {todayWeather ? `${todayWeather.humidity}%` : '--'}
+                                    </span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-center py-8">
+                                <Loader2 className="animate-spin h-6 w-6 text-white" />
+                            </div>
+                        )}
                     </div>
+
+                    <SoftCard className="p-3 xl:col-span-4">
+                        <div className="flex items-center justify-between mb-1">
+                            <h2 className="text-sm font-semibold text-slate-800">{t('totalRainfall')}</h2>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-500">
+                                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#F5A623]" />mm</span>
+                                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#147677]" />%</span>
+                            </div>
+                        </div>
+                        {weeklyChartData.length > 0 ? (
+                            <ChartContainer config={weeklyChartConfig} className="h-[120px] w-full aspect-auto">
+                                <BarChart data={weeklyChartData} margin={{ top: 4, right: 0, left: -28, bottom: 0 }}>
+                                    <XAxis dataKey="day" tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                    <YAxis tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} />
+                                    <Tooltip content={<ChartTooltipContent />} />
+                                    <Bar dataKey="rain" fill="#F5A623" radius={[6, 6, 6, 6]} barSize={8} name={t('rainAmountMm')} />
+                                    <Bar dataKey="rainChance" fill="#147677" radius={[6, 6, 6, 6]} barSize={8} name={t('rainChancePercent')} />
+                                </BarChart>
+                            </ChartContainer>
+                        ) : (
+                            <div className="flex justify-center py-6">
+                                <Loader2 className="animate-spin h-5 w-5 text-[#147677]" />
+                            </div>
+                        )}
+                    </SoftCard>
+
+                    <SoftCard className="p-3 xl:col-span-4">
+                        <h2 className="text-sm font-semibold text-slate-800">{t('weatherConditions')}</h2>
+                        {conditionBreakdown.length > 0 ? (
+                            <div className="relative">
+                                <ChartContainer config={weeklyChartConfig} className="h-[120px] w-full aspect-auto">
+                                    <PieChart>
+                                        <Pie data={conditionBreakdown} dataKey="value" nameKey="name" innerRadius={32} outerRadius={46} paddingAngle={3} stroke="none">
+                                            {conditionBreakdown.map((entry) => (
+                                                <Cell key={entry.name} fill={entry.fill} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip content={<ChartTooltipContent hideLabel />} />
+                                    </PieChart>
+                                </ChartContainer>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span className="text-lg font-bold text-slate-800">{conditionBreakdown[0]?.value || 0}</span>
+                                    <span className="text-[10px] text-slate-400 capitalize">{conditionBreakdown[0]?.name}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex justify-center py-6">
+                                <Loader2 className="animate-spin h-5 w-5 text-[#147677]" />
+                            </div>
+                        )}
+                    </SoftCard>
+
+                    <SoftCard className="p-3 xl:col-span-4">
+                        <h2 className="text-sm font-semibold text-slate-800">{t('daysWithRain')}</h2>
+                        {weeklySummary ? (
+                            <div className="relative">
+                                <ChartContainer config={weeklyChartConfig} className="h-[120px] w-full aspect-auto">
+                                    <PieChart>
+                                        <Pie data={rainyDonut} dataKey="value" nameKey="name" innerRadius={32} outerRadius={46} paddingAngle={3} stroke="none">
+                                            {rainyDonut.map((entry) => (
+                                                <Cell key={entry.name} fill={entry.fill} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip content={<ChartTooltipContent hideLabel />} />
+                                    </PieChart>
+                                </ChartContainer>
+                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span className="text-lg font-bold text-slate-800">{weeklySummary.daysWithRain}</span>
+                                    <span className="text-[10px] text-slate-400">{t('days')}</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex justify-center py-6">
+                                <Loader2 className="animate-spin h-5 w-5 text-[#147677]" />
+                            </div>
+                        )}
+                    </SoftCard>
                 </div>
 
-                {/* Footer */}
-                <div className="text-center p-6 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
-                    <p className="text-xs text-slate-500">
-                        {t('dataLastUpdated')}: {new Date().toLocaleString()}
-                    </p>
-                </div>
+                <p className="text-center text-xs text-slate-400">
+                    {t('dataLastUpdated')}: {lastUpdatedAt ? lastUpdatedAt.toLocaleString(dateLocale) : '—'}
+                    <span className="mx-2">·</span>
+                    {t('updatedDaily')}
+                </p>
             </div>
         </AppLayout>
     );
