@@ -25,6 +25,7 @@
   "locationsManagement": "Gucunga Ahantu",
   "farmers": "Abahinzi",
   "locations": "Ahantu",
+  "locationsAssigned": "Ahantu hashinzwe",
   "locationDetails" : "Ibisobanuro by'Ahantu",
   "viewLocationInfo": "Reba Amakuru y'Ahantu",
   "totalAlerts": "Imburizi zose",
@@ -779,6 +780,8 @@
   "failedToLoadLocation": "Byanze gukuramo amakuru y'ahantu",
 
   "noFarmersFound": "Nta bahinzi babonetse",
+  "listOfFarmers": "Urutonde rw'Abahinzi",
+  "showingEntries": "Byerekanwe {{count}} muri {{total}}",
 
   "adminAccessRequired": "Kwinjira kwa mutegetsi byifuzwa",
   "failedToLoadLocations": "Byanze gukuramo ahantu",
@@ -1214,6 +1217,8 @@
     "rainChancePercent": "Amahirwe %",
     "dry": "Humye",
     "todayCount": "{{count}} uyu munsi",
+    "allTime": "Igihe cyose",
+    "inTheSystem": "Mu sisitemu",
     "avg": "impuzandengo",
     "clouds": "Ibicu byiganje",
     "rain": "Imvura",

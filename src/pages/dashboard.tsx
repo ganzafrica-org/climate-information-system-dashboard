@@ -502,31 +502,34 @@ const Dashboard: NextPage = () => {
         {
             label: t('totalFarmersReached'),
             value: dashboardStats.totalFarmers,
-            showToday: false,
-            icon: <Users className="h-5 w-5 text-[#147677]" />,
-            iconBg: 'bg-[#147677]/10',
+            caption: t('allTime'),
+            captionTone: 'teal' as const,
+            icon: <Users className="h-5 w-5 text-[#7B8CFF]" strokeWidth={2} />,
+            iconBg: 'bg-[#E8EEFF]',
         },
         {
             label: t('totalMessagesSent'),
             value: dashboardStats.messagesSent,
-            showToday: false,
-            icon: <MessageSquare className="h-5 w-5 text-[#F5A623]" />,
-            iconBg: 'bg-[#F5A623]/10',
+            caption: t('allTime'),
+            captionTone: 'teal' as const,
+            icon: <MessageSquare className="h-5 w-5 text-[#3DCC8A]" strokeWidth={2} />,
+            iconBg: 'bg-[#E5F8EE]',
         },
         {
             label: t('activeAlerts'),
             value: dashboardStats.activeAlerts,
-            showToday: true,
-            today: dashboardStats.alertsToday || 0,
-            icon: <AlertTriangle className="h-5 w-5 text-[#F5A623]" />,
-            iconBg: 'bg-[#F5A623]/10',
+            caption: t('todayCount', { count: (dashboardStats.alertsToday || 0).toLocaleString() }),
+            captionTone: 'orange' as const,
+            icon: <AlertTriangle className="h-5 w-5 text-[#F5A623]" strokeWidth={2} />,
+            iconBg: 'bg-[#FDECDC]',
         },
         {
             label: t('totalActiveLocations'),
             value: dashboardStats.activeLocations,
-            showToday: false,
-            icon: <MapPin className="h-5 w-5 text-[#147677]" />,
-            iconBg: 'bg-[#147677]/10',
+            caption: t('inTheSystem'),
+            captionTone: 'teal' as const,
+            icon: <MapPin className="h-5 w-5 text-[#C084FC]" strokeWidth={2} />,
+            iconBg: 'bg-[#F3E8FF]',
         },
     ];
 
@@ -599,19 +602,22 @@ const Dashboard: NextPage = () => {
                             <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <p className="text-slate-400 text-xs">{stat.label}</p>
-                                    <p className="text-xl font-bold text-slate-800 tracking-tight">
+                                    <p className="text-3xl font-bold text-slate-800 tracking-tight">
                                         {stat.value.toLocaleString()}
                                     </p>
-                                    {stat.showToday && (
-                                        <div className="mt-1 text-xs">
-                                            <span className="inline-flex items-center gap-0.5 font-medium text-[#F5A623]">
-                                                <ArrowUpRight className="h-3.5 w-3.5" />
-                                                {t('todayCount', { count: (stat.today || 0).toLocaleString() })}
-                                            </span>
-                                        </div>
-                                    )}
+                                    <div className="mt-1.5 text-xs">
+                                        <span
+                                            className={cn(
+                                                'inline-flex items-center gap-0.5 font-medium',
+                                                stat.captionTone === 'orange' ? 'text-[#F5A623]' : 'text-[#147677]'
+                                            )}
+                                        >
+                                            <ArrowUpRight className="h-3.5 w-3.5" />
+                                            {stat.caption}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center shrink-0', stat.iconBg)}>
+                                <div className={cn('h-12 w-12 rounded-full flex items-center justify-center shrink-0', stat.iconBg)}>
                                     {stat.icon}
                                 </div>
                             </div>

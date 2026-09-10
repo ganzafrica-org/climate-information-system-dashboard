@@ -20,8 +20,6 @@ import {
     Upload,
     CheckCircle, 
     X, 
-    FileText, 
-    Download,
     Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -159,9 +157,6 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                     <DialogTitle className="flex items-center gap-2">
                         {t('addNewFarmer')}
                     </DialogTitle>
-                    <DialogDescription>
-                        {t('fillFarmerDetails')}
-                    </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -376,33 +371,17 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
 
                         <Separator />
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <h4 className="font-medium mb-3 flex items-center gap-2">
-                                    <MapPin className="h-4 w-4" style={{ color: '#147677' }} />
-                                    {t('locations')}
-                                </h4>
-                                <div className="flex flex-wrap gap-2">
-                                    {farmer.locations.map((location) => (
-                                        <Badge key={location.id} style={{ backgroundColor: '#147677', color: '#ffffff' }}>
-                                            {location.name}
-                                        </Badge>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div>
-                                <h4 className="font-medium mb-3">{t('additionalInfo')}</h4>
-                                <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">{t('farmerId')}:</span>
-                                        <span>#{farmer.id}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-muted-foreground">{t('lastUpdated')}:</span>
-                                        <span>{new Date(farmer.updatedAt).toLocaleDateString()}</span>
-                                    </div>
-                                </div>
+                        <div>
+                            <h4 className="font-medium mb-3 flex items-center gap-2">
+                                <MapPin className="h-4 w-4" style={{ color: '#147677' }} />
+                                {t('locationsAssigned')}
+                            </h4>
+                            <div className="flex flex-wrap gap-2">
+                                {farmer.locations.map((location) => (
+                                    <Badge key={location.id} style={{ backgroundColor: '#147677', color: '#ffffff' }}>
+                                        {location.name}
+                                    </Badge>
+                                ))}
                             </div>
                         </div>
                     </div>
@@ -498,9 +477,6 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                         <Edit className="h-5 w-5" style={{ color: '#147677' }} />
                         {t('editFarmer')}
                     </DialogTitle>
-                    <DialogDescription>
-                        {t('updateFarmerDetails')}
-                    </DialogDescription>
                 </DialogHeader>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -607,33 +583,6 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
     const [uploadProgress, setUploadProgress] = useState(0);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
     const [dragOver, setDragOver] = useState(false);
-
-    const generateTemplate = () => {
-        const templateData = [
-            {
-                name: 'Jean Uwimana',
-                phone: '+250788123456',
-                locationIds: '1,2',
-                isActive: 'true'
-            },
-            {
-                name: 'Marie Mukeshimana',
-                phone: '+250785952376',
-                locationIds: '3',
-                isActive: 'true'
-            },
-            {
-                name: 'Emmanuel Habimana',
-                phone: '+250772345678',
-                locationIds: '1,4,5',
-                isActive: 'false'
-            }
-        ];
-
-        const headers = ['name', 'phone', 'locationIds', 'isActive'];
-        api.exportAsCSV(templateData, 'farmers_import_template.csv', headers);
-        toast.success(t('templateDownloaded'));
-    };
 
     const handleFileSelect = (file: File) => {
         if (!file.name.endsWith('.csv')) {
@@ -747,7 +696,7 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
             <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
-                        <Upload className="h-5 w-5" style={{ color: '#2580f5' }} />
+                        <Upload className="h-5 w-5 text-[#147677]" />
                         {t('importFarmers')}
                     </DialogTitle>
                     <DialogDescription>
@@ -756,44 +705,20 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                 </DialogHeader>
 
                 <div className="space-y-6">
-                    <div className="p-4 rounded-lg bg-gray-200" >
-                        <div className="flex items-start gap-3">
-                            <FileText className="h-5 w-5 mt-0.5" style={{ color: '#2580f5' }} />
-                            <div className="flex-1">
-                                <h4 className="font-medium mb-1" style={{ color: '#2580f5' }}>
-                                    {t('csvTemplate')}
-                                </h4>
-                                <p className="text-sm mb-3" style={{ color: '#2580f5' }}>
-                                    {t('downloadTemplateDescription')}
-                                </p>
-                                <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={generateTemplate}
-                                    style={{ borderColor: '#2580f5', color: '#2580f5' }}
-                                    className="hover:bg-blue-50"
-                                >
-                                    <Download className="h-4 w-4 mr-2" />
-                                    <span className="hidden md:block">{t('downloadTemplate')}</span>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-
                     <div className="space-y-4">
                         <h4 className="font-medium">{t('uploadCSVFile')}</h4>
 
                         <div
                             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                                 dragOver
-                                    ? 'bg-blue-50'
+                                    ? 'bg-[#147677]/10'
                                     : selectedFile
                                         ? 'border-green-500'
                                         : 'border-gray-300 hover:border-gray-400'
                             }`}
                             style={{
-                                borderColor: dragOver ? '#2580f5' : selectedFile ? '#16a34a' : '#d1d5db',
-                                backgroundColor: dragOver ? '#3a93f2' : selectedFile ? '#ECFDF6' : 'transparent'
+                                borderColor: dragOver ? '#147677' : selectedFile ? '#16a34a' : '#d1d5db',
+                                backgroundColor: dragOver ? 'rgba(20, 118, 119, 0.08)' : selectedFile ? '#ECFDF6' : 'transparent'
                             }}
                             onDrop={handleDrop}
                             onDragOver={handleDragOver}
@@ -819,15 +744,14 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                                 </div>
                             ) : (
                                 <div className="space-y-2">
-                                    <Upload className="h-8 w-8 text-muted-foreground mx-auto" />
+                                    <Upload className="h-8 w-8 text-[#147677] mx-auto" />
                                     <p className="text-muted-foreground">
                                         {t('dragDropOrClick')}
                                     </p>
                                     <Button 
                                         variant="outline" 
                                         onClick={() => fileInputRef.current?.click()}
-                                        style={{ borderColor: '#2580f5', color: '#2580f5' }}
-                                        className="hover:bg-blue-50"
+                                        className="border-[#147677] text-[#147677] hover:bg-[#147677]/10 hover:text-[#147677]"
                                     >
                                         {t('selectFile')}
                                     </Button>
@@ -867,21 +791,21 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                                     <div className="text-2xl font-bold" style={{ color: '#e46064' }}>{importResult.errors}</div>
                                     <div className="text-sm" style={{ color: '#e46064' }}>{t('errors')}</div>
                                 </div>
-                                <div className="text-center p-3 rounded-lg" style={{ backgroundColor: '#3a93f2' }}>
-                                    <div className="text-2xl font-bold" style={{ color: '#2580f5' }}>{importResult.total}</div>
-                                    <div className="text-sm" style={{ color: '#2580f5' }}>{t('total')}</div>
+                                <div className="text-center p-3 rounded-lg" style={{ backgroundColor: '#14767714' }}>
+                                    <div className="text-2xl font-bold" style={{ color: '#147677' }}>{importResult.total}</div>
+                                    <div className="text-sm" style={{ color: '#147677' }}>{t('total')}</div>
                                 </div>
                             </div>
 
                             {importResult.createdLocations && importResult.createdLocations.length > 0 && (
                                 <div className="space-y-2">
-                                    <h5 className="font-medium" style={{ color: '#2580f5' }}>
+                                    <h5 className="font-medium" style={{ color: '#147677' }}>
                                         {t('createdLocations') || 'Created Locations'} ({importResult.createdLocations.length})
                                     </h5>
                                     <div className="max-h-40 overflow-y-auto space-y-2">
                                         {importResult.createdLocations.map((location, index) => (
-                                            <Alert key={index} className="border-blue-200" style={{ backgroundColor: '#E0EDFD' }}>
-                                                <MapPin className="h-4 w-4" style={{ color: '#2580f5' }} />
+                                            <Alert key={index} className="border-[#147677]/20" style={{ backgroundColor: '#14767714' }}>
+                                                <MapPin className="h-4 w-4" style={{ color: '#147677' }} />
                                                 <AlertDescription className="text-sm">
                                                     <div className="flex items-center justify-between">
                                                         <div>
@@ -936,8 +860,7 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                         <Button
                             onClick={handleImport}
                             disabled={!selectedFile || isUploading}
-                            style={{ backgroundColor: '#343a40', borderColor: '#343a40' }}
-                            className="hover:opacity-90 text-white"
+                            variant="primary"
                         >
                             {isUploading ? t('importing') : t('importFarmers')}
                         </Button>

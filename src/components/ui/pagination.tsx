@@ -129,7 +129,18 @@ export type PaginationProps = {
   onPageChange?: (page: number) => void;
   label?: string;
   className?: string;
+  variant?: "default" | "boxed";
+  showEdges?: boolean;
 };
+
+const boxedBtn = (enabled: boolean, active = false) =>
+  `flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-sm outline-none transition-colors ${
+    active
+      ? "bg-[#147677] font-medium text-white"
+      : enabled
+        ? "bg-[#F3F4F6] text-slate-500 hover:bg-[#E5E7EB] hover:text-slate-700"
+        : "bg-[#F3F4F6] text-slate-300"
+  }`;
 
 function Chevron({ flip = false }: { flip?: boolean }) {
   return (
@@ -153,7 +164,110 @@ function Chevron({ flip = false }: { flip?: boolean }) {
   );
 }
 
-export function Pagination({
+function BoxedPagination({
+  count,
+  page,
+  defaultPage,
+  siblings,
+  boundaries,
+  onPageChange,
+  label = "Pagination",
+  className = "",
+  showEdges = false,
+}: PaginationProps) {
+  const pagination = usePagination({
+    count,
+    page,
+    defaultPage,
+    siblings,
+    boundaries,
+    onPageChange,
+  });
+  const { items, canPrev, canNext } = pagination;
+  const current = pagination.page;
+
+  return (
+    <nav aria-label={label} className={`inline-block ${className}`}>
+      <div className="flex items-center gap-1.5">
+        {showEdges && (
+          <button
+            type="button"
+            aria-label="First page"
+            aria-disabled={current <= 1}
+            onClick={() => current > 1 && pagination.goTo(1)}
+            className={boxedBtn(current > 1)}
+          >
+            «
+          </button>
+        )}
+        <button
+          type="button"
+          aria-label="Previous page"
+          aria-disabled={!canPrev}
+          onClick={() => canPrev && pagination.prev()}
+          className={boxedBtn(canPrev)}
+        >
+          ‹
+        </button>
+        {items.map((item) => {
+          if (typeof item !== "number") {
+            return (
+              <span
+                key={item}
+                aria-hidden
+                className="flex h-8 min-w-8 items-center justify-center text-sm text-slate-400"
+              >
+                …
+              </span>
+            );
+          }
+          const selected = item === current;
+          return (
+            <button
+              key={item}
+              type="button"
+              aria-label={`Page ${item}`}
+              aria-current={selected ? "page" : undefined}
+              onClick={() => pagination.goTo(item)}
+              className={boxedBtn(true, selected)}
+            >
+              {item}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-label="Next page"
+          aria-disabled={!canNext}
+          onClick={() => canNext && pagination.next()}
+          className={boxedBtn(canNext)}
+        >
+          ›
+        </button>
+        {showEdges && (
+          <button
+            type="button"
+            aria-label="Last page"
+            aria-disabled={current >= count}
+            onClick={() => current < count && pagination.goTo(count)}
+            className={boxedBtn(current < count)}
+          >
+            »
+          </button>
+        )}
+      </div>
+    </nav>
+  );
+}
+
+export function Pagination(props: PaginationProps) {
+  if (props.variant === "boxed") {
+    return <BoxedPagination {...props} />;
+  }
+  return <DefaultPagination {...props} />;
+}
+
+function DefaultPagination({
   count,
   page,
   defaultPage,
