@@ -595,7 +595,7 @@ const Dashboard: NextPage = () => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     {stats.map((stat) => (
-                        <SoftCard key={stat.label} className="px-4 py-5">
+                        <SoftCard key={stat.label} className="px-5 py-6">
                             <div className="flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <p className="text-slate-400 text-xs">{stat.label}</p>
