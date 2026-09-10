@@ -17,7 +17,9 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useLanguage } from '@/i18n';
 import { Badge } from '../ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ViewAlertDialog } from './AlertsDialogs';
@@ -111,42 +113,24 @@ const DeleteConfirmationDialog = ({
 }) => {
     const { t } = useLanguage();
 
-    if (!isOpen) return null;
-
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 shadow-lg">
-                <div className="text-center">
-                    <div className="mb-4">
-                        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4">
-                            <Trash className="h-6 w-6 text-red-600" />
-                        </div>
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                            {t('confirmDelete') || 'Confirm Delete'}
-                        </h3>
-                        <p className="text-sm text-gray-500">
-                            {t('confirmDeleteMessage') || `Are you sure you want to delete the ${alertCount} selected alert${alertCount > 1 ? 's' : ''}?`}
-                        </p>
+        <Dialog open={isOpen} onOpenChange={(o) => { if (!o) onClose(); }}>
+            <DialogContent className="max-w-md">
+                <DialogHeader>
+                    <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-2">
+                        <Trash className="h-6 w-6 text-red-600" />
                     </div>
-                    <div className="flex gap-3 justify-center">
-                        <Button
-                            variant="outline"
-                            onClick={onClose}
-                            className="px-6"
-                        >
-                            {t('cancel') || 'Cancel'}
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={onConfirm}
-                            className="px-6"
-                        >
-                            {t('delete') || 'Delete'}
-                        </Button>
-                    </div>
-                </div>
-            </div>
-        </div>
+                    <DialogTitle className="text-center">{t('confirmDelete') || 'Confirm Delete'}</DialogTitle>
+                    <DialogDescription className="text-center">
+                        {t('confirmDeleteMessage') || `Are you sure you want to delete the ${alertCount} selected alert${alertCount > 1 ? 's' : ''}?`}
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="sm:justify-center">
+                    <Button variant="outline" onClick={onClose} className="px-6">{t('cancel') || 'Cancel'}</Button>
+                    <Button variant="destructive" onClick={onConfirm} className="px-6">{t('delete') || 'Delete'}</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };
 
@@ -500,212 +484,67 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 </CardHeader>
                 <CardContent className="p-0">
                     <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="bg-[#f2f5fa] text-black">
-                                <tr>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm w-12">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectAll}
-                                            onChange={handleSelectAll}
-                                            className="rounded border-gray-300"
-                                        />
-                                    </th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                                        <button
-                                            className="flex items-center gap-1 hover:text-white/80"
-                                            onClick={() => handleSort('type')}
-                                        >
-                                            <span>{t("type")}</span>
-                                            <ArrowUpDown className="h-3 w-3" />
-                                        </button>
-                                    </th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                                        <button
-                                            className="flex items-center gap-1 hover:text-white/80"
-                                            onClick={() => handleSort('message')}
-                                        >
-                                            <span>{t("message")}</span>
-                                            <ArrowUpDown className="h-3 w-3" />
-                                        </button>
-                                    </th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                                        <button
-                                            className="flex items-center gap-1 hover:text-white/80"
-                                            onClick={() => handleSort('location')}
-                                        >
-                                            <span>{t("location")}</span>
-                                            <ArrowUpDown className="h-3 w-3" />
-                                        </button>
-                                    </th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                                        <span>{t("priority")}</span>
-                                    </th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                                        <button
-                                            className="flex items-center gap-1 hover:text-white/80"
-                                            onClick={() => handleSort('isSent')}
-                                        >
-                                            <span>{t("status")}</span>
-                                            <ArrowUpDown className="h-3 w-3" />
-                                        </button>
-                                    </th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">
-                                        <button
-                                            className="flex items-center gap-1 hover:text-white/80"
-                                            onClick={() => handleSort('createdAt')}
-                                        >
-                                            <span>{t("created")}</span>
-                                            <ArrowUpDown className="h-3 w-3" />
-                                        </button>
-                                    </th>
-                                    <th className="py-4 px-6 text-center font-semibold text-sm">
-                                        {t("actions")}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {alerts.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={9} className="py-8 text-center text-muted-foreground">
-                                            {isLoading ? (
-                                                <div className="flex items-center justify-center gap-2">
-                                                    <Loader2 className="animate-spin h-4 w-4" />
-                                                    <span>{t("loadingAlerts")}</span>
-                                                </div>
-                                            ) : (
-                                                t("noAlertsFound")
-                                            )}
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    alerts.map((alert, index) => (
-                                        <tr
-                                            key={alert.id}
-                                            className={`border-b hover:bg-muted/50 transition-colors ${
-                                                selectedAlerts.has(alert.id) ? 'bg-blue-50' : ''
-                                            }`}
-                                        >
-                                            <td className="py-3 px-4" onClick={(e) => e.stopPropagation()}>
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedAlerts.has(alert.id)}
-                                                    onChange={() => handleSelectAlert(alert.id)}
-                                                    className="rounded border-gray-300"
-                                                />
-                                            </td>
-                                            <td 
-                                                className="py-3 px-4 cursor-pointer"
-                                                onClick={() => handleViewDetails(alert)}
-                                            >
-                                                <div className="font-medium capitalize">{alert.type}</div>
-                                                {alert.category && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {typeof alert.category === 'string' ? alert.category : 'General'}
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            <td 
-                                                className="py-3 px-4 cursor-pointer"
-                                                onClick={() => handleViewDetails(alert)}
-                                            >
-                                                <div className="text-sm line-clamp-2 max-w-[300px]">
-                                                    {typeof alert.message === 'string' ? alert.message : 'No message'}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground mt-1">
-                                                    {alert.messageLength} chars • {alert.messageSegments} segments
-                                                </div>
-                                            </td>
-
-                                            <td 
-                                                className="py-3 px-4 cursor-pointer"
-                                                onClick={() => handleViewDetails(alert)}
-                                            >
-                                                <div className="flex flex-wrap gap-1">
-                                                    <Badge variant="outline" className="text-xs">
-                                                        <MapPin className="h-3 w-3 mr-1" />
-                                                        {typeof alert.location === 'string' ? alert.location : 'Unknown Location'}
-                                                    </Badge>
-                                                </div>
-                                                {alert.recipientCount && (
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        {alert.recipientCount} recipients
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            <td 
-                                                className="py-3 px-4 cursor-pointer"
-                                                onClick={() => handleViewDetails(alert)}
-                                            >
-                                                <PriorityBadge priority={alert.priority || 'medium'} />
-                                            </td>
-
-                                            <td 
-                                                className="py-3 px-4 cursor-pointer"
-                                                onClick={() => handleViewDetails(alert)}
-                                            >
-                                                <StatusBadge status={alert.status || (alert.isSent ? 'sent' : 'draft')} />
-                                                {alert.sentAt && (
-                                                    <div className="text-xs text-muted-foreground mt-1">
-                                                        <Clock className="h-3 w-3 inline mr-1" />
-                                                        {new Date(alert.sentAt).toLocaleString()}
-                                                    </div>
-                                                )}
-                                            </td>
-
-                                            <td 
-                                                className="py-3 px-4 cursor-pointer"
-                                                onClick={() => handleViewDetails(alert)}
-                                            >
-                                                <div className="text-xs text-muted-foreground">
-                                                    <Calendar className="h-3 w-3 inline mr-1" />
-                                                    {new Date(alert.createdAt).toLocaleDateString()}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {new Date(alert.createdAt).toLocaleTimeString()}
-                                                </div>
-                                            </td>
-
-                                            <td className="py-3 px-4 text-right" onClick={(e) => e.stopPropagation()}>
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon">
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={() => handleViewDetails(alert)}>
-                                                            <AlertCircle className="h-4 w-4 mr-2" />
-                                                            {t("viewDetails")}
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => handleEditAlert(alert)}>
-                                                            <Edit className="h-4 w-4 mr-2" />
-                                                            {t("editAlert")}
-                                                        </DropdownMenuItem>
-                                                        {!alert.isSent && (
-                                                            <DropdownMenuItem onClick={() => handleSendAlert(alert)}>
-                                                                <MessageSquare className="h-4 w-4 mr-2" />
-                                                                {t("sendNow")}
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        <Separator className="my-1" />
-                                                        <DropdownMenuItem 
-                                                            className="text-red-600"
-                                                            onClick={() => handleDeleteAlert(alert.id)}
-                                                        >
-                                                            <Trash className="h-4 w-4 mr-2" />
-                                                            {t("delete")}
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
+                        <DataTable<Alert>
+                            label={t("alerts")}
+                            data={alerts}
+                            getRowId={(a) => String(a.id)}
+                            loading={isLoading}
+                            selectable
+                            selectedIds={new Set(Array.from(selectedAlerts).map(String))}
+                            onSelectionChange={(ids) => setSelectedAlerts(new Set(Array.from(ids).map(Number)))}
+                            onRowClick={(a) => handleViewDetails(a)}
+                            emptyState={t("noAlertsFound")}
+                            columns={[
+                              { id: "type", header: t("type"), value: (a) => a.type || "", cell: (a) => (
+                                <div>
+                                  <div className="font-medium capitalize">{a.type}</div>
+                                  {a.category && <div className="text-xs text-muted-foreground">{typeof a.category === 'string' ? a.category : 'General'}</div>}
+                                </div>
+                              ) },
+                              { id: "message", header: t("message"), value: (a) => (typeof a.message === 'string' ? a.message : ''), cell: (a) => (
+                                <div>
+                                  <div className="text-sm line-clamp-2 max-w-[300px]">{typeof a.message === 'string' ? a.message : 'No message'}</div>
+                                  <div className="text-xs text-muted-foreground mt-1">{a.messageLength} chars • {a.messageSegments} segments</div>
+                                </div>
+                              ) },
+                              { id: "location", header: t("location"), value: (a) => (typeof a.location === 'string' ? a.location : ''), cell: (a) => (
+                                <div>
+                                  <Badge variant="outline" className="text-xs"><MapPin className="h-3 w-3 mr-1" />{typeof a.location === 'string' ? a.location : 'Unknown Location'}</Badge>
+                                  {a.recipientCount && <div className="text-xs text-muted-foreground mt-1">{a.recipientCount} recipients</div>}
+                                </div>
+                              ) },
+                              { id: "priority", header: t("priority"), sortable: false, cell: (a) => <PriorityBadge priority={a.priority || 'medium'} /> },
+                              { id: "isSent", header: t("status"), value: (a) => (a.isSent ? 1 : 0), cell: (a) => (
+                                <div>
+                                  <StatusBadge status={a.status || (a.isSent ? 'sent' : 'draft')} />
+                                  {a.sentAt && <div className="text-xs text-muted-foreground mt-1"><Clock className="h-3 w-3 inline mr-1" />{new Date(a.sentAt).toLocaleString()}</div>}
+                                </div>
+                              ) },
+                              { id: "createdAt", header: t("created"), value: (a) => a.createdAt || "", cell: (a) => (
+                                <div>
+                                  <div className="text-xs text-muted-foreground"><Calendar className="h-3 w-3 inline mr-1" />{new Date(a.createdAt).toLocaleDateString()}</div>
+                                  <div className="text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleTimeString()}</div>
+                                </div>
+                              ) },
+                              rowActionsColumn<Alert>((alert) => (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewDetails(alert)}><AlertCircle className="h-4 w-4 mr-2" />{t("viewDetails")}</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleEditAlert(alert)}><Edit className="h-4 w-4 mr-2" />{t("editAlert")}</DropdownMenuItem>
+                                    {!alert.isSent && (
+                                      <DropdownMenuItem onClick={() => handleSendAlert(alert)}><MessageSquare className="h-4 w-4 mr-2" />{t("sendNow")}</DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem destructive onClick={() => handleDeleteAlert(alert.id)}><Trash className="h-4 w-4 mr-2" />{t("delete")}</DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )),
+                            ] as SortableColumn<Alert>[]}
+                            onSortChange={(next) => { if (next) handleSort(next.columnId); }}
+                        />
                     </div>
                 </CardContent>
 

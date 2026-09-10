@@ -38,6 +38,12 @@ export type DataTableProps<T> = {
   maxHeight?: number
   className?: string
   variant?: "default" | "sheet"
+  /** Multi-select checkbox column (controlled). */
+  selectable?: boolean
+  selectedIds?: Set<string>
+  onSelectionChange?: (ids: Set<string>) => void
+  /** Row click (ignored for clicks on buttons/inputs/menus inside cells). */
+  onRowClick?: (row: T) => void
 }
 
 /**
@@ -63,6 +69,10 @@ export function DataTable<T>({
   maxHeight,
   className,
   variant = "default",
+  selectable,
+  selectedIds,
+  onSelectionChange,
+  onRowClick,
 }: DataTableProps<T>) {
   const [page, setPage] = useState(1)
 
@@ -138,6 +148,10 @@ export function DataTable<T>({
         rowHeight={rowHeight}
         maxHeight={maxHeight}
         variant={variant}
+        selectable={selectable}
+        selectedIds={selectedIds}
+        onSelectionChange={onSelectionChange}
+        onRowClick={onRowClick}
       />
       {footer}
       {pagination && pageCount > 1 && (

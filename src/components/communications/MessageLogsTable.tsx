@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, MoreHorizontal, RefreshCw, Download, Search } from 'lucide-react';
+import { DataTable, rowActionsColumn, type SortableColumn } from '@/components/ui/table';
+import { MoreHorizontal, RefreshCw, Download, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/i18n';
 
@@ -294,136 +295,50 @@ export function MessageLogsTable() {
                     </div>
                 </div>
 
-                {isLoading ? (
-                    <div className="flex items-center justify-center py-16">
-                        <div className="flex flex-col items-center space-y-3">
-                            <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
-                            <span className="text-gray-500">{t('loading') || 'Loading...'}</span>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="text-black bg-[#f2f5fa]">
-                                <tr>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">#</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('alertTitle') || 'Alert Title'}</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('farmerName') || 'Farmer Name'}</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('phoneNumber') || 'Phone'}</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('status') || 'Status'}</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('provider') || 'Provider'}</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('messageLength') || 'Length'}</th>
-                                    <th className="py-4 px-6 text-left font-semibold text-sm">{t('timestamp') || 'Timestamp'}</th>
-                                    <th className="py-4 px-6 text-center font-semibold text-sm">{t('actions') || 'Actions'}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white">
-                                {filteredLogs.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={9} className="py-16 text-center">
-                                            <div className="text-gray-500">{t('noLogsFound') || 'No logs found'}</div>
-                                        </td>
-                                    </tr>
-                                ) : (
-                                    filteredLogs.map((log, index) => (
-                                        <tr
-                                            key={`${log.messageId}-${log.id}-${index}`}
-                                            className={`border-b border-gray-100 hover:bg-gray-50 transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
-                                        >
-                                            <td className="py-4 px-6 text-sm text-gray-900">{index + 1}</td>
-                                            <td className="py-4 px-6 text-sm">
-                                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                                                    {log.alertTitle || log.alertType || 'N/A'}
-                                                </Badge>
-                                            </td>
-                                            <td className="py-4 px-6 text-sm">
-                                                {log.farmerName || `Farmer ${log.farmerId}`}
-                                            </td>
-                                            <td className="py-4 px-6 text-sm font-mono">{log.phoneNumber}</td>
-                                            <td className="py-4 px-6">
-                                                <StatusBadge log={log} />
-                                            </td>
-                                            <td className="py-4 px-6 text-sm">
-                                                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                                                    {log.provider || 'N/A'}
-                                                </Badge>
-                                            </td>
-                                            <td className="py-4 px-6 text-sm">{getMessageLength(log)} chars</td>
-                                            <td className="py-4 px-6 text-sm">
-                                                {formatTimestamp(log)}
-                                            </td>
-                                            <td className="py-4 px-6 text-center">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="sm" 
-                                                            className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
-                                                        >
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="w-56">
-                                                        <DropdownMenuItem 
-                                                            onClick={() => {
-                                                                const details = {
-                                                                    'Alert ID': log.alertId,
-                                                                    'Alert Title': log.alertTitle,
-                                                                    'Farmer': log.farmerName,
-                                                                    'Phone': log.phoneNumber,
-                                                                    'Status': log.status,
-                                                                    'Provider': log.provider,
-                                                                    'Message ID': log.messageId,
-                                                                    'Message': log.message,
-                                                                    'Error': log.error || log.errorMessage || 'None'
-                                                                };
-                                                                toast.info(JSON.stringify(details, null, 2));
-                                                            }} 
-                                                            className="cursor-pointer hover:bg-blue-50"
-                                                        >
-                                                            View Details
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem 
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(log.messageId);
-                                                                toast.success('Message ID copied to clipboard');
-                                                            }} 
-                                                            className="cursor-pointer hover:bg-green-50"
-                                                        >
-                                                            Copy Message ID
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem 
-                                                            onClick={() => toast.info(log.message)} 
-                                                            className="cursor-pointer hover:bg-yellow-50"
-                                                        >
-                                                            View Message
-                                                        </DropdownMenuItem>
-                                                        {(log.error || log.errorMessage) && (
-                                                            <DropdownMenuItem 
-                                                                onClick={() => toast.error(log.error || log.errorMessage || 'Unknown error')} 
-                                                                className="cursor-pointer hover:bg-red-50"
-                                                            >
-                                                                View Error
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                        {log.errorReason && (
-                                                            <DropdownMenuItem 
-                                                                onClick={() => toast.error(log.errorReason!)} 
-                                                                className="cursor-pointer hover:bg-red-50"
-                                                            >
-                                                                View Error Reason
-                                                            </DropdownMenuItem>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </td>
-                                        </tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+                <div className="p-4">
+                  <DataTable<MessageLog>
+                    label="Message logs"
+                    data={filteredLogs}
+                    getRowId={(l) => `${l.messageId}-${l.id}`}
+                    loading={isLoading}
+                    pagination={{ pageSize: 15 }}
+                    emptyState={t('noLogsFound') || 'No logs found'}
+                    columns={[
+                      { id: 'alertTitle', header: t('alertTitle') || 'Alert Title', value: (l) => l.alertTitle || l.alertType || '', cell: (l) => (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{l.alertTitle || l.alertType || 'N/A'}</Badge>
+                      ) },
+                      { id: 'farmerName', header: t('farmerName') || 'Farmer Name', value: (l) => l.farmerName || `Farmer ${l.farmerId}`, cell: (l) => l.farmerName || `Farmer ${l.farmerId}` },
+                      { id: 'phoneNumber', header: t('phoneNumber') || 'Phone', value: (l) => l.phoneNumber || '', cell: (l) => <span className="font-mono">{l.phoneNumber}</span> },
+                      { id: 'status', header: t('status') || 'Status', sortable: false, cell: (l) => <StatusBadge log={l} /> },
+                      { id: 'provider', header: t('provider') || 'Provider', value: (l) => l.provider || '', cell: (l) => (
+                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{l.provider || 'N/A'}</Badge>
+                      ) },
+                      { id: 'length', header: t('messageLength') || 'Length', numeric: true, value: (l) => getMessageLength(l), cell: (l) => `${getMessageLength(l)} chars` },
+                      { id: 'timestamp', header: t('timestamp') || 'Timestamp', value: (l) => l.timestamp || l.sentAt || l.createdAt || '', cell: (l) => formatTimestamp(l) },
+                      rowActionsColumn<MessageLog>((log) => (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56">
+                            <DropdownMenuItem onClick={() => {
+                              const details = { 'Alert ID': log.alertId, 'Alert Title': log.alertTitle, 'Farmer': log.farmerName, 'Phone': log.phoneNumber, 'Status': log.status, 'Provider': log.provider, 'Message ID': log.messageId, 'Message': log.message, 'Error': log.error || log.errorMessage || 'None' };
+                              toast.info(JSON.stringify(details, null, 2));
+                            }}>View Details</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(log.messageId); toast.success('Message ID copied to clipboard'); }}>Copy Message ID</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toast.info(log.message)}>View Message</DropdownMenuItem>
+                            {(log.error || log.errorMessage) && (
+                              <DropdownMenuItem destructive onClick={() => toast.error(log.error || log.errorMessage || 'Unknown error')}>View Error</DropdownMenuItem>
+                            )}
+                            {log.errorReason && (
+                              <DropdownMenuItem destructive onClick={() => toast.error(log.errorReason!)}>View Error Reason</DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )),
+                    ] as SortableColumn<MessageLog>[]}
+                  />
+                </div>
             </CardContent>
         </Card>
     );

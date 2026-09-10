@@ -9,8 +9,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
 import {
     ArrowUpDown, ChevronDown, Download, Edit, Loader2, MapPin, MessageSquare,
     MoreHorizontal, Phone, Plus, Search, Trash, Upload, User, ChevronLeft, ChevronRight,
@@ -313,132 +314,58 @@ const Locations: NextPage = () => {
                             </div>
                         </div>
 
-                        {isLoading ? (
-                            <div className="flex items-center justify-center py-16 ">
-                                <div className="flex flex-col items-center space-y-3">
-                                    <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
-                                    <span className="text-gray-500">{t("loading") || "Loading..."}</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="text-black bg-[#f2f5fa]">
-                                    <tr>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            #
-                                        </th>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            {t("name") || "Location Name"}
-                                        </th>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            {t("coordinates") || "Coordinates"}
-                                        </th>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            {t("createdAt") || "Created Date"}
-                                        </th>
-                                        <th className="py-4 px-6 text-center font-semibold text-sm">
-                                            {t("actions") || "Actions"}
-                                        </th>
-                                    </tr>
-                                    </thead>
-                                    <tbody className="bg-white">
-                                    {locations.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-16 text-center">
-                                                <div className="flex flex-col items-center space-y-3">
-                                                    <MapPin className="h-12 w-12 text-gray-300" />
-                                                    <div className="text-gray-500 font-medium">{t("noLocationsFound") || "No locations found"}</div>
-                                                    <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        locations.map((location, index) => (
-                                            <tr
-                                                key={location.id}
-                                                className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors duration-150 ${
-                                                    index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                                }`}
-                                                onClick={() => handleViewLocation(location.id)}
-                                            >
-                                                <td className="py-4 px-6 text-sm text-gray-900">
-                                                    {(currentPage - 1) * limit + index + 1}
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <div className="font-medium text-gray-900">{location.name}</div>
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <div className="text-sm text-gray-600 font-mono">
-                                                        {location.lat && location.lon ? (
-                                                            <span>{location.lat.toFixed(6)}, {location.lon.toFixed(6)}</span>
-                                                        ) : (
-                                                            <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <div className="text-sm text-gray-600">
-                                                        {location.createdAt ? new Date(location.createdAt).toLocaleDateString() : '-'}
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-6 text-center">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                            <Button 
-                                                                variant="ghost" 
-                                                                size="sm" 
-                                                                className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
-                                                            >
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-56">
-                                                            <DropdownMenuItem 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleViewLocation(location.id);
-                                                                }}
-                                                                className="cursor-pointer hover:bg-blue-50"
-                                                            >
-                                                                <MapPin className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
-                                                                {t("viewLocation") || "View Location"}
-                                                            </DropdownMenuItem>
-                                                            {user?.role === 'admin' && (
-                                                                <>
-                                                                    <DropdownMenuItem 
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleEditLocation(location);
-                                                                        }}
-                                                                        className="cursor-pointer hover:bg-green-50"
-                                                                    >
-                                                                        <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
-                                                                        {t("editLocation") || "Edit Location"}
-                                                                    </DropdownMenuItem>
-                                                                    <Separator className="my-1" />
-                                                                    <DropdownMenuItem
-                                                                        className="cursor-pointer hover:bg-red-50"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDeleteLocation(location.id);
-                                                                        }}
-                                                                    >
-                                                                        <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
-                                                                        <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
-                                                                    </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </td>
-                                            </tr>
-                                        ))
+                        <div className="p-4">
+                          <DataTable<any>
+                            label="Locations"
+                            data={locations}
+                            getRowId={(l) => String(l.id)}
+                            loading={isLoading}
+                            onRowClick={(l) => handleViewLocation(l.id)}
+                            emptyState={
+                              <div className="flex flex-col items-center space-y-3">
+                                <MapPin className="h-12 w-12 text-gray-300" />
+                                <div className="text-gray-500 font-medium">{t("noLocationsFound") || "No locations found"}</div>
+                                <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
+                              </div>
+                            }
+                            columns={[
+                              { id: "name", header: t("name") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-medium text-gray-900">{l.name}</span> },
+                              { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
+                                <span className="text-sm text-gray-600 font-mono">
+                                  {l.lat && l.lon ? `${l.lat.toFixed(6)}, ${l.lon.toFixed(6)}` : <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>}
+                                </span>
+                              ) },
+                              { id: "createdAt", header: t("createdAt") || "Created Date", value: (l: any) => l.createdAt || "", cell: (l: any) => l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '-' },
+                              rowActionsColumn<any>((location: any) => (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem onClick={() => handleViewLocation(location.id)}>
+                                      <MapPin className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
+                                      {t("viewLocation") || "View Location"}
+                                    </DropdownMenuItem>
+                                    {user?.role === 'admin' && (
+                                      <>
+                                        <DropdownMenuItem onClick={() => handleEditLocation(location)}>
+                                          <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
+                                          {t("editLocation") || "Edit Location"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem destructive onClick={() => handleDeleteLocation(location.id)}>
+                                          <Trash className="h-4 w-4 mr-2" />
+                                          {t("delete") || "Delete"}
+                                        </DropdownMenuItem>
+                                      </>
                                     )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )),
+                            ] as SortableColumn<any>[]}
+                          />
+                        </div>
+
 
                         {/* Pagination Footer - Matching the provided design exactly */}
                         {totalCount > 0 && (
