@@ -996,6 +996,8 @@
 
   "communications": "Communications",
   "customMessages": "Custom Messages",
+  "weatherScheduler": "Weather Scheduler",
+  "logs": "Logs",
   "allLocations": "All Locations",
   "Agricultural Alerts & Messages": "Agricultural Alerts & Messages",
   "alertDetails": "Alert Details",

@@ -3,7 +3,7 @@ import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Map, BarChart3, Filter, Download } from 'lucide-react';
 import { useLanguage } from '@/i18n';
@@ -397,58 +397,50 @@ export default function SoilSuitabilityPage() {
     </CardTitle>
   </CardHeader>
   <CardContent className="space-y-6">
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full py-2">
-      <TabsList className="grid w-full grid-cols-2 bg-gray-100">
-        <TabsTrigger 
-          value="suitability" 
-          className={activeTab === 'suitability' ? 'bg-gradient-to-r from-[#147677] via-[#0f5f5f] to-[#0c4d4d] text-white' : ''}
-        >
-          {t('suitability')}
-        </TabsTrigger>
-        <TabsTrigger 
-          value="susceptibility" 
-          className={activeTab === 'susceptibility' ? 'bg-gradient-to-r from-[#147677] via-[#0f5f5f] to-[#0c4d4d] text-white' : ''}
-        >
-          {t('risk')}
-        </TabsTrigger>
-      </TabsList>
-
-      <TabsContent value="suitability" className="space-y-4">
-        <div>
-          <label className="text-sm font-medium mb-2 block">{t('cropType')}</label>
-          <Select value={selectedCrop} onValueChange={setSelectedCrop}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {cropTypes.map(crop => (
-                <SelectItem key={crop.value} value={crop.value}>
-                  {crop.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </TabsContent>
-
-      <TabsContent value="susceptibility" className="space-y-4">
-        <div>
-          <label className="text-sm font-medium mb-2 block">{t('hazardType')}</label>
-          <Select value={selectedHazard} onValueChange={setSelectedHazard}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {hazardTypes.map(hazard => (
-                <SelectItem key={hazard.value} value={hazard.value}>
-                  {hazard.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </TabsContent>
-    </Tabs>
+    <Tabs
+      value={activeTab}
+      onValueChange={setActiveTab}
+      className="w-full"
+      items={[
+        { value: 'suitability', label: t('suitability') },
+        { value: 'susceptibility', label: t('risk') },
+      ]}
+      renderPanel={(value) =>
+        value === 'suitability' ? (
+          <div className="space-y-4">
+            <label className="text-sm font-medium mb-2 block">{t('cropType')}</label>
+            <Select value={selectedCrop} onValueChange={setSelectedCrop}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {cropTypes.map(crop => (
+                  <SelectItem key={crop.value} value={crop.value}>
+                    {crop.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <label className="text-sm font-medium mb-2 block">{t('hazardType')}</label>
+            <Select value={selectedHazard} onValueChange={setSelectedHazard}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {hazardTypes.map(hazard => (
+                  <SelectItem key={hazard.value} value={hazard.value}>
+                    {hazard.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )
+      }
+    />
 
     <div>
       <label className="text-sm font-medium mb-2 block">{t('filterBySector')}</label>
