@@ -384,7 +384,7 @@ export function SendAlertDialog({
         message: errorMessage,
         results: {
           successful: [],
-          failed: buildFarmerSendResults(selectedFarmers, farmers, true) as SendResult['results']['failed'],
+          failed: buildFarmerSendResults(selectedFarmers, farmers, true) as NonNullable<SendResult['results']>['failed'],
         }
       };
 
