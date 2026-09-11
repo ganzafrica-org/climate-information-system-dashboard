@@ -312,7 +312,7 @@ export default function SoilSuitabilityPage() {
           </aside>
 
           {/* MAP STAGE */}
-          <div className="relative flex-1 max-lg:h-[62vh]">
+          <div className="relative isolate flex-1 max-lg:h-[62vh]">
             <SoilMap
               mode={mode}
               suitability={mergedSuitability}

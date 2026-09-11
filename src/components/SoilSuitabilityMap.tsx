@@ -48,7 +48,8 @@ function FitDistrict({ district }: { district: FeatureCollection | null }) {
     if (!district) return
     try {
       const layer = L.geoJSON(district as any)
-      // Extra bottom padding so the district frames above the floating dock.
+      // Extra bottom padding so the district frames above the floating dock,
+      // and a touch on the left where the panel sits.
       map.fitBounds(layer.getBounds(), {
         paddingTopLeft: [24, 24],
         paddingBottomRight: [24, 220],

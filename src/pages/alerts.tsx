@@ -47,7 +47,7 @@ const Alerts: NextPage = () => {
       <AppLayout>
         <div className="flex items-center justify-center min-h-[400px]">
           <div className="text-center">
-            <Loader2 className="animate-spin h-8 w-8 mx-auto" style={{ color: '#2580f5' }} />
+            <Loader2 className="animate-spin h-8 w-8 mx-auto" />
             <p className="mt-2 text-gray-500">{t('loadingLocations')}</p>
                 </div>
               </div>

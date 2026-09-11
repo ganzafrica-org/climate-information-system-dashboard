@@ -20,6 +20,7 @@ import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { ViewAlertDialog } from './AlertsDialogs';
@@ -554,15 +555,14 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                             {t("showing")} {startIndex} - {endIndex} {t("of")} {totalCount} {t("alerts")}
                         </div>
                         <div className="flex items-center gap-2">
-                            <select
-                                value={limit}
-                                onChange={(e) => setLimit(Number(e.target.value))}
-                                className="text-sm border rounded px-2 py-1"
-                            >
-                                <option value={10}>10 per page</option>
-                                <option value={25}>25 per page</option>
-                                <option value={50}>50 per page</option>
-                            </select>
+                            <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
+                                <SelectTrigger className="h-8 w-[120px]"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="10">10 per page</SelectItem>
+                                    <SelectItem value="25">25 per page</SelectItem>
+                                    <SelectItem value="50">50 per page</SelectItem>
+                                </SelectContent>
+                            </Select>
                             <Button
                                 variant="outline"
                                 size="sm"

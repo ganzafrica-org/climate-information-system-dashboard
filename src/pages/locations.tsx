@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
 import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     ArrowUpDown, ChevronDown, Download, Edit, Loader2, MapPin, MessageSquare,
     MoreHorizontal, Phone, Plus, Search, Trash, Upload, User, ChevronLeft, ChevronRight,
@@ -343,13 +344,13 @@ const Locations: NextPage = () => {
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end" className="w-56">
                                     <DropdownMenuItem onClick={() => handleViewLocation(location.id)}>
-                                      <MapPin className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
+                                      <MapPin className="h-4 w-4 mr-2" />
                                       {t("viewLocation") || "View Location"}
                                     </DropdownMenuItem>
                                     {user?.role === 'admin' && (
                                       <>
                                         <DropdownMenuItem onClick={() => handleEditLocation(location)}>
-                                          <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
+                                          <Edit className="h-4 w-4 mr-2" />
                                           {t("editLocation") || "Edit Location"}
                                         </DropdownMenuItem>
                                         <DropdownMenuSeparator />
@@ -374,17 +375,16 @@ const Locations: NextPage = () => {
                                     <span>
                                         {locations.length === 0 ? "0" : `${Math.min((currentPage - 1) * limit + 1, totalCount)}-${Math.min(currentPage * limit, totalCount)}`} of {totalCount} row(s) selected.
                                     </span>
-                                    <span>Rows per page</span>
-                                    <select 
-                                        className="border border-gray-300 rounded px-2 py-1 text-sm bg-white ml-2"
-                                        value={limit}
-                                        onChange={(e) => handleLimitChange(parseInt(e.target.value))}
-                                    >
-                                        <option value="10">10</option>
-                                        <option value="20">20</option>
-                                        <option value="50">50</option>
-                                        <option value="100">100</option>
-                                    </select>
+                                    <span>{t("rowsPerPage") || "Rows per page"}</span>
+                                    <Select value={String(limit)} onValueChange={(v) => handleLimitChange(parseInt(v))}>
+                                        <SelectTrigger className="ml-2 h-8 w-[72px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="10">10</SelectItem>
+                                            <SelectItem value="20">20</SelectItem>
+                                            <SelectItem value="50">50</SelectItem>
+                                            <SelectItem value="100">100</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 
                                 <div className="flex items-center space-x-4">
