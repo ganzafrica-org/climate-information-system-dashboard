@@ -48,7 +48,11 @@ function FitDistrict({ district }: { district: FeatureCollection | null }) {
     if (!district) return
     try {
       const layer = L.geoJSON(district as any)
-      map.fitBounds(layer.getBounds(), { padding: [16, 16] })
+      // Extra bottom padding so the district frames above the floating dock.
+      map.fitBounds(layer.getBounds(), {
+        paddingTopLeft: [24, 24],
+        paddingBottomRight: [24, 220],
+      })
     } catch {
       /* keep default view */
     }
@@ -117,11 +121,10 @@ export default function SoilSuitabilityMap({
       style={{ height: "100%", width: "100%", background: "#e9eef2" }}
     >
       <TileLayer
-        attribution='Boundaries RLMUA/RNRA &middot; &copy; OpenStreetMap, &copy; CARTO'
-        url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
+        attribution='Boundaries RLMUA/RNRA &middot; &copy; OpenStreetMap contributors'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
-        opacity={0.85}
+        opacity={0.9}
       />
       <FitDistrict district={district} />
 

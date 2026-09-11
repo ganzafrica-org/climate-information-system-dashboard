@@ -1066,6 +1066,8 @@
 "filtersAndAnalysis": "Filters and Analysis",
 "suitability": "Suitability",
 "risk": "Risk",
+"soilSuitabilityFull": "Soil suitability",
+"soilRiskFull": "Soil susceptibility",
 "cropType": "Crop Type",
 "hazardType": "Hazard Type",
 "filterBySector": "Filter by Sector",

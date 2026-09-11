@@ -5,6 +5,7 @@ import { Map as MapIcon, Download, ChevronDown, Layers, X } from "lucide-react"
 import { useLanguage } from "@/i18n"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { SegmentedControl } from "@/components/ui/segmented-control"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DataTable, type SortableColumn } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { SoilPopover } from "@/components/SoilSuitabilityMap"
@@ -190,24 +191,23 @@ export default function SoilSuitabilityPage() {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 space-y-4">
-        {/* Header */}
-        <div className="flex items-center justify-between rounded-2xl bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] px-5 py-4 text-white shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-white/10 bg-white/15 p-2.5"><MapIcon className="h-6 w-6" /></div>
+        {/* Header — matches the dashboard white-card style */}
+        <div className="rounded-lg bg-white px-4 py-3 shadow-sm">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <h1 className="text-lg font-bold md:text-xl">{t("soilSuitabilityAnalysis") || "Soil Suitability & Risk · Musanze"}</h1>
-              <p className="text-xs text-white/80">{t("soilAnalysisDescription") || "Crop suitability & hazard susceptibility across 15 sectors"}</p>
+              <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{t("soilSuitabilityAnalysis") || "Soil Suitability & Risk · Musanze"}</h1>
+              <p className="text-sm text-slate-400">{t("soilAnalysisDescription") || "Crop suitability & hazard susceptibility across 15 sectors"}</p>
             </div>
+            <button onClick={handleExport} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb]">
+              <Download className="h-4 w-4 text-[#147677]" /> {t("exportData") || "Export CSV"}
+            </button>
           </div>
-          <button onClick={handleExport} className="flex items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-medium hover:bg-white/20">
-            <Download className="h-4 w-4" /> {t("exportData") || "Export CSV"}
-          </button>
         </div>
 
         {/* One framed unit: left panel + map */}
         <div className="flex h-[640px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm max-lg:h-auto max-lg:flex-col">
           {/* LEFT PANEL */}
-          <aside className="w-[300px] shrink-0 overflow-y-auto border-r border-border p-4 max-lg:w-full max-lg:border-b max-lg:border-r-0">
+          <aside className="w-[310px] shrink-0 overflow-y-auto border-r border-border p-4 max-lg:w-full max-lg:border-b max-lg:border-r-0">
             <Group label={t("analysis") || "Analysis"}>
               <SegmentedControl
                 label="Analysis mode"
@@ -261,7 +261,7 @@ export default function SoilSuitabilityPage() {
                   <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
                     {SECTORS.map((s) => (
                       <label key={s} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
-                        <input type="checkbox" className="accent-[#147677]" checked={sectors.has(s)} onChange={() => toggleSector(s)} />
+                        <Checkbox checked={sectors.has(s)} onCheckedChange={() => toggleSector(s)} />
                         {s}
                       </label>
                     ))}
@@ -276,7 +276,7 @@ export default function SoilSuitabilityPage() {
               ) : ranking.length === 0 ? (
                 <p className="text-xs text-muted-foreground">{t("noData") || "No data"}</p>
               ) : (
-                <div className="max-h-[150px] space-y-0.5 overflow-y-auto">
+                <div className="max-h-[140px] space-y-0.5 overflow-y-auto">
                   {ranking.map(([s, area]) => (
                     <button key={s} onClick={() => toggleSector(s)} className={`grid w-full grid-cols-[64px_1fr_40px] items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs hover:bg-[#147677]/5 ${sectors.has(s) ? "bg-[#147677]/5" : ""}`}>
                       <span className="truncate">{s}</span>
@@ -293,7 +293,7 @@ export default function SoilSuitabilityPage() {
               <div className="space-y-0.5">
                 {([["district", t("districtBoundary") || "District boundary", ""], ["sectors", t("sector") || "Sectors", "15"], ["restricted", t("restrictedAreas") || "Restricted areas", "lakes, parks"]] as const).map(([key, label, hint]) => (
                   <label key={key} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-sm hover:bg-muted">
-                    <input type="checkbox" className="accent-[#147677]" checked={overlays[key]} onChange={() => setOverlays((o) => ({ ...o, [key]: !o[key] }))} />
+                    <Checkbox checked={overlays[key]} onCheckedChange={() => setOverlays((o) => ({ ...o, [key]: !o[key] }))} />
                     <span className="font-medium">{label}</span>
                     {hint && <span className="ml-auto text-[11px] text-muted-foreground">{hint}</span>}
                   </label>
@@ -328,7 +328,7 @@ export default function SoilSuitabilityPage() {
             {/* horizontal legend, top-right */}
             <div className="absolute right-3 top-3 z-[500] rounded-lg border border-border bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
               <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {(mode === "risk" ? (t("risk") || "Risk") : (t("suitability") || "Suitability"))} · {t("area") || "area"} (ha)
+                {(mode === "risk" ? (t("soilRiskFull") || "Soil susceptibility") : (t("soilSuitabilityFull") || "Soil suitability"))} · {t("area") || "area"} (ha)
               </div>
               <div className="flex">
                 {legendClasses.map((cls, i) => (
@@ -358,7 +358,7 @@ export default function SoilSuitabilityPage() {
 
             {/* collapsible bottom dock */}
             <div className="absolute inset-x-3 bottom-3 z-[500] flex flex-col overflow-hidden rounded-xl border border-border bg-card/97 shadow-[0_-2px_24px_rgba(20,40,60,0.16)] backdrop-blur" style={{ maxHeight: dockOpen ? "44%" : undefined }}>
-              <div className="flex items-center gap-1 border-b border-border px-3">
+              <div className="flex items-center gap-1 border-b border-border bg-white px-3 rounded-t-xl">
                 {dockTabs.map((label, i) => (
                   <button key={i} onClick={() => setDockTab(i)} className={`border-b-2 px-3 py-2.5 text-xs font-semibold ${dockTab === i ? "border-[#147677] text-[#147677]" : "border-transparent text-muted-foreground"}`}>{label}</button>
                 ))}
