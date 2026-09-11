@@ -760,13 +760,13 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
                       <Button variant="ghost" size="icon" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => handleViewLocation(location.id)}><Eye className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />{t("viewDetails") || "View Details"}</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEditLocation(location)}><Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />{t("editLocation") || "Edit Location"}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleViewLocation(location.id)}><Eye className="h-4 w-4 mr-2" />{t("viewDetails") || "View Details"}</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEditLocation(location)}><Edit className="h-4 w-4 mr-2" />{t("editLocation") || "Edit Location"}</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleOpenCustomMessageDialog(location)}><MessageSquare className="h-4 w-4 mr-2" style={{ color: '#adc9e3' }} />{t("sendCustomMessage") || "Send Custom Message"}</DropdownMenuItem>
                       <DropdownMenuItem onClick={() => {
                         if (location.latitude && location.longitude) window.open(`https://maps.google.com/?q=${location.latitude},${location.longitude}`, '_blank');
                         else toast.error(t('noCoordinatesAvailable') || 'No coordinates available for this location');
-                      }}><Navigation className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />{t("viewOnMap") || "View on Map"}</DropdownMenuItem>
+                      }}><Navigation className="h-4 w-4 mr-2" />{t("viewOnMap") || "View on Map"}</DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem destructive onClick={() => handleDeleteLocation(location.id)}><Trash className="h-4 w-4 mr-2" />{t("delete") || "Delete"}</DropdownMenuItem>
                     </DropdownMenuContent>
@@ -976,7 +976,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
             <Button
               onClick={handleSendCustomMessage}
               disabled={isSendingCustomMessage || !customMessageText.trim()}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-primary hover:bg-primary/90"
             >
               {isSendingCustomMessage ? (
                 <>

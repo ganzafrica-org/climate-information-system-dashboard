@@ -60,7 +60,7 @@ export function FarmerLocationFilter({ locations, selectedLocationId, onLocation
 
     return (
         <div className="flex items-center gap-2 mb-4">
-            <Filter className="h-4 w-4" style={{ color: '#2580f5' }} />
+            <Filter className="h-4 w-4" />
             <Label htmlFor="location-filter" className="text-sm font-medium">
                 {t('filterByLocation')}:
             </Label>

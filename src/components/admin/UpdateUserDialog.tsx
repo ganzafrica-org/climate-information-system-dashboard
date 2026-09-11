@@ -223,7 +223,7 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
               <Button 
                 type="submit" 
                 disabled={isLoading} 
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 {isLoading ? (
                   <>

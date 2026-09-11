@@ -10,6 +10,7 @@ import { toast } from "sonner"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { useLanguage } from "@/i18n"
 import { SegmentedControl } from "@/components/ui/segmented-control"
+import { Checkbox } from "@/components/ui/checkbox"
 import { DataTable, type SortableColumn } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton"
 import api from "@/lib/api"
@@ -209,7 +210,7 @@ const Historical: NextPage = () => {
                     const on = idx >= 0
                     return (
                       <label key={l.id} className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm ${on ? "bg-[#147677]/5" : "hover:bg-muted"}`}>
-                        <input type="checkbox" className="accent-[#147677]" checked={on} onChange={() => toggleLocation(l.id)} />
+                        <Checkbox checked={on} onCheckedChange={() => toggleLocation(l.id)} />
                         <span className="h-2.5 w-2.5 rounded-full" style={{ background: on ? SERIES_COLORS[idx % SERIES_COLORS.length] : "#cbd5e1" }} />
                         <span className="flex-1 truncate font-medium">{l.name}</span>
                       </label>

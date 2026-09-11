@@ -1082,6 +1082,7 @@
 "records": "Records",
 "insights": "Insights",
 "insightPickTwo": "Select two or more locations to see comparative insights.",
+"rowsPerPage": "Rows per page",
 "difference": "difference",
 "avgTemp": "averages",
 "filtersAndAnalysis": "Filters and Analysis",

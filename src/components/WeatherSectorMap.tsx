@@ -27,7 +27,10 @@ function FitDistrict({ district }: { district: FeatureCollection | null }) {
   useEffect(() => {
     if (!district) return
     try {
-      map.fitBounds(L.geoJSON(district as any).getBounds(), { padding: [16, 16] })
+      map.fitBounds(L.geoJSON(district as any).getBounds(), {
+        paddingTopLeft: [24, 24],
+        paddingBottomRight: [24, 220],
+      })
     } catch {}
   }, [district, map])
   return null
@@ -71,11 +74,10 @@ export default function WeatherSectorMap({
       style={{ height: "100%", width: "100%", background: "#e9eef2" }}
     >
       <TileLayer
-        attribution='&copy; OpenStreetMap, &copy; CARTO'
-        url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
-        subdomains="abcd"
+        attribution='&copy; OpenStreetMap contributors'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
-        opacity={0.85}
+        opacity={0.9}
       />
       <FitDistrict district={district} />
 
