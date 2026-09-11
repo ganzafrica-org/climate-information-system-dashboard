@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { motion, useReducedMotion } from "motion/react";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const CELL = { type: "spring", stiffness: 520, damping: 34, mass: 0.45 } as const;
 
@@ -287,13 +288,10 @@ export function SortableTable<T>({
           >
             {selectable && (
               <div role="columnheader" className="flex min-w-0 items-center justify-center">
-                <input
-                  type="checkbox"
+                <Checkbox
                   aria-label="Select all rows"
-                  className="h-4 w-4 cursor-pointer accent-[hsl(var(--primary))]"
-                  checked={allSelected}
-                  ref={(el) => { if (el) el.indeterminate = someSelected; }}
-                  onChange={toggleAll}
+                  checked={allSelected ? true : someSelected ? "indeterminate" : false}
+                  onCheckedChange={toggleAll}
                 />
               </div>
             )}
@@ -444,14 +442,11 @@ export function SortableTable<T>({
                 style={{ height: rowHeight, gridTemplateColumns: template }}
               >
                 {selectable && (
-                  <div role="cell" className="flex min-w-0 items-center justify-center">
-                    <input
-                      type="checkbox"
+                  <div role="cell" className="flex min-w-0 items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
                       aria-label={`Select ${nameOf(row)}`}
-                      className="h-4 w-4 cursor-pointer accent-[hsl(var(--primary))]"
                       checked={selected.has(id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleOne(id)}
+                      onCheckedChange={() => toggleOne(id)}
                     />
                   </div>
                 )}

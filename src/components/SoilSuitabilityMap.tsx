@@ -1,405 +1,210 @@
-import { useEffect, useRef, useState } from 'react';
-import { MapContainer, TileLayer, GeoJSON, LayersControl, useMap } from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import type { SuitabilityData, SusceptibilityData, AdministrativeData } from '@/pages/soil-suitability';
+"use client"
 
-// Fix for Leaflet default icons in Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-});
+import { useEffect, useRef } from "react"
+import { MapContainer, TileLayer, GeoJSON, useMap } from "react-leaflet"
+import L from "leaflet"
+import "leaflet/dist/leaflet.css"
+import {
+  type Mode,
+  type FeatureCollection,
+  suitabilityColor,
+  susceptibilityColor,
+  readSector,
+  readArea,
+  normalizeSusceptibilityClass,
+} from "@/lib/soil"
 
-const { BaseLayer, Overlay } = LayersControl;
+// Musanze district center + a tight zoom that frames the district.
+const MUSANZE_CENTER: [number, number] = [-1.4923, 29.6076]
+const MUSANZE_ZOOM = 11
 
-const SUITABILITY_COLORS = {
-  'Very Suitable': '#38A800',
-  'Suitable': '#98E600',
-  'Moderate Suitable': '#E9FFBE',
-  'Less Suitable': '#FFEBAF',
-  'Not Suitable': '#FF5500'
-};
-
-// Handle all variations of susceptibility class names from different GeoJSON files
-const SUSCEPTIBILITY_COLORS = {
-  // Correct names from mapping guidance
-  'Extremely Susceptible': '#A80000',
-  'Highly Susceptible': '#FF5500',
-  'Moderate Susceptible': '#F5CA7A',
-  'Slightly Susceptible': '#E1E1E1',
-  // Variations with trailing spaces (flooding, soil erosion files)
-  'Extremely Susceptible ': '#A80000',
-  'Highly Susceptible ': '#FF5500',
-  'Moderately Susceptible ': '#F5CA7A',
-  'Slightly Susceptible ': '#E1E1E1',
-  // Variations without trailing spaces but with "Moderately" (landslide file)
-  'Moderately Susceptible': '#F5CA7A'
-};
-
-interface MapProps {
-  suitabilityData: any;
-  susceptibilityData: any;
-  sectors: AdministrativeData | null;
-  district: AdministrativeData | null;
-  restrictedAreas: AdministrativeData | null;
-  selectedSector: string;
-  onSectorSelect: (sector: string) => void;
-  activeLayer: string;
-  selectedCrop?: string;
-  selectedHazard?: string;
+export type SoilPopover = {
+  x: number
+  y: number
+  sector: string
+  suitabilityClass?: string
+  riskClass?: string
+  area: number
+  crop?: string
 }
 
-function MapUpdater({ sectors, selectedSector, onSectorSelect }: {
-  sectors: AdministrativeData | null;
-  selectedSector: string;
-  onSectorSelect: (sector: string) => void;
-}) {
-  const map = useMap();
+type Props = {
+  mode: Mode
+  suitability: FeatureCollection | null
+  susceptibility: FeatureCollection | null
+  sectors: FeatureCollection | null
+  district: FeatureCollection | null
+  restricted: FeatureCollection | null
+  selectedSectors: Set<string>
+  onToggleSector: (sector: string) => void
+  overlays: { district: boolean; sectors: boolean; restricted: boolean }
+  onFeaturePopover: (p: SoilPopover | null) => void
+}
 
+/** Fits the map to the district bounds once it is available. */
+function FitDistrict({ district }: { district: FeatureCollection | null }) {
+  const map = useMap()
   useEffect(() => {
+    if (!district) return
     try {
-      if (sectors && selectedSector) {
-        const selectedFeature = sectors.features.find(
-          feature => feature.properties.NAME === selectedSector
-        );
-
-        if (selectedFeature) {
-          const layer = L.geoJSON(selectedFeature);
-          const bounds = layer.getBounds();
-          if (bounds.isValid()) {
-            map.fitBounds(bounds, { padding: [20, 20] });
-          }
-        }
-      } else if (sectors) {
-        const layer = L.geoJSON(sectors);
-        const bounds = layer.getBounds();
-        if (bounds.isValid()) {
-          map.fitBounds(bounds, { padding: [20, 20] });
-        }
-      }
-    } catch (error) {
-      console.error('Error updating map bounds:', error);
+      const layer = L.geoJSON(district as any)
+      // Extra bottom padding so the district frames above the floating dock.
+      map.fitBounds(layer.getBounds(), {
+        paddingTopLeft: [24, 24],
+        paddingBottomRight: [24, 220],
+      })
+    } catch {
+      /* keep default view */
     }
-  }, [map, sectors, selectedSector]);
-
-  return null;
+  }, [district, map])
+  return null
 }
 
 export default function SoilSuitabilityMap({
-  suitabilityData,
-  susceptibilityData,
+  mode,
+  suitability,
+  susceptibility,
   sectors,
   district,
-  restrictedAreas,
-  selectedSector,
-  onSectorSelect,
-  activeLayer,
-  selectedCrop,
-  selectedHazard
-}: MapProps) {
-  const mapRef = useRef<L.Map | null>(null);
-  const [isMapReady, setIsMapReady] = useState(false);
-  const [mapError, setMapError] = useState<string | null>(null);
+  restricted,
+  selectedSectors,
+  onToggleSector,
+  overlays,
+  onFeaturePopover,
+}: Props) {
+  // Bump this whenever the *data* (crop/hazard/mode/sector filter) changes so the
+  // fill layers re-render with new styles. We DON'T key on selection alone — the
+  // sector outline layer restyles imperatively via setStyle (no remount flicker).
+  const suitKey = `suit-${mode}-${suitability?.features.length ?? 0}`
+  const riskKey = `risk-${mode}-${susceptibility?.features.length ?? 0}`
 
-  useEffect(() => {
-    // Set map as ready after component mounts
-    const timer = setTimeout(() => {
-      setIsMapReady(true);
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, []);
+  const showSuit = mode === "suitability" || mode === "combined"
+  const showRisk = mode === "risk" || mode === "combined"
 
-  // Don't render on server side
-  if (typeof window === 'undefined') {
-    return (
-      <div className="h-[600px] w-full rounded-lg overflow-hidden border bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <div className="text-gray-600">Loading map...</div>
-        </div>
-      </div>
-    );
-  }
+  const fillStyle = (color: string, opacity: number) => ({
+    fillColor: color,
+    weight: 0,
+    opacity: 0,
+    color: "transparent",
+    fillOpacity: opacity,
+  })
 
-  const getSuitabilityStyle = (feature: any) => {
-    try {
-      const suitabilityClass = feature.properties?.Suitability_Class;
-      const color = SUITABILITY_COLORS[suitabilityClass as keyof typeof SUITABILITY_COLORS] || '#CCCCCC';
-
-      return {
-        fillColor: color,
-        weight: 0,
-        opacity: 0,
-        fillOpacity: 0.7,
-        color: 'transparent'
-      };
-    } catch (error) {
-      console.error('Error getting suitability style:', error);
-      return {
-        fillColor: '#CCCCCC',
-        weight: 0,
-        opacity: 0,
-        fillOpacity: 0.7,
-        color: 'transparent'
-      };
-    }
-  };
-
-  const getSusceptibilityStyle = (feature: any) => {
-    try {
-      const susceptibilityClass = feature.properties?.Susceptibility_Class;
-      const color = SUSCEPTIBILITY_COLORS[susceptibilityClass as keyof typeof SUSCEPTIBILITY_COLORS] || '#CCCCCC';
-
-      return {
-        fillColor: color,
-        weight: 0,
-        opacity: 0,
-        fillOpacity: 0.7,
-        color: 'transparent'
-      };
-    } catch (error) {
-      console.error('Error getting susceptibility style:', error);
-      return {
-        fillColor: '#CCCCCC',
-        weight: 0,
-        opacity: 0,
-        fillOpacity: 0.7,
-        color: 'transparent'
-      };
-    }
-  };
-
-  const getDistrictStyle = () => ({
-    fillColor: 'transparent',
-    weight: 2,
-    opacity: 1,
-    color: '#000000',
-    fillOpacity: 0
-  });
-
-  const getSectorStyle = (feature: any) => {
-    const isSelected = feature.properties?.NAME === selectedSector;
+  // ---- sector outline layer: restyle in place, never remount ----
+  const sectorLayerRef = useRef<L.GeoJSON | null>(null)
+  const sectorStyle = (sector: string): L.PathOptions => {
+    const active = selectedSectors.has(sector)
     return {
-      fillColor: isSelected ? '#3B82F6' : 'transparent',
-      weight: isSelected ? 2 : 0.5,
-      opacity: 1,
-      color: isSelected ? '#1E40AF' : '#000000',
-      fillOpacity: isSelected ? 0.1 : 0
-    };
-  };
-
-  const getRestrictedStyle = () => ({
-    fillColor: '#DC2626',
-    weight: 2,
-    opacity: 1,
-    color: '#000000',
-    fillOpacity: 0.2
-  });
-
-  const onSectorClick = (feature: any, layer: L.Layer) => {
-    try {
-      const sectorName = feature.properties?.NAME;
-      if (sectorName) {
-        onSectorSelect(selectedSector === sectorName ? '' : sectorName);
-      }
-    } catch (error) {
-      console.error('Error handling sector click:', error);
+      fillColor: active ? "#147677" : "transparent",
+      fillOpacity: active ? 0.12 : 0,
+      weight: active ? 2.5 : 0.75,
+      color: active ? "#0f5f5f" : "#334155",
+      opacity: active ? 1 : 0.6,
     }
-  };
-
-  const createTooltipContent = (properties: any, type: 'suitability' | 'susceptibility') => {
-    try {
-      const className = type === 'suitability'
-        ? properties.Suitability_Class
-        : properties.Susceptibility_Class;
-      const area = properties.Area_ha;
-      const sector = properties.SECTOR || properties.Sector || properties.sector || 'Unknown';
-
-      return `
-        <div class="font-medium">
-          <div><strong>Class:</strong> ${className || 'Unknown'}</div>
-          <div><strong>Area:</strong> ${area ? area.toLocaleString() : 'Unknown'} ha</div>
-          <div><strong>Sector:</strong> ${sector}</div>
-        </div>
-      `;
-    } catch (error) {
-      console.error('Error creating tooltip content:', error);
-      return '<div class="font-medium">Error loading data</div>';
-    }
-  };
-
-  if (mapError) {
-    return (
-      <div className="h-[600px] w-full rounded-lg overflow-hidden border bg-red-50 flex items-center justify-center">
-        <div className="text-center p-6">
-          <div className="text-red-600 font-medium text-lg mb-2">Map Error</div>
-          <div className="text-red-500 text-sm mb-4">{mapError}</div>
-          <button 
-            onClick={() => {
-              setMapError(null);
-              setIsMapReady(false);
-              setTimeout(() => setIsMapReady(true), 100);
-            }}
-            className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    );
   }
-
-  if (!isMapReady) {
-    return (
-      <div className="h-[600px] w-full rounded-lg overflow-hidden border bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-          <div className="text-gray-600">Loading map...</div>
-        </div>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const layer = sectorLayerRef.current
+    if (!layer) return
+    layer.eachLayer((l: any) => {
+      const s = readSector(l.feature?.properties || {})
+      l.setStyle(sectorStyle(s))
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSectors])
 
   return (
-    <div className="h-[600px] w-full rounded-lg overflow-hidden border">
-      <MapContainer
-        center={[-1.95, 30.06]}
-        zoom={15}
-        style={{ height: '100%', width: '100%' }}
-        ref={mapRef}
-        whenReady={() => {
-          try {
-            console.log('Map is ready');
-          } catch (error) {
-            console.error('Map ready error:', error);
-            setMapError('Failed to initialize map');
-          }
-        }}
-      >
-        <LayersControl position="topright">
-          <BaseLayer checked name="OpenStreetMap">
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-          </BaseLayer>
+    <MapContainer
+      center={MUSANZE_CENTER}
+      zoom={MUSANZE_ZOOM}
+      minZoom={9}
+      maxZoom={16}
+      zoomControl={false}
+      style={{ height: "100%", width: "100%", background: "#e9eef2" }}
+    >
+      <TileLayer
+        attribution='Boundaries RLMUA/RNRA &middot; &copy; OpenStreetMap contributors'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        maxZoom={19}
+        opacity={0.9}
+      />
+      <FitDistrict district={district} />
 
-          <BaseLayer name="Satellite">
-            <TileLayer
-              attribution='&copy; <a href="https://www.esri.com/">Esri</a>'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-            />
-          </BaseLayer>
-
-          {/* District Boundary - Always visible */}
-          {district && (
-            <Overlay checked name="District Boundary">
-              <GeoJSON
-                key="district"
-                data={district}
-                style={getDistrictStyle}
-                onEachFeature={(feature, layer) => {
-                  if (feature.properties?.NAME) {
-                    layer.bindTooltip(
-                      `<div class="font-medium">District: ${feature.properties.NAME}</div>`,
-                      { permanent: false, direction: 'top' }
-                    );
-                  }
-                }}
-              />
-            </Overlay>
-          )}
-
-          {/* Sectors - Always visible, clickable */}
-          {sectors && (
-            <Overlay checked name="Sectors">
-              <GeoJSON
-                key={`sectors-${selectedSector}`}
-                data={sectors}
-                style={getSectorStyle}
-                onEachFeature={(feature, layer) => {
-                  if (feature.properties?.NAME) {
-                    layer.bindTooltip(
-                      `<div class="font-medium">Sector: ${feature.properties.NAME}</div>`,
-                      { permanent: false, direction: 'top' }
-                    );
-
-                    layer.on('click', () => onSectorClick(feature, layer));
-                    layer.on('mouseover', () => {
-                      (layer as any).setStyle({ fillOpacity: 0.3 });
-                    });
-                    layer.on('mouseout', () => {
-                      (layer as any).setStyle(getSectorStyle(feature));
-                    });
-                  }
-                }}
-              />
-            </Overlay>
-          )}
-
-          {/* Restricted Areas */}
-          {restrictedAreas && (
-            <Overlay checked name="Restricted Areas">
-              <GeoJSON
-                key="restricted"
-                data={restrictedAreas}
-                style={getRestrictedStyle}
-                onEachFeature={(feature, layer) => {
-                  if (feature.properties?.NAME) {
-                    layer.bindTooltip(
-                      `<div class="font-medium">Restricted Area: ${feature.properties.NAME}</div>`,
-                      { permanent: false, direction: 'top' }
-                    );
-                  }
-                }}
-              />
-            </Overlay>
-          )}
-
-          {/* Suitability Layer */}
-          {suitabilityData && activeLayer === 'suitability' && (
-            <Overlay checked name="Crop Suitability">
-              <GeoJSON
-                key={`suitability-${selectedCrop}-${selectedSector}`}
-                data={suitabilityData}
-                style={getSuitabilityStyle}
-                onEachFeature={(feature, layer) => {
-                  layer.bindTooltip(
-                    createTooltipContent(feature.properties, 'suitability'),
-                    { permanent: false, direction: 'top' }
-                  );
-                }}
-              />
-            </Overlay>
-          )}
-
-          {/* Susceptibility Layer */}
-          {susceptibilityData && activeLayer === 'susceptibility' && (
-            <Overlay checked name="Hazard Susceptibility">
-              <GeoJSON
-                key={`susceptibility-${selectedHazard}-${selectedSector}`}
-                data={susceptibilityData}
-                style={getSusceptibilityStyle}
-                onEachFeature={(feature, layer) => {
-                  layer.bindTooltip(
-                    createTooltipContent(feature.properties, 'susceptibility'),
-                    { permanent: false, direction: 'top' }
-                  );
-                }}
-              />
-            </Overlay>
-          )}
-        </LayersControl>
-
-        <MapUpdater
-          sectors={sectors}
-          selectedSector={selectedSector}
-          onSectorSelect={onSectorSelect}
+      {/* Suitability fill */}
+      {showSuit && suitability && (
+        <GeoJSON
+          key={suitKey}
+          data={suitability as any}
+          style={(f: any) => fillStyle(suitabilityColor(f.properties?.Suitability_Class), mode === "combined" ? 0.7 : 0.8)}
         />
-      </MapContainer>
-    </div>
-  );
+      )}
+
+      {/* Risk fill (hatched-feel via lower opacity when combined) */}
+      {showRisk && susceptibility && (
+        <GeoJSON
+          key={riskKey}
+          data={susceptibility as any}
+          style={(f: any) => fillStyle(susceptibilityColor(f.properties?.Susceptibility_Class), mode === "combined" ? 0.45 : 0.75)}
+        />
+      )}
+
+      {/* District boundary */}
+      {overlays.district && district && (
+        <GeoJSON
+          key="district"
+          data={district as any}
+          style={{ fillColor: "transparent", weight: 2.5, color: "#1b2532", opacity: 0.9, fillOpacity: 0 } as L.PathOptions}
+          interactive={false}
+        />
+      )}
+
+      {/* Sectors: clickable, restyled imperatively */}
+      {overlays.sectors && sectors && (
+        <GeoJSON
+          key="sectors"
+          data={sectors as any}
+          ref={sectorLayerRef as any}
+          style={(f: any) => sectorStyle(readSector(f.properties)) as any}
+          onEachFeature={(feature: any, layer: L.Layer) => {
+            const sector = readSector(feature.properties)
+            layer.on({
+              click: (e: L.LeafletMouseEvent) => {
+                onToggleSector(sector)
+                // Build popover content from the fills under this sector
+                const suitFeat = suitability?.features.find(
+                  (x) => readSector(x.properties) === sector
+                )
+                const riskFeat = susceptibility?.features.find(
+                  (x) => readSector(x.properties) === sector
+                )
+                const container = (e.target as any)._map.getContainer() as HTMLElement
+                const rect = container.getBoundingClientRect()
+                onFeaturePopover({
+                  x: e.originalEvent.clientX - rect.left,
+                  y: e.originalEvent.clientY - rect.top,
+                  sector,
+                  suitabilityClass: suitFeat?.properties?.Suitability_Class,
+                  riskClass: riskFeat ? normalizeSusceptibilityClass(riskFeat.properties?.Susceptibility_Class) : undefined,
+                  area: suitFeat ? readArea(suitFeat.properties) : riskFeat ? readArea(riskFeat.properties) : 0,
+                })
+              },
+              mouseover: () => (layer as any).setStyle({ weight: 2.5, color: "#0f5f5f", opacity: 1 }),
+              mouseout: () => (layer as any).setStyle(sectorStyle(sector)),
+            })
+          }}
+        />
+      )}
+
+      {/* Restricted areas */}
+      {overlays.restricted && restricted && (
+        <GeoJSON
+          key="restricted"
+          data={restricted as any}
+          style={{ fillColor: "#334155", weight: 1.5, color: "#1b2532", opacity: 0.8, fillOpacity: 0.18 } as L.PathOptions}
+          onEachFeature={(feature: any, layer: L.Layer) => {
+            const name = feature.properties?.NAME
+            if (name) layer.bindTooltip(name, { sticky: true })
+          }}
+        />
+      )}
+    </MapContainer>
+  )
 }

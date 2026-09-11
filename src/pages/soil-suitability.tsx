@@ -1,561 +1,409 @@
-import { useState, useEffect, useMemo } from 'react';
-import dynamic from 'next/dynamic';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Map, BarChart3, Filter, Download } from 'lucide-react';
-import { useLanguage } from '@/i18n';
-import {AppLayout} from "@/components/layout/AppLayout";
+import { useMemo, useState } from "react"
+import dynamic from "next/dynamic"
+import { useQuery } from "@tanstack/react-query"
+import { Map as MapIcon, Download, ChevronDown, Layers, X } from "lucide-react"
+import { useLanguage } from "@/i18n"
+import { AppLayout } from "@/components/layout/AppLayout"
+import { SegmentedControl } from "@/components/ui/segmented-control"
+import { Checkbox } from "@/components/ui/checkbox"
+import { DataTable, type SortableColumn } from "@/components/ui/table"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { SoilPopover } from "@/components/SoilSuitabilityMap"
+import {
+  CROPS, HAZARDS, SECTORS, SUITABILITY_CLASSES, SUSCEPTIBILITY_CLASSES,
+  SUITABILITY_COLORS, SUSCEPTIBILITY_COLORS, type Mode, type FeatureCollection,
+  filterBySectors, areaByClass, suitableAreaBySector, readArea, readSector,
+  normalizeSusceptibilityClass,
+} from "@/lib/soil"
 
-const MapWithNoSSR = dynamic(() => import('@/components/SoilSuitabilityMap'), {
+const SoilMap = dynamic(() => import("@/components/SoilSuitabilityMap"), {
   ssr: false,
-  loading: () => (
-      <div className="h-[600px] flex items-center justify-center bg-gray-50 rounded-lg">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-  )
-});
+  loading: () => <div className="h-full w-full animate-pulse bg-muted" />,
+})
 
-export interface SuitabilityData {
-  type: 'FeatureCollection';
-  features: Array<{
-    type: 'Feature';
-    properties: {
-      Suitability_Class: string;
-      Area_ha: number;
-      SECTOR?: string;
-      CELL?: string;
-      VILLAGE?: string;
-      [key: string]: any;
-    };
-    geometry: any;
-  }>;
+async function loadGeo(file: string): Promise<FeatureCollection> {
+  const res = await fetch(`/suitability-vs-susceptability/${file}`)
+  if (!res.ok) throw new Error(`Failed to load ${file}`)
+  return res.json()
 }
 
-export interface SusceptibilityData {
-  type: 'FeatureCollection';
-  features: Array<{
-    type: 'Feature';
-    properties: {
-      Susceptibility_Class: string;
-      Area_ha: number;
-      SECTOR?: string;
-      CELL?: string;
-      VILLAGE?: string;
-      [key: string]: any;
-    };
-    geometry: any;
-  }>;
+function useGeo(file: string | null) {
+  return useQuery({
+    queryKey: ["soil-geo", file],
+    queryFn: () => loadGeo(file as string),
+    enabled: !!file,
+    staleTime: 60 * 60 * 1000,
+  })
 }
-
-export interface AdministrativeData {
-  type: 'FeatureCollection';
-  features: Array<{
-    type: 'Feature';
-    properties: {
-      NAME: string;
-      [key: string]: any;
-    };
-    geometry: any;
-  }>;
-}
-
-const getSuitabilityColors = (t: (key: string) => string) => ({
-  [t('verySuitable')]: '#38A800',
-  [t('suitable')]: '#98E600',
-  [t('moderateSuitable')]: '#E9FFBE',
-  [t('lessSuitable')]: '#FFEBAF',
-  [t('notSuitable')]: '#FF5500'
-});
-
-const SUITABILITY_COLORS = {
-  'Very Suitable': '#38A800',
-  'Suitable': '#98E600',
-  'Moderate Suitable': '#E9FFBE',
-  'Less Suitable': '#FFEBAF',
-  'Not Suitable': '#FF5500'
-};
-
-const getSusceptibilityColors = (t: (key: string) => string) => ({
-  [t('extremelySusceptible')]: '#A80000',
-  [t('highlySusceptible')]: '#FF5500',
-  [t('moderateSusceptible')]: '#F5CA7A',
-  [t('slightlySusceptible')]: '#E1E1E1'
-});
-
-// Handle all variations of susceptibility class names from different GeoJSON files
-const SUSCEPTIBILITY_COLORS = {
-  // Correct names from mapping guidance
-  'Extremely Susceptible': '#A80000',
-  'Highly Susceptible': '#FF5500',
-  'Moderate Susceptible': '#F5CA7A',
-  'Slightly Susceptible': '#E1E1E1',
-  // Variations with trailing spaces (flooding, soil erosion files)
-  'Extremely Susceptible ': '#A80000',
-  'Highly Susceptible ': '#FF5500',
-  'Moderately Susceptible ': '#F5CA7A',
-  'Slightly Susceptible ': '#E1E1E1',
-  // Variations without trailing spaces but with "Moderately" (landslide file)
-  'Moderately Susceptible': '#F5CA7A'
-};
-
-const getCropTypes = () => [
-  { value: 'beans', label: 'Beans', file: 'Beans_Suitability_Layer.geojson' },
-  { value: 'irish_potatoes', label: 'Irish Potatoes', file: 'Irish_Potatoes_Suitability_Layer.geojson' },
-  { value: 'maize', label: 'Maize', file: 'Maize_Suitability_Layer.geojson' }
-];
-
-const getHazardTypes = () => [
-  { value: 'flooding', label: 'Flooding', file: 'Rev_Flooding__Susceptibility.geojson' },
-  { value: 'landslide', label: 'Landslide', file: 'Rev_Landslide__Susceptibility.geojson' },
-  { value: 'soil_erosion', label: 'Soil Erosion', file: 'Rev_SoilErosion__Susceptibility.geojson' }
-];
 
 export default function SoilSuitabilityPage() {
-  const { t } = useLanguage();
-  const [selectedCrop, setSelectedCrop] = useState('beans');
-  const [selectedHazard, setSelectedHazard] = useState('flooding');
-  const [selectedSector, setSelectedSector] = useState<string>('');
-  const [activeTab, setActiveTab] = useState('suitability');
-  const [suitabilityData, setSuitabilityData] = useState<SuitabilityData | null>(null);
-  const [susceptibilityData, setSusceptibilityData] = useState<SusceptibilityData | null>(null);
-  const [sectors, setSectors] = useState<AdministrativeData | null>(null);
-  const [district, setDistrict] = useState<AdministrativeData | null>(null);
-  const [restrictedAreas, setRestrictedAreas] = useState<AdministrativeData | null>(null);
-  const [musanzeData, setMusanzeData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { t } = useLanguage()
+  // Map a raw class string (from the GeoJSON) to its i18n key.
+  const CLASS_KEY: Record<string, string> = {
+    "Very Suitable": "verySuitable", "Suitable": "suitable", "Moderate Suitable": "moderateSuitable",
+    "Less Suitable": "lessSuitable", "Not Suitable": "notSuitable",
+    "Extremely Susceptible": "extremelySusceptible", "Highly Susceptible": "highlySusceptible",
+    "Moderately Susceptible": "moderateSusceptible", "Slightly Susceptible": "slightlySusceptible",
+  }
+  const classLabel = (cls: string) => t(CLASS_KEY[cls] || "") || cls
+  const cropLabel = (v: string, fallback: string) => t(v === "irish_potatoes" ? "irishPotatoes" : v) || fallback
+  const [mode, setMode] = useState<Mode>("suitability")
+  const [crops, setCrops] = useState<Set<string>>(new Set(["beans"]))
+  const [hazard, setHazard] = useState<string>("flooding")
+  const [sectors, setSectors] = useState<Set<string>>(new Set())
+  const [overlays, setOverlays] = useState({ district: true, sectors: true, restricted: false })
+  const [popover, setPopover] = useState<SoilPopover | null>(null)
+  const [dockTab, setDockTab] = useState(0)
+  const [dockOpen, setDockOpen] = useState(true)
+  const [sectorMenuOpen, setSectorMenuOpen] = useState(false)
 
-  // Memoized crop and hazard types with translations
-  const cropTypes = useMemo(() => [
-    { value: 'beans', label: t('beans'), file: 'Beans_Suitability_Layer.geojson' },
-    { value: 'irish_potatoes', label: t('irishPotatoes'), file: 'Irish_Potatoes_Suitability_Layer.geojson' },
-    { value: 'maize', label: t('maize'), file: 'Maize_Suitability_Layer.geojson' }
-  ], [t]);
+  // ---- data ----
+  const districtQ = useGeo("Musanze_District_Boundary.geojson")
+  const sectorsQ = useGeo("Sectors.geojson")
+  const restrictedQ = useGeo("Restricted_Areas.geojson")
 
-  const hazardTypes = useMemo(() => [
-    { value: 'flooding', label: t('flooding'), file: 'Rev_Flooding__Susceptibility.geojson' },
-    { value: 'landslide', label: t('landslide'), file: 'Rev_Landslide__Susceptibility.geojson' },
-    { value: 'soil_erosion', label: t('soilErosion'), file: 'Rev_SoilErosion__Susceptibility.geojson' }
-  ], [t]);
+  // Load each selected crop layer (hooks must be stable → load all three, use selected)
+  const beansQ = useGeo(CROPS[0].file)
+  const potatoQ = useGeo(CROPS[1].file)
+  const maizeQ = useGeo(CROPS[2].file)
+  const cropData: Record<string, FeatureCollection | undefined> = {
+    beans: beansQ.data, irish_potatoes: potatoQ.data, maize: maizeQ.data,
+  }
+  const hazardFile = HAZARDS.find((h) => h.value === hazard)?.file ?? null
+  const hazardQ = useGeo(hazardFile)
 
-  const loadGeoJsonData = async (filename: string) => {
-    try {
-      const response = await fetch(`/suitability-vs-susceptability/${filename}`);
-      if (!response.ok) {
-        throw new Error(`Failed to load ${filename}: ${response.status} ${response.statusText}`);
+  const showSuit = mode === "suitability" || mode === "combined"
+  const showRisk = mode === "risk" || mode === "combined"
+
+  // Merge selected crops into one suitability collection (for the map fill + stats).
+  // When multiple crops are picked we keep the best (highest) class per parcel is
+  // out of scope; we simply overlay — the map shows the union, tables show per-crop.
+  const mergedSuitability = useMemo<FeatureCollection | null>(() => {
+    if (!showSuit) return null
+    const picked = Array.from(crops).map((c) => cropData[c]).filter(Boolean) as FeatureCollection[]
+    if (picked.length === 0) return null
+    const features = picked.flatMap((fc) => fc.features)
+    return filterBySectors({ type: "FeatureCollection", features }, sectors)
+  }, [crops, cropData, sectors, showSuit])
+
+  const filteredRisk = useMemo<FeatureCollection | null>(() => {
+    if (!showRisk) return null
+    return filterBySectors(hazardQ.data ?? null, sectors)
+  }, [hazardQ.data, sectors, showRisk])
+
+  // legend + ranking (based on suitability of the FIRST selected crop for clarity)
+  const primaryCrop = Array.from(crops)[0]
+  const primarySuit = useMemo(
+    () => filterBySectors(cropData[primaryCrop] ?? null, sectors),
+    [cropData, primaryCrop, sectors]
+  )
+  const suitTotals = useMemo(() => areaByClass(mergedSuitability, "suitability"), [mergedSuitability])
+  const riskTotals = useMemo(() => areaByClass(filteredRisk, "susceptibility"), [filteredRisk])
+  const ranking = useMemo(() => {
+    const bySector = suitableAreaBySector(primarySuit)
+    return Object.entries(bySector).sort((a, b) => b[1] - a[1])
+  }, [primarySuit])
+  const rankMax = ranking.length ? ranking[0][1] : 1
+
+  const isLoading =
+    districtQ.isLoading || sectorsQ.isLoading ||
+    (showSuit && (beansQ.isLoading || potatoQ.isLoading || maizeQ.isLoading)) ||
+    (showRisk && hazardQ.isLoading)
+
+  // ---- dock table: area by class (one column per selected crop) ----
+  const selectedCropList = CROPS.filter((c) => crops.has(c.value))
+  const classRows = (showRisk && mode === "risk" ? SUSCEPTIBILITY_CLASSES : SUITABILITY_CLASSES).map((cls) => ({ cls }))
+  const areaTableColumns = useMemo<SortableColumn<{ cls: string }>[]>(() => {
+    const colorMap = mode === "risk" ? SUSCEPTIBILITY_COLORS : SUITABILITY_COLORS
+    const cols: SortableColumn<{ cls: string }>[] = [
+      {
+        id: "class", header: t("class") || "Class", value: (r) => r.cls, width: "180px",
+        cell: (r) => (
+          <span className="flex items-center gap-2 whitespace-nowrap">
+            <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: colorMap[r.cls] || "#ccc" }} />
+            {classLabel(r.cls)}
+          </span>
+        ),
+      },
+    ]
+    if (mode === "risk") {
+      cols.push({
+        id: "area", header: `${t("area") || "Area"} (ha)`, numeric: true, width: "minmax(120px, 1fr)",
+        value: (r) => Math.round(riskTotals[r.cls] || 0),
+        cell: (r) => Math.round(riskTotals[r.cls] || 0).toLocaleString(),
+      })
+    } else {
+      for (const c of selectedCropList) {
+        const data = filterBySectors(cropData[c.value] ?? null, sectors)
+        const totals = areaByClass(data, "suitability")
+        cols.push({
+          id: c.value, header: `${cropLabel(c.value, c.label)} (ha)`, numeric: true, width: "150px",
+          value: (r) => Math.round(totals[r.cls] || 0),
+          cell: (r) => Math.round(totals[r.cls] || 0).toLocaleString(),
+        })
       }
-      const data = await response.json();
-      if (!data || !data.features) {
-        throw new Error(`Invalid GeoJSON data in ${filename}`);
-      }
-      return data;
-    } catch (err) {
-      console.error(`Error loading ${filename}:`, err);
-      throw err;
     }
-  };
+    return cols
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, selectedCropList.map((c) => c.value).join(","), sectors, cropData, riskTotals, t])
 
-  useEffect(() => {
-    let isMounted = true;
+  const bySectorColumns = useMemo<SortableColumn<[string, number]>[]>(() => [
+    { id: "sector", header: t("sector") || "Sector", value: (r) => r[0], cell: (r) => r[0] },
+    { id: "area", header: `${t("suitable") || "Suitable"} (ha)`, numeric: true, value: (r) => Math.round(r[1]), cell: (r) => Math.round(r[1]).toLocaleString() },
+  ], [t])
 
-    const loadInitialData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
+  const restrictedRows = restrictedQ.data?.features.map((f) => ({ name: f.properties?.NAME as string, area: readArea(f.properties) })) ?? []
+  const restrictedColumns = useMemo<SortableColumn<{ name: string; area: number }>[]>(() => [
+    { id: "name", header: t("name") || "Restricted area", value: (r) => r.name, cell: (r) => r.name },
+    { id: "area", header: `${t("area") || "Area"} (ha)`, numeric: true, value: (r) => Math.round(r.area), cell: (r) => Math.round(r.area).toLocaleString() },
+  ], [t])
 
-        const [sectorsData, districtData, restrictedData, musanzeGeoData] = await Promise.all([
-          loadGeoJsonData('Sectors.geojson'),
-          loadGeoJsonData('Musanze_District_Boundary.geojson'),
-          loadGeoJsonData('Restricted_Areas.geojson'),
-          fetch('/musanze_geo.json').then(res => {
-            if (!res.ok) throw new Error(`Failed to load musanze_geo.json: ${res.status}`);
-            return res.json();
-          })
-        ]);
+  const toggleCrop = (v: string) => setCrops((prev) => {
+    const n = new Set(prev)
+    if (n.has(v)) { if (n.size > 1) n.delete(v) } else n.add(v)
+    return n
+  })
+  const toggleSector = (s: string) => setSectors((prev) => {
+    const n = new Set(prev); n.has(s) ? n.delete(s) : n.add(s); return n
+  })
 
-        if (isMounted) {
-          setSectors(sectorsData);
-          setDistrict(districtData);
-          setRestrictedAreas(restrictedData);
-          setMusanzeData(musanzeGeoData);
-        }
-      } catch (err: any) {
-        console.error('Error loading initial data:', err);
-        if (isMounted) {
-          setError(`Failed to load administrative data: ${err.message || 'Unknown error'}`);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadInitialData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadSuitabilityData = async () => {
-      try {
-        const cropFile = getCropTypes().find(c => c.value === selectedCrop)?.file;
-        console.log('Loading suitability data for crop:', selectedCrop, 'File:', cropFile);
-        if (cropFile && isMounted) {
-          const data = await loadGeoJsonData(cropFile);
-          console.log('Loaded suitability data:', data?.features?.length, 'features');
-          if (isMounted) {
-            setSuitabilityData(data);
-          }
-        }
-      } catch (err: any) {
-        console.error('Error loading suitability data:', err);
-        if (isMounted) {
-          setError(`Failed to load suitability data: ${err.message || 'Unknown error'}`);
-        }
-      }
-    };
-
-    loadSuitabilityData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedCrop]);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadSusceptibilityData = async () => {
-      try {
-        const hazardFile = getHazardTypes().find(h => h.value === selectedHazard)?.file;
-        console.log('Loading susceptibility data for hazard:', selectedHazard, 'File:', hazardFile);
-        if (hazardFile && isMounted) {
-          const data = await loadGeoJsonData(hazardFile);
-          console.log('Loaded susceptibility data:', data?.features?.length, 'features');
-          if (isMounted) {
-            setSusceptibilityData(data);
-          }
-        }
-      } catch (err: any) {
-        console.error('Error loading susceptibility data:', err);
-        if (isMounted) {
-          setError(`Failed to load susceptibility data: ${err.message || 'Unknown error'}`);
-        }
-      }
-    };
-
-    loadSusceptibilityData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedHazard]);
-
-  const filteredData = useMemo(() => {
-    const filterBySector = (data: any) => {
-      if (!data || !selectedSector || selectedSector === 'All sectors') return data;
-
-      return {
-        ...data,
-        features: data.features.filter((feature: any) =>
-            feature.properties.SECTOR === selectedSector ||
-            feature.properties.Sector === selectedSector ||
-            feature.properties.sector === selectedSector ||
-            feature.properties.ADM3_EN === selectedSector
-        )
-      };
-    };
-
-    return {
-      suitability: filterBySector(suitabilityData),
-      susceptibility: filterBySector(susceptibilityData)
-    };
-  }, [suitabilityData, susceptibilityData, selectedSector]);
-
-  const areaStats = useMemo(() => {
-    const calculateStats = (data: any, classField: string) => {
-      if (!data) return {};
-
-      const stats: Record<string, number> = {};
-      data.features.forEach((feature: any) => {
-        const className = feature.properties[classField];
-        const area = feature.properties.Area_ha || 0;
-        stats[className] = (stats[className] || 0) + area;
-      });
-
-      return stats;
-    };
-
-    return {
-      suitability: calculateStats(filteredData.suitability, 'Suitability_Class'),
-      susceptibility: calculateStats(filteredData.susceptibility, 'Susceptibility_Class')
-    };
-  }, [filteredData]);
-
-  const availableSectors = useMemo(() => {
-    if (!musanzeData) return [];
-    const sectorNames = new Set<string>();
-    musanzeData.features.forEach((feature: any) => {
-      if (feature.properties.ADM3_EN) {
-        sectorNames.add(feature.properties.ADM3_EN);
-      }
-    });
-    return Array.from(sectorNames).sort();
-  }, [musanzeData]);
-
-  const handleExportData = () => {
-    const dataToExport = activeTab === 'suitability' ? filteredData.suitability : filteredData.susceptibility;
-    if (!dataToExport) return;
-
-    const csvData = dataToExport.features.map((feature: { properties: { [x: string]: any; Area_ha: any; SECTOR: any; Sector: any; sector: any; CELL: any; Cell: any; cell: any; VILLAGE: any; Village: any; village: any; }; }) => ({
-      Class: feature.properties[activeTab === 'suitability' ? 'Suitability_Class' : 'Susceptibility_Class'],
-      Area_ha: feature.properties.Area_ha,
-      Sector: feature.properties.SECTOR || feature.properties.Sector || feature.properties.sector || '',
-      Cell: feature.properties.CELL || feature.properties.Cell || feature.properties.cell || '',
-      Village: feature.properties.VILLAGE || feature.properties.Village || feature.properties.village || ''
-    }));
-
-    const csv = [
-      Object.keys(csvData[0]).join(','),
-      ...csvData.map((row: { [s: string]: unknown; } | ArrayLike<unknown>) => Object.values(row).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${activeTab}_${selectedCrop || selectedHazard}_${selectedSector || 'all'}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  if (loading) {
-    return (
-        <div className="container mx-auto p-6">
-          <div className="flex items-center justify-center h-96">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            <span className="ml-2">{t('loadingSoilData')}</span>
-          </div>
-        </div>
-    );
+  const handleExport = () => {
+    const rows: any[] = []
+    if (mode === "risk") {
+      Object.entries(riskTotals).forEach(([cls, area]) => rows.push({ Metric: hazard, Class: cls, Area_ha: Math.round(area) }))
+    } else {
+      selectedCropList.forEach((c) => {
+        const totals = areaByClass(filterBySectors(cropData[c.value] ?? null, sectors), "suitability")
+        Object.entries(totals).forEach(([cls, area]) => rows.push({ Crop: c.label, Class: cls, Area_ha: Math.round(area) }))
+      })
+    }
+    if (!rows.length) return
+    const csv = [Object.keys(rows[0]).join(","), ...rows.map((r) => Object.values(r).join(","))].join("\n")
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
+    const a = document.createElement("a")
+    a.href = url; a.download = `soil_${mode}_${Array.from(sectors).join("-") || "all"}.csv`; a.click()
+    URL.revokeObjectURL(url)
   }
 
-  if (error) {
-    return (
-        <div className="container mx-auto p-6">
-          <Card className="border-red-200">
-            <CardContent className="p-6">
-              <p className="text-red-600">{error}</p>
-            </CardContent>
-          </Card>
-        </div>
-    );
+  const legendClasses = mode === "risk" ? SUSCEPTIBILITY_CLASSES : SUITABILITY_CLASSES
+  const legendColors = mode === "risk" ? SUSCEPTIBILITY_COLORS : SUITABILITY_COLORS
+  const legendTotals = mode === "risk" ? riskTotals : suitTotals
+  const legendShort: Record<string, string> = {
+    "Very Suitable": "Very", "Suitable": "Suitable", "Moderate Suitable": "Moderate",
+    "Less Suitable": "Less", "Not Suitable": "Not",
+    "Extremely Susceptible": "Extreme", "Highly Susceptible": "High",
+    "Moderately Susceptible": "Moderate", "Slightly Susceptible": "Slight",
   }
+
+  const dockTabs = [t("areaByClass") || "Area by class", t("bySector") || "By sector", t("restricted") || "Restricted"]
 
   return (
-      <AppLayout>
-        <div className="container mx-auto p-6 space-y-6">
-        <div className="bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] rounded-2xl p-6 text-white shadow-xl">
-  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-    <div className="flex items-center gap-4">
-      <div className="bg-white/20 backdrop-blur-sm p-3 rounded-xl border border-white/10">
-        <Map className="h-8 w-8" />
-      </div>
-      <div>
-        <h1 className="text-3xl font-bold">
-          {t('soilSuitabilityAnalysis')}
-        </h1>
-        <p className="text-white/80 mt-2">
-          {t('soilAnalysisDescription')}
-        </p>
-      </div>
-    </div>
-    <Button
-      onClick={handleExportData}
-      variant="outline"
-      className="flex items-center gap-2 bg-white/10 border-white/20 text-white hover:bg-white/20 backdrop-blur-sm"
-    >
-      <Download className="h-4 w-4" />
-      {t('exportData')}
-    </Button>
-  </div>
-</div>
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <Card className="lg:col-span-1 border-0 shadow-xl">
-  <CardHeader className="bg-gradient-to-r from-[#147677]/10 to-[#147677]/20 border-b border-[#147677]/30">
-    <CardTitle className="flex items-center gap-2 text-slate-900">
-      <Filter className="h-5 w-5 text-[#147677]" />
-      {t('filtersAndAnalysis')}
-    </CardTitle>
-  </CardHeader>
-  <CardContent className="space-y-6">
-    <Tabs
-      value={activeTab}
-      onValueChange={setActiveTab}
-      className="w-full"
-      items={[
-        { value: 'suitability', label: t('suitability') },
-        { value: 'susceptibility', label: t('risk') },
-      ]}
-      renderPanel={(value) =>
-        value === 'suitability' ? (
-          <div className="space-y-4">
-            <label className="text-sm font-medium mb-2 block">{t('cropType')}</label>
-            <Select value={selectedCrop} onValueChange={setSelectedCrop}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {cropTypes.map(crop => (
-                  <SelectItem key={crop.value} value={crop.value}>
-                    {crop.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <label className="text-sm font-medium mb-2 block">{t('hazardType')}</label>
-            <Select value={selectedHazard} onValueChange={setSelectedHazard}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {hazardTypes.map(hazard => (
-                  <SelectItem key={hazard.value} value={hazard.value}>
-                    {hazard.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )
-      }
-    />
-
-    <div>
-      <label className="text-sm font-medium mb-2 block">{t('filterBySector')}</label>
-      <Select value={selectedSector} onValueChange={setSelectedSector}>
-        <SelectTrigger>
-          <SelectValue placeholder={t('allSectors')} />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="All sectors">{t('allSectors')}</SelectItem>
-          {availableSectors.map(sector => (
-            <SelectItem key={sector} value={sector}>
-              {sector}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-
-    {selectedSector && (
-      <Badge variant="secondary" className="w-full justify-center">
-        {t('filtered')}: {selectedSector}
-      </Badge>
-    )}
-
-                {/* Distribution moved here */}
-                <div className="border-t pt-4">
-                  <h3 className="text-sm font-medium mb-4 flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    {t('areaDistribution')}
-                  </h3>
-                  <div className="space-y-2">
-                    {Object.entries(
-                        activeTab === 'suitability' ? areaStats.suitability : areaStats.susceptibility
-                    ).map(([className, area]) => {
-                      const colors = activeTab === 'suitability' ? getSuitabilityColors(t) : getSusceptibilityColors(t);
-                      const englishColors = activeTab === 'suitability' ? SUITABILITY_COLORS : SUSCEPTIBILITY_COLORS;
-                      let color = colors[className] || englishColors[className as keyof typeof englishColors];
-
-                      // Handle trailing spaces and variations in class names
-                      if (!color && className) {
-                        const trimmedClass = className.trim();
-                        color = colors[trimmedClass] || englishColors[trimmedClass as keyof typeof englishColors];
-                      }
-
-                      color = color || '#CCCCCC';
-
-          return (
-            <div
-              key={className}
-              className="flex items-center justify-between p-2 rounded border"
-            >
-              <div className="flex items-center gap-2">
-                <div
-                  className="w-3 h-3 rounded"
-                  style={{ backgroundColor: color }}
-                />
-                <span className="text-xs font-medium">{className}</span>
-              </div>
-              <span className="text-xs text-muted-foreground">
-                {area.toLocaleString()} {t('hectares')}
-              </span>
+    <AppLayout>
+      <div className="p-4 md:p-6 space-y-4">
+        {/* Header — matches the dashboard white-card style */}
+        <div className="rounded-lg bg-white px-4 py-3 shadow-sm">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{t("soilSuitabilityAnalysis") || "Soil Suitability & Risk · Musanze"}</h1>
+              <p className="text-sm text-slate-400">{t("soilAnalysisDescription") || "Crop suitability & hazard susceptibility across 15 sectors"}</p>
             </div>
-          );
-        })}
-      </div>
-    </div>
-  </CardContent>
-</Card>
-
-
-            <Card className="lg:col-span-3 border-0 shadow-xl">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-[#147677]/10 border-b border-slate-200">
-                <CardTitle className="flex items-center gap-2 text-slate-800">
-                  <Map className="h-5 w-5 text-[#147677]" />
-                  {t('interactiveMap')}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="py-2">
-                {error ? (
-                  <div className="h-[600px] flex items-center justify-center bg-red-50 rounded-lg border border-red-200">
-                    <div className="text-center p-6">
-                      <div className="text-red-600 font-medium text-lg mb-2">Map Unavailable</div>
-                      <div className="text-red-500 text-sm mb-4">{error}</div>
-                      <button 
-                        onClick={() => {
-                          setError(null);
-                          setLoading(true);
-                          window.location.reload();
-                        }}
-                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-                      >
-                        Reload Page
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <MapWithNoSSR
-                        suitabilityData={filteredData.suitability}
-                        susceptibilityData={filteredData.susceptibility}
-                        sectors={sectors}
-                        district={district}
-                        restrictedAreas={restrictedAreas}
-                        selectedSector={selectedSector}
-                        onSectorSelect={setSelectedSector}
-                        activeLayer={activeTab}
-                        selectedCrop={selectedCrop}
-                        selectedHazard={selectedHazard}
-                    />
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <button onClick={handleExport} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb]">
+              <Download className="h-4 w-4 text-[#147677]" /> {t("exportData") || "Export CSV"}
+            </button>
           </div>
         </div>
-      </AppLayout>
-  );
+
+        {/* One framed unit: left panel + map */}
+        <div className="flex h-[640px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm max-lg:h-auto max-lg:flex-col">
+          {/* LEFT PANEL */}
+          <aside className="w-[310px] shrink-0 overflow-y-auto border-r border-border p-4 max-lg:w-full max-lg:border-b max-lg:border-r-0">
+            <Group label={t("analysis") || "Analysis"}>
+              <SegmentedControl
+                label="Analysis mode"
+                value={mode}
+                onValueChange={(v) => setMode(v as Mode)}
+                className="w-full"
+                options={[
+                  { value: "suitability", label: t("suitability") || "Suitability" },
+                  { value: "risk", label: t("risk") || "Risk" },
+                  { value: "combined", label: t("combined") || "Combined" },
+                ]}
+              />
+            </Group>
+
+            {showSuit && (
+              <Group label={t("crops") || "Crops"}>
+                <div className="flex flex-wrap gap-2">
+                  {CROPS.map((c) => {
+                    const on = crops.has(c.value)
+                    return (
+                      <button key={c.value} onClick={() => toggleCrop(c.value)}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${on ? "border-[#147677] bg-[#147677]/10 text-[#147677]" : "border-border bg-card text-muted-foreground hover:bg-muted"}`}>
+                        <span className={`h-2 w-2 rounded-full ${on ? "bg-[#147677]" : "bg-muted-foreground/40"}`} />
+                        {t(c.value === "irish_potatoes" ? "irishPotatoes" : c.value) || c.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </Group>
+            )}
+
+            {showRisk && mode !== "combined" && (
+              <Group label={t("hazardType") || "Hazard"}>
+                <select value={hazard} onChange={(e) => setHazard(e.target.value)} className="w-full rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                  {HAZARDS.map((h) => <option key={h.value} value={h.value}>{t(h.value === "soil_erosion" ? "soilErosion" : h.value) || h.label}</option>)}
+                </select>
+              </Group>
+            )}
+
+            <Group label={t("sector") || "Sectors"} action={sectors.size > 0 ? { label: t("clear") || "Clear", onClick: () => setSectors(new Set()) } : undefined}>
+              <div className="relative">
+                <button onClick={() => setSectorMenuOpen((o) => !o)} className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left text-sm">
+                  <span className="flex flex-wrap gap-1">
+                    {sectors.size === 0 ? <span className="text-muted-foreground">{t("allSectors") || "All sectors"}</span>
+                      : Array.from(sectors).slice(0, 2).map((s) => <span key={s} className="rounded bg-[#147677]/10 px-1.5 py-0.5 text-[11px] font-medium text-[#147677]">{s}</span>)}
+                    {sectors.size > 2 && <span className="rounded bg-[#147677]/10 px-1.5 py-0.5 text-[11px] font-medium text-[#147677]">+{sectors.size - 2}</span>}
+                  </span>
+                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                </button>
+                {sectorMenuOpen && (
+                  <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
+                    {SECTORS.map((s) => (
+                      <label key={s} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                        <Checkbox checked={sectors.has(s)} onCheckedChange={() => toggleSector(s)} />
+                        {s}
+                      </label>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Group>
+
+            <Group label={`${t("sectorsRanked") || "Sectors ranked · suitable area"}`}>
+              {isLoading ? (
+                <div className="space-y-2">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-4 w-full" />)}</div>
+              ) : ranking.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{t("noData") || "No data"}</p>
+              ) : (
+                <div className="max-h-[140px] space-y-0.5 overflow-y-auto">
+                  {ranking.map(([s, area]) => (
+                    <button key={s} onClick={() => toggleSector(s)} className={`grid w-full grid-cols-[64px_1fr_40px] items-center gap-2 rounded-md px-1.5 py-1 text-left text-xs hover:bg-[#147677]/5 ${sectors.has(s) ? "bg-[#147677]/5" : ""}`}>
+                      <span className="truncate">{s}</span>
+                      <span className="h-1.5 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-[#147677]" style={{ width: `${Math.max(4, (area / rankMax) * 100)}%` }} /></span>
+                      <span className="text-right tabular-nums text-muted-foreground">{Math.round(area / 1000)}k</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {sectors.size > 0 && <p className="mt-1.5 text-[11px] text-muted-foreground">{sectors.size} {t("selected") || "selected"} · {t("clearToRankAll") || "clear to rank all 15"}</p>}
+            </Group>
+
+            <Group label={t("overlays") || "Overlays"}>
+              <div className="space-y-0.5">
+                {([["district", t("districtBoundary") || "District boundary", ""], ["sectors", t("sector") || "Sectors", "15"], ["restricted", t("restrictedAreas") || "Restricted areas", "lakes, parks"]] as const).map(([key, label, hint]) => (
+                  <label key={key} className="flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 text-sm hover:bg-muted">
+                    <Checkbox checked={overlays[key]} onCheckedChange={() => setOverlays((o) => ({ ...o, [key]: !o[key] }))} />
+                    <span className="font-medium">{label}</span>
+                    {hint && <span className="ml-auto text-[11px] text-muted-foreground">{hint}</span>}
+                  </label>
+                ))}
+              </div>
+            </Group>
+          </aside>
+
+          {/* MAP STAGE */}
+          <div className="relative flex-1 max-lg:h-[62vh]">
+            <SoilMap
+              mode={mode}
+              suitability={mergedSuitability}
+              susceptibility={filteredRisk}
+              sectors={sectorsQ.data ?? null}
+              district={districtQ.data ?? null}
+              restricted={restrictedQ.data ?? null}
+              selectedSectors={sectors}
+              onToggleSector={toggleSector}
+              overlays={overlays}
+              onFeaturePopover={setPopover}
+            />
+
+            {/* badge (top-left area, beside zoom which map hides — we add our own) */}
+            <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded-lg border border-border bg-card/95 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
+              {mode === "risk"
+                ? <>{t(hazard === "soil_erosion" ? "soilErosion" : hazard)} · </>
+                : <>{selectedCropList.map((c) => c.label).join(" + ")} · </>}
+              <b className="text-foreground">{sectors.size === 0 ? (t("allSectors") || "all sectors") : `${sectors.size} ${t("sector") || "sectors"}`}</b>
+            </div>
+
+            {/* horizontal legend, top-right */}
+            <div className="absolute right-3 top-3 z-[500] rounded-lg border border-border bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
+              <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {(mode === "risk" ? (t("soilRiskFull") || "Soil susceptibility") : (t("soilSuitabilityFull") || "Soil suitability"))} · {t("area") || "area"} (ha)
+              </div>
+              <div className="flex">
+                {legendClasses.map((cls, i) => (
+                  <div key={cls} className="w-[52px] text-center text-[9px]">
+                    <div className="mb-1 truncate text-muted-foreground">{legendShort[cls] || cls}</div>
+                    <div className="h-[7px]" style={{ backgroundColor: legendColors[cls], borderRadius: i === 0 ? "3px 0 0 3px" : i === legendClasses.length - 1 ? "0 3px 3px 0" : 0 }} />
+                    <div className="mt-1 tabular-nums text-muted-foreground/80">{Math.round((legendTotals[cls] || 0) / 1000)}k</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* on-map popover */}
+            {popover && (
+              <div className="absolute z-[600] w-52 -translate-x-1/2 -translate-y-full rounded-xl border border-border bg-popover p-3 text-xs shadow-xl"
+                style={{ left: popover.x, top: popover.y - 8 }}>
+                <button onClick={() => setPopover(null)} className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+                <h4 className="mb-1.5 text-sm font-semibold">{popover.sector}</h4>
+                {popover.suitabilityClass && <span className="mb-1 mr-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: SUITABILITY_COLORS[popover.suitabilityClass] || "#888" }}>{classLabel(popover.suitabilityClass)}</span>}
+                {popover.riskClass && <span className="mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: SUSCEPTIBILITY_COLORS[popover.riskClass] || "#888" }}>{classLabel(popover.riskClass)}</span>}
+                <div className="mt-1 space-y-0.5 text-muted-foreground">
+                  <div className="flex justify-between"><span>{t("area") || "Area"}</span><b className="tabular-nums text-foreground">{Math.round(popover.area).toLocaleString()} ha</b></div>
+                  <div className="flex justify-between"><span>{t("sector") || "Sector"}</span><b className="text-foreground">{popover.sector}</b></div>
+                </div>
+              </div>
+            )}
+
+            {/* collapsible bottom dock */}
+            <div className="absolute inset-x-3 bottom-3 z-[500] flex flex-col overflow-hidden rounded-xl border border-border bg-card/97 shadow-[0_-2px_24px_rgba(20,40,60,0.16)] backdrop-blur" style={{ maxHeight: dockOpen ? "44%" : undefined }}>
+              <div className="flex items-center gap-1 border-b border-border bg-white px-3 rounded-t-xl">
+                {dockTabs.map((label, i) => (
+                  <button key={i} onClick={() => setDockTab(i)} className={`border-b-2 px-3 py-2.5 text-xs font-semibold ${dockTab === i ? "border-[#147677] text-[#147677]" : "border-transparent text-muted-foreground"}`}>{label}</button>
+                ))}
+                <button onClick={() => setDockOpen((o) => !o)} className="ml-auto flex items-center gap-1 px-2 py-2 text-xs font-medium text-muted-foreground">
+                  <Layers className="h-3.5 w-3.5" /> {dockOpen ? (t("collapse") || "Collapse") : (t("expand") || "Expand")}
+                </button>
+              </div>
+              {dockOpen && (
+                <div className="overflow-auto p-3">
+                  {dockTab === 0 && (
+                    <div className="overflow-x-auto">
+                      <div style={{ minWidth: 180 + (mode === "risk" ? 120 : selectedCropList.length * 150) }}>
+                        <DataTable label="Area by class" data={classRows} columns={areaTableColumns} getRowId={(r) => r.cls} loading={isLoading} skeletonRows={5} rowHeight={40} />
+                      </div>
+                    </div>
+                  )}
+                  {dockTab === 1 && <DataTable label="By sector" data={ranking} columns={bySectorColumns} getRowId={(r) => r[0]} loading={isLoading} skeletonRows={5} rowHeight={40} emptyState={t("noData") || "No data"} />}
+                  {dockTab === 2 && <DataTable label="Restricted areas" data={restrictedRows} columns={restrictedColumns} getRowId={(r) => r.name} loading={restrictedQ.isLoading} skeletonRows={2} rowHeight={40} />}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </AppLayout>
+  )
+}
+
+function Group({ label, action, children }: { label: string; action?: { label: string; onClick: () => void }; children: React.ReactNode }) {
+  return (
+    <div className="mb-5">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
+        {action && <button onClick={action.onClick} className="text-[10.5px] font-semibold text-[#147677] hover:underline">{action.label}</button>}
+      </div>
+      {children}
+    </div>
+  )
 }

@@ -105,10 +105,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                                     disabled={sidebarOpen || isMobile}
                                     className="w-full"
                                 >
-                                    <Link href={item.href}>
+                                    <Link href={item.href} className="block w-full">
                                         <Button
                                             variant="ghost"
-                                            className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${isActive ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                            className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${isActive ? 'bg-[#147677] text-white hover:bg-[#147677] hover:text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
                                         >
                                             {item.icon}
                                             {(sidebarOpen || isMobile) && <span className="ml-3">{item.label}</span>}
@@ -130,10 +130,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                                 disabled={sidebarOpen || isMobile}
                                 className="w-full"
                             >
-                                <Link href="/admin/users">
+                                <Link href="/admin/users" className="block w-full">
                                     <Button
                                         variant="ghost"
-                                        className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${router.pathname === '/admin/users' ? 'bg-[#147677] text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
+                                        className={`w-full justify-start mb-1 text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] ${router.pathname === '/admin/users' ? 'bg-[#147677] text-white hover:bg-[#147677] hover:text-white' : ''} ${!sidebarOpen && !isMobile ? 'justify-center' : ''}`}
                                     >
                                         <Users size={20} />
                                         {(sidebarOpen || isMobile) && <span className="ml-3">Admin</span>}
@@ -302,17 +302,17 @@ export function AppLayout({ children }: AppLayoutProps) {
                                     </div>
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                                <div className="flex items-center space-x-2 p-2">
-                                    <Avatar className="h-8 w-8">
+                            <DropdownMenuContent align="end" className="w-72">
+                                <div className="flex items-center gap-2 p-2">
+                                    <Avatar className="h-8 w-8 shrink-0">
                                         <AvatarFallback className="bg-ganz-primary text-white text-sm">
                                             {getUserInitials(user.username)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className="flex flex-col">
-                                        <span className="text-sm font-medium">{user.username}</span>
-                                        <span className="text-xs text-muted-foreground">{user.phone}</span>
-                                        <span className="text-xs text-muted-foreground capitalize">{user.role}</span>
+                                    <div className="flex min-w-0 flex-col">
+                                        <span className="truncate text-sm font-medium" title={user.username}>{user.username}</span>
+                                        <span className="truncate text-xs text-muted-foreground">{user.phone}</span>
+                                        <span className="text-xs capitalize text-muted-foreground">{user.role}</span>
                                     </div>
                                 </div>
                                 <DropdownMenuSeparator />
