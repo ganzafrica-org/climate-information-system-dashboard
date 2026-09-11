@@ -2,7 +2,7 @@ import { useMemo, useState } from "react"
 import type { NextPage } from "next"
 import dynamic from "next/dynamic"
 import { useQuery } from "@tanstack/react-query"
-import { CloudSun, Download, Layers, X, Sprout } from "lucide-react"
+import { Download, Layers, X, Sprout } from "lucide-react"
 import { useLanguage } from "@/i18n"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { SegmentedControl } from "@/components/ui/segmented-control"
@@ -94,17 +94,17 @@ const Forecasts: NextPage = () => {
   return (
     <AppLayout>
       <div className="p-4 md:p-6 space-y-4">
-        <div className="flex items-center justify-between rounded-2xl bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] px-5 py-4 text-white shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="rounded-xl border border-white/10 bg-white/15 p-2.5"><CloudSun className="h-6 w-6" /></div>
+        {/* Header — dashboard white-card style */}
+        <div className="rounded-lg bg-white px-4 py-3 shadow-sm">
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
             <div>
-              <h1 className="text-lg font-bold md:text-xl">{t("weatherForecast") || "Weather Forecast · Musanze"}</h1>
-              <p className="text-xs text-white/80">{t("forecastChoroplethDesc") || "Sectors shaded by forecast — click one for detail"}</p>
+              <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{t("weatherForecast") || "Weather Forecast · Musanze"}</h1>
+              <p className="text-sm text-slate-400">{t("forecastChoroplethDesc") || "Sectors shaded by forecast — click one for detail"}</p>
             </div>
+            <button onClick={handleExport} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb]">
+              <Download className="h-4 w-4 text-[#147677]" /> {t("exportData") || "Export CSV"}
+            </button>
           </div>
-          <button onClick={handleExport} className="flex items-center gap-2 rounded-lg border border-white/25 bg-white/10 px-3 py-2 text-xs font-medium hover:bg-white/20">
-            <Download className="h-4 w-4" /> {t("exportData") || "Export CSV"}
-          </button>
         </div>
 
         {weatherQ.isError && (

@@ -103,3 +103,77 @@ export function metricRange(values: (number | null)[], metric: WeatherMetric): [
 
 export const TEMP_LEGEND = TEMP_STOPS
 export const RAIN_LEGEND = RAIN_STOPS
+
+// ---------------------------------------------------------------------------
+// Historical aggregation (per-sector choropleth on the Historical page).
+// The backend exposes history per *location* (GET /api/weather/historical/
+// location/:id). Musanze's seeded locations ARE its sectors, so we map
+// sector name -> location id and aggregate that location's records over the
+// selected window into the two choropleth metrics + trend series.
+// ---------------------------------------------------------------------------
+
+export type HistoryRecord = {
+  date: string
+  weatherSummary: {
+    temperature: { current: number; min: number; max: number }
+    precipitation: { rainAmount: number }
+  }
+}
+
+export type PeriodRow = {
+  key: string
+  tempAvg: number
+  tempMin: number
+  tempMax: number
+  rainfall: number
+}
+
+export type SectorHistory = {
+  sector: string
+  avgTemp: number | null
+  totalRain: number | null
+  count: number
+  monthly: PeriodRow[]
+}
+
+const MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0)
+
+/** Aggregate one location's records into monthly rows + window totals. */
+export function aggregateHistory(sector: string, records: HistoryRecord[]): SectorHistory {
+  if (!records?.length) return { sector, avgTemp: null, totalRain: null, count: 0, monthly: [] }
+  const buckets: Record<string, { tAvg: number[]; tMin: number[]; tMax: number[]; rain: number[] }> = {}
+  const allTemp: number[] = []
+  let allRain = 0
+  for (const r of records) {
+    const key = new Date(r.date).toLocaleString("en-US", { month: "short" })
+    buckets[key] ??= { tAvg: [], tMin: [], tMax: [], rain: [] }
+    const s = r.weatherSummary
+    buckets[key].tAvg.push(s.temperature.current)
+    buckets[key].tMin.push(s.temperature.min)
+    buckets[key].tMax.push(s.temperature.max)
+    buckets[key].rain.push(s.precipitation.rainAmount)
+    allTemp.push(s.temperature.current)
+    allRain += s.precipitation.rainAmount
+  }
+  const monthly: PeriodRow[] = MONTH_ORDER.filter((k) => buckets[k]).map((k) => ({
+    key: k,
+    tempAvg: +mean(buckets[k].tAvg).toFixed(1),
+    tempMin: +mean(buckets[k].tMin).toFixed(1),
+    tempMax: +mean(buckets[k].tMax).toFixed(1),
+    rainfall: Math.round(buckets[k].rain.reduce((x, y) => x + y, 0)),
+  }))
+  return {
+    sector,
+    avgTemp: +mean(allTemp).toFixed(1),
+    totalRain: Math.round(allRain),
+    count: records.length,
+    monthly,
+  }
+}
+
+/** Choropleth value for a sector history under the selected metric. */
+export function historyMetricValue(h: SectorHistory | undefined, metric: WeatherMetric): number | null {
+  if (!h) return null
+  return metric === "temp" ? h.avgTemp : h.totalRain
+}
