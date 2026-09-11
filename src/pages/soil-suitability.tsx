@@ -38,6 +38,15 @@ function useGeo(file: string | null) {
 
 export default function SoilSuitabilityPage() {
   const { t } = useLanguage()
+  // Map a raw class string (from the GeoJSON) to its i18n key.
+  const CLASS_KEY: Record<string, string> = {
+    "Very Suitable": "verySuitable", "Suitable": "suitable", "Moderate Suitable": "moderateSuitable",
+    "Less Suitable": "lessSuitable", "Not Suitable": "notSuitable",
+    "Extremely Susceptible": "extremelySusceptible", "Highly Susceptible": "highlySusceptible",
+    "Moderately Susceptible": "moderateSusceptible", "Slightly Susceptible": "slightlySusceptible",
+  }
+  const classLabel = (cls: string) => t(CLASS_KEY[cls] || "") || cls
+  const cropLabel = (v: string, fallback: string) => t(v === "irish_potatoes" ? "irishPotatoes" : v) || fallback
   const [mode, setMode] = useState<Mode>("suitability")
   const [crops, setCrops] = useState<Set<string>>(new Set(["beans"]))
   const [hazard, setHazard] = useState<string>("flooding")
@@ -108,18 +117,18 @@ export default function SoilSuitabilityPage() {
     const colorMap = mode === "risk" ? SUSCEPTIBILITY_COLORS : SUITABILITY_COLORS
     const cols: SortableColumn<{ cls: string }>[] = [
       {
-        id: "class", header: t("class") || "Class", value: (r) => r.cls,
+        id: "class", header: t("class") || "Class", value: (r) => r.cls, width: "180px",
         cell: (r) => (
-          <span className="flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-sm" style={{ backgroundColor: colorMap[r.cls] || "#ccc" }} />
-            {r.cls}
+          <span className="flex items-center gap-2 whitespace-nowrap">
+            <span className="inline-block h-3 w-3 shrink-0 rounded-sm" style={{ backgroundColor: colorMap[r.cls] || "#ccc" }} />
+            {classLabel(r.cls)}
           </span>
         ),
       },
     ]
     if (mode === "risk") {
       cols.push({
-        id: "area", header: `${t("area") || "Area"} (ha)`, numeric: true,
+        id: "area", header: `${t("area") || "Area"} (ha)`, numeric: true, width: "minmax(120px, 1fr)",
         value: (r) => Math.round(riskTotals[r.cls] || 0),
         cell: (r) => Math.round(riskTotals[r.cls] || 0).toLocaleString(),
       })
@@ -128,7 +137,7 @@ export default function SoilSuitabilityPage() {
         const data = filterBySectors(cropData[c.value] ?? null, sectors)
         const totals = areaByClass(data, "suitability")
         cols.push({
-          id: c.value, header: `${c.label} (ha)`, numeric: true,
+          id: c.value, header: `${cropLabel(c.value, c.label)} (ha)`, numeric: true, width: "150px",
           value: (r) => Math.round(totals[r.cls] || 0),
           cell: (r) => Math.round(totals[r.cls] || 0).toLocaleString(),
         })
@@ -347,8 +356,8 @@ export default function SoilSuitabilityPage() {
                 style={{ left: popover.x, top: popover.y - 8 }}>
                 <button onClick={() => setPopover(null)} className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
                 <h4 className="mb-1.5 text-sm font-semibold">{popover.sector}</h4>
-                {popover.suitabilityClass && <span className="mb-1 mr-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: SUITABILITY_COLORS[popover.suitabilityClass] || "#888" }}>{popover.suitabilityClass}</span>}
-                {popover.riskClass && <span className="mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: SUSCEPTIBILITY_COLORS[popover.riskClass] || "#888" }}>{popover.riskClass}</span>}
+                {popover.suitabilityClass && <span className="mb-1 mr-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: SUITABILITY_COLORS[popover.suitabilityClass] || "#888" }}>{classLabel(popover.suitabilityClass)}</span>}
+                {popover.riskClass && <span className="mb-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: SUSCEPTIBILITY_COLORS[popover.riskClass] || "#888" }}>{classLabel(popover.riskClass)}</span>}
                 <div className="mt-1 space-y-0.5 text-muted-foreground">
                   <div className="flex justify-between"><span>{t("area") || "Area"}</span><b className="tabular-nums text-foreground">{Math.round(popover.area).toLocaleString()} ha</b></div>
                   <div className="flex justify-between"><span>{t("sector") || "Sector"}</span><b className="text-foreground">{popover.sector}</b></div>
@@ -368,7 +377,13 @@ export default function SoilSuitabilityPage() {
               </div>
               {dockOpen && (
                 <div className="overflow-auto p-3">
-                  {dockTab === 0 && <DataTable label="Area by class" data={classRows} columns={areaTableColumns} getRowId={(r) => r.cls} loading={isLoading} skeletonRows={5} rowHeight={40} />}
+                  {dockTab === 0 && (
+                    <div className="overflow-x-auto">
+                      <div style={{ minWidth: 180 + (mode === "risk" ? 120 : selectedCropList.length * 150) }}>
+                        <DataTable label="Area by class" data={classRows} columns={areaTableColumns} getRowId={(r) => r.cls} loading={isLoading} skeletonRows={5} rowHeight={40} />
+                      </div>
+                    </div>
+                  )}
                   {dockTab === 1 && <DataTable label="By sector" data={ranking} columns={bySectorColumns} getRowId={(r) => r[0]} loading={isLoading} skeletonRows={5} rowHeight={40} emptyState={t("noData") || "No data"} />}
                   {dockTab === 2 && <DataTable label="Restricted areas" data={restrictedRows} columns={restrictedColumns} getRowId={(r) => r.name} loading={restrictedQ.isLoading} skeletonRows={2} rowHeight={40} />}
                 </div>
