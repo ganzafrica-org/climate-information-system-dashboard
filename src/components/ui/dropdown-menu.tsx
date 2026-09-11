@@ -241,7 +241,10 @@ export function DropdownMenuContent({
             ...(resolvedAlign === "end" ? { right } : { left }),
           }}
           className={cn(
-            "z-[200] min-w-[200px] whitespace-nowrap rounded-[11px] border border-border bg-popover p-[5px] text-popover-foreground shadow-lg",
+            // Portals to <body>; must sit above Leaflet panes (max ~700) and the
+            // map overlay panels/popover (z-[500]/z-[600]) so the profile menu
+            // is never occluded by the map.
+            "z-[1000] min-w-[200px] whitespace-nowrap rounded-[11px] border border-border bg-popover p-[5px] text-popover-foreground shadow-lg",
             className
           )}
         >

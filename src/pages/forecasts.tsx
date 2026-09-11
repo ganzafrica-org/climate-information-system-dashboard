@@ -155,7 +155,7 @@ const Forecasts: NextPage = () => {
           </aside>
 
           {/* MAP STAGE */}
-          <div className="relative flex-1 max-lg:h-[62vh]">
+          <div className="relative isolate flex-1 max-lg:h-[62vh]">
             {isLoading ? (
               <div className="flex h-full items-center justify-center">
                 <div className="w-2/3 space-y-3">
