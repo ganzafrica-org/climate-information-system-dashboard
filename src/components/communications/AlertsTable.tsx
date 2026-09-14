@@ -598,7 +598,18 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                                 onClick={() => handleViewDetails(alert)}
                                             >
                                                 <div className="text-sm line-clamp-2 max-w-[300px]">
-                                                    {typeof alert.message === 'string' ? alert.message : 'No message'}
+                                                    {(()=>{
+                                                        const msg = typeof alert.message === 'string' ? alert.message : 'No message';
+                                                        const colonIndex = msg.indexOf(' ');
+                                                        if(colonIndex > -1) {
+                                                          return(
+                                                            <> 
+                                                              <span>{msg.substring(colonIndex)}</span>
+                                                            </>
+                                                          )
+                                                        }
+                                                        return <span>{msg}</span>
+                                                    })()}
                                                 </div>
                                                 <div className="text-xs text-muted-foreground mt-1">
                                                     {alert.messageLength} chars • {alert.messageSegments} segments
