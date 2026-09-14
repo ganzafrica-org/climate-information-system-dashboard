@@ -9,8 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
     ArrowUpDown, ChevronDown, Download, Edit, Loader2, MapPin, MessageSquare,
     MoreHorizontal, Phone, Plus, Search, Trash, Upload, User, ChevronLeft, ChevronRight,
@@ -51,7 +53,6 @@ const Locations: NextPage = () => {
 
     // Allow all authenticated users to view locations; admin will still control mutations
     useEffect(() => {
-        // no-op: viewing is allowed for all authenticated users
     }, [isAuthenticated, user, router, t]);
 
     useEffect(() => {
@@ -61,6 +62,7 @@ const Locations: NextPage = () => {
     }, [searchTerm, currentPage, limit, isAuthenticated]);
 
     const handleApiError = (error: any) => {
+        console.error('API Error:', error);
         setHasError(true);
 
         if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
@@ -156,6 +158,7 @@ const Locations: NextPage = () => {
 
             return response.data.locations;
         } catch (error) {
+            console.error('Failed to fetch all locations for export:', error);
             throw error;
         }
     };
@@ -190,6 +193,7 @@ const Locations: NextPage = () => {
 
             toast.success(t('locationsExportedSuccessfully') + ` (${allLocations.length} ${t('locations')})`);
         } catch (error: any) {
+            console.error('Export error:', error);
             toast.error(t('failedToExportLocations'));
         } finally {
             setIsExporting(false);
@@ -311,132 +315,58 @@ const Locations: NextPage = () => {
                             </div>
                         </div>
 
-                        {isLoading ? (
-                            <div className="flex items-center justify-center py-16 ">
-                                <div className="flex flex-col items-center space-y-3">
-                                    <Loader2 className="animate-spin h-8 w-8" style={{ color: '#2580f5' }} />
-                                    <span className="text-gray-500">{t("loading") || "Loading..."}</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full">
-                                    <thead className="text-black bg-[#f2f5fa]">
-                                    <tr>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            #
-                                        </th>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            {t("name") || "Location Name"}
-                                        </th>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            {t("coordinates") || "Coordinates"}
-                                        </th>
-                                        <th className="py-4 px-6 text-left font-semibold text-sm">
-                                            {t("createdAt") || "Created Date"}
-                                        </th>
-                                        <th className="py-4 px-6 text-center font-semibold text-sm">
-                                            {t("actions") || "Actions"}
-                                        </th>
-                                    </tr>
-                                    </thead>
-                                    <tbody className="bg-white">
-                                    {locations.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-16 text-center">
-                                                <div className="flex flex-col items-center space-y-3">
-                                                    <MapPin className="h-12 w-12 text-gray-300" />
-                                                    <div className="text-gray-500 font-medium">{t("noLocationsFound") || "No locations found"}</div>
-                                                    <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        locations.map((location, index) => (
-                                            <tr
-                                                key={location.id}
-                                                className={`border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors duration-150 ${
-                                                    index % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                                }`}
-                                                onClick={() => handleViewLocation(location.id)}
-                                            >
-                                                <td className="py-4 px-6 text-sm text-gray-900">
-                                                    {(currentPage - 1) * limit + index + 1}
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <div className="font-medium text-gray-900">{location.name}</div>
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <div className="text-sm text-gray-600 font-mono">
-                                                        {location.lat && location.lon ? (
-                                                            <span>{location.lat.toFixed(6)}, {location.lon.toFixed(6)}</span>
-                                                        ) : (
-                                                            <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <div className="text-sm text-gray-600">
-                                                        {location.createdAt ? new Date(location.createdAt).toLocaleDateString() : '-'}
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-6 text-center">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                                            <Button 
-                                                                variant="ghost" 
-                                                                size="sm" 
-                                                                className="h-8 w-8 p-0 hover:bg-gray-100 transition-colors"
-                                                            >
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-56">
-                                                            <DropdownMenuItem 
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleViewLocation(location.id);
-                                                                }}
-                                                                className="cursor-pointer hover:bg-blue-50"
-                                                            >
-                                                                <MapPin className="h-4 w-4 mr-2" style={{ color: '#2580f5' }} />
-                                                                {t("viewLocation") || "View Location"}
-                                                            </DropdownMenuItem>
-                                                            {user?.role === 'admin' && (
-                                                                <>
-                                                                    <DropdownMenuItem 
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleEditLocation(location);
-                                                                        }}
-                                                                        className="cursor-pointer hover:bg-green-50"
-                                                                    >
-                                                                        <Edit className="h-4 w-4 mr-2" style={{ color: '#66a9e3' }} />
-                                                                        {t("editLocation") || "Edit Location"}
-                                                                    </DropdownMenuItem>
-                                                                    <Separator className="my-1" />
-                                                                    <DropdownMenuItem
-                                                                        className="cursor-pointer hover:bg-red-50"
-                                                                        onClick={(e) => {
-                                                                            e.stopPropagation();
-                                                                            handleDeleteLocation(location.id);
-                                                                        }}
-                                                                    >
-                                                                        <Trash className="h-4 w-4 mr-2" style={{ color: '#e46064' }} />
-                                                                        <span style={{ color: '#e46064' }}>{t("delete") || "Delete"}</span>
-                                                                    </DropdownMenuItem>
-                                                                </>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </td>
-                                            </tr>
-                                        ))
+                        <div className="p-4">
+                          <DataTable<any>
+                            label="Locations"
+                            data={locations}
+                            getRowId={(l) => String(l.id)}
+                            loading={isLoading}
+                            onRowClick={(l) => handleViewLocation(l.id)}
+                            emptyState={
+                              <div className="flex flex-col items-center space-y-3">
+                                <MapPin className="h-12 w-12 text-gray-300" />
+                                <div className="text-gray-500 font-medium">{t("noLocationsFound") || "No locations found"}</div>
+                                <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
+                              </div>
+                            }
+                            columns={[
+                              { id: "name", header: t("name") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-medium text-gray-900">{l.name}</span> },
+                              { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
+                                <span className="text-sm text-gray-600 font-mono">
+                                  {l.lat && l.lon ? `${l.lat.toFixed(6)}, ${l.lon.toFixed(6)}` : <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>}
+                                </span>
+                              ) },
+                              { id: "createdAt", header: t("createdAt") || "Created Date", value: (l: any) => l.createdAt || "", cell: (l: any) => l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '-' },
+                              rowActionsColumn<any>((location: any) => (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-56">
+                                    <DropdownMenuItem onClick={() => handleViewLocation(location.id)}>
+                                      <MapPin className="h-4 w-4 mr-2" />
+                                      {t("viewLocation") || "View Location"}
+                                    </DropdownMenuItem>
+                                    {user?.role === 'admin' && (
+                                      <>
+                                        <DropdownMenuItem onClick={() => handleEditLocation(location)}>
+                                          <Edit className="h-4 w-4 mr-2" />
+                                          {t("editLocation") || "Edit Location"}
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem destructive onClick={() => handleDeleteLocation(location.id)}>
+                                          <Trash className="h-4 w-4 mr-2" />
+                                          {t("delete") || "Delete"}
+                                        </DropdownMenuItem>
+                                      </>
                                     )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              )),
+                            ] as SortableColumn<any>[]}
+                          />
+                        </div>
+
 
                         {/* Pagination Footer - Matching the provided design exactly */}
                         {totalCount > 0 && (
@@ -445,17 +375,16 @@ const Locations: NextPage = () => {
                                     <span>
                                         {locations.length === 0 ? "0" : `${Math.min((currentPage - 1) * limit + 1, totalCount)}-${Math.min(currentPage * limit, totalCount)}`} of {totalCount} row(s) selected.
                                     </span>
-                                    <span>Rows per page</span>
-                                    <select 
-                                        className="border border-gray-300 rounded px-2 py-1 text-sm bg-white ml-2"
-                                        value={limit}
-                                        onChange={(e) => handleLimitChange(parseInt(e.target.value))}
-                                    >
-                                        <option value="10">10</option>
-                                        <option value="20">20</option>
-                                        <option value="50">50</option>
-                                        <option value="100">100</option>
-                                    </select>
+                                    <span>{t("rowsPerPage") || "Rows per page"}</span>
+                                    <Select value={String(limit)} onValueChange={(v) => handleLimitChange(parseInt(v))}>
+                                        <SelectTrigger className="ml-2 h-8 w-[72px]"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="10">10</SelectItem>
+                                            <SelectItem value="20">20</SelectItem>
+                                            <SelectItem value="50">50</SelectItem>
+                                            <SelectItem value="100">100</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 
                                 <div className="flex items-center space-x-4">

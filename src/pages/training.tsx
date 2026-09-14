@@ -20,7 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import {Tabs, TabsList, TabsTrigger, TabsContent} from '@/components/ui/tabs';
+import { Tabs } from '@/components/ui/tabs';
 import {Badge} from '@/components/ui/badge';
 import {
     BookOpen,
@@ -191,26 +191,20 @@ const Training = () => {
                         </CardContent>
                     </Card>
                 ) : (
-                    <Tabs defaultValue="modules" value={activeTab} onValueChange={setActiveTab}>
-                            <TabsList>
-                            <TabsTrigger
-                                value="modules"
-                                className="text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] data-[state=active]:bg-[#147677] data-[state=active]:text-white"
-                            >
-                                <LayoutGrid className="h-4 w-4 mr-2" />
-                                {t('trainingModules')}
-                            </TabsTrigger>
-                            <TabsTrigger
-                                value="faq"
-                                style={{ display: 'none' }}
-                                className="text-gray-700 hover:bg-[#147677]/10 hover:text-[#147677] data-[state=active]:bg-[#147677] data-[state=active]:text-white"
-                            >
-                                <Info className="h-4 w-4 mr-2" />
-                                {t('frequentlyAskedQuestions')}
-                            </TabsTrigger>
-                        </TabsList>
+                  <>
+                    <Tabs
+                        value={activeTab}
+                        defaultValue="modules"
+                        onValueChange={setActiveTab}
+                        items={[
+                            { value: 'modules', label: <span className="inline-flex items-center"><LayoutGrid className="h-4 w-4 mr-2" />{t('trainingModules')}</span> },
+                        ]}
+                        renderPanel={() => null}
+                    />
 
-                        <TabsContent value="modules" className="space-y-4 mt-4">
+                    <div>
+                        {activeTab === 'modules' && (
+                          <div className="space-y-4 mt-4">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                 <div className="relative w-full sm:w-auto">
                                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -407,9 +401,11 @@ const Training = () => {
                                     </div>
                                 </Card>
                             )}
-                        </TabsContent>
+                          </div>
+                        )}
 
-                        <TabsContent value="faq" className="space-y-4 mt-4">
+                        {activeTab === 'faq' && (
+                          <div className="space-y-4 mt-4">
                             <div className="relative mb-4">
                                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                                 <Input
@@ -467,8 +463,10 @@ const Training = () => {
                                     </div>
                                 </CardFooter>
                             </Card>
-                        </TabsContent>
-                    </Tabs>
+                          </div>
+                        )}
+                    </div>
+                  </>
                 )}
             </div>
         </AppLayout>

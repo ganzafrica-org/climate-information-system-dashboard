@@ -84,8 +84,13 @@ export interface WeatherAlert {
     createdAt: string;
     message?: string;
     severity?: string;
+    level?: string;
+    priority?: string;
     title?: string;
     description?: string;
+    category?: string;
+    location?: string | { id?: number; name?: string } | null;
+    locationId?: number;
 }
 
 export interface WeatherData {
@@ -94,13 +99,21 @@ export interface WeatherData {
         current: CurrentWeather;
         daily: DailyWeather[];
         alerts: WeatherAlert[];
+        intelligentAlerts?: WeatherAlert[];
     };
+    intelligentAlerts?: WeatherAlert[];
+    alerts?: WeatherAlert[];
     message: string;
     weatherOverview: string;
     alert: {
         id: number;
         type: string;
         createdAt: string;
+        message?: string;
+        title?: string;
+        severity?: string;
+        level?: string;
+        priority?: string;
     };
     weatherDataId: number;
     weatherDataStored: boolean;

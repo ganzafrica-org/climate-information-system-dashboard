@@ -53,7 +53,7 @@ interface Alert {
   targetAudience?: string;
   deliveryMethod?: string;
   recipientCount?: number;
-  status?: 'draft' | 'scheduled' | 'sent' | 'failed';
+  status?: 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending';
 }
 
 interface ViewAlertDialogProps {
@@ -127,9 +127,10 @@ export function ViewAlertDialog({
     switch (status?.toLowerCase()) {
       case 'sent': return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'scheduled': return <Clock className="h-4 w-4 text-[#147677]" />;
-      case 'draft': return <FileText className="h-4 w-4 text-gray-500" />;
+      case 'draft': return <FileText className="h-4 w-4 text-[#147677]" />;
+      case 'pending': return <Clock className="h-4 w-4 text-[#147677]" />;
       case 'failed': return <XCircle className="h-4 w-4 text-red-500" />;
-      default: return <FileText className="h-4 w-4 text-gray-500" />;
+      default: return <FileText className="h-4 w-4 text-[#147677]" />;
     }
   };
 
@@ -138,12 +139,13 @@ export function ViewAlertDialog({
       case 'sent': return 'default';
       case 'scheduled': return 'secondary';
       case 'draft': return 'outline';
+      case 'pending': return 'outline';
       case 'failed': return 'destructive';
       default: return 'outline';
     }
   };
 
-  const currentStatus = alert.status || (alert.isSent ? 'sent' : 'draft');
+  const currentStatus: 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending' = (alert.status as 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending' | undefined) || (alert.isSent ? 'sent' : 'draft');
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -189,10 +191,22 @@ export function ViewAlertDialog({
               </div>
             </div>
             <div className="flex flex-col gap-2">
-              <Badge variant={getPriorityColor(alert.priority)}>
+              <Badge 
+                variant={getPriorityColor(alert.priority)}
+                className={
+                  alert.priority === 'medium' || alert.priority === 'low'
+                    ? 'border-[#147677] text-[#147677]' : ''
+                }
+              >
                 {alert.priority || 'medium'} priority
               </Badge>
-              <Badge variant={getStatusColor(currentStatus)} className="flex items-center gap-1">
+              <Badge 
+                variant={getStatusColor(currentStatus)} 
+                className={`flex items-center gap-1 ${
+                  currentStatus === 'draft' || currentStatus === 'pending' || currentStatus === 'scheduled'
+                    ? 'border-[#147677] text-[#147677]' : ''
+                }`}
+              >
                 {getStatusIcon(currentStatus)}
                 {currentStatus}
               </Badge>
@@ -209,7 +223,7 @@ export function ViewAlertDialog({
                 {t('alertMessage')}
               </h3>
               <Button variant="outline" size="sm" onClick={handleCopyMessage} className="border-[#147677] text-[#147677] hover:bg-[#147677]/10">
-                <Copy className="h-4 w-4 mr-2" />
+                <Copy className="h-4 w-4 mr-2 text-[#147677]" />
                 {t('copy')}
               </Button>
             </div>
@@ -270,7 +284,13 @@ export function ViewAlertDialog({
               <div className="space-y-3 text-sm">
                 <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
                   <span className="text-muted-foreground">{t('status')}:</span>
-                  <Badge variant={getStatusColor(currentStatus)} className="flex items-center gap-1">
+                  <Badge 
+                    variant={getStatusColor(currentStatus)} 
+                    className={`flex items-center gap-1 ${
+                      currentStatus === 'draft' || currentStatus === 'pending' || currentStatus === 'scheduled'
+                        ? 'border-[#147677] text-[#147677]' : ''
+                    }`}
+                  >
                     {getStatusIcon(currentStatus)}
                     {currentStatus}
                   </Badge>
@@ -347,9 +367,9 @@ export function ViewAlertDialog({
             {!alert.isSent && onSend && (
               <Button
                 onClick={handleSendAlert}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 bg-[#147677] hover:bg-[#147677]/90 text-white"
               >
-                <Send className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 mr-2 text-white" />
                 {t('sendToFarmers')}
               </Button>
             )}
@@ -357,9 +377,9 @@ export function ViewAlertDialog({
               <Button
                 variant="outline"
                 onClick={handleEditAlert}
-                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                className="border-[#147677] text-[#147677] hover:bg-[#147677]/10"
               >
-                <Edit className="h-4 w-4 mr-2" />
+                <Edit className="h-4 w-4 mr-2 text-[#147677]" />
                 {t('editAlert')}
               </Button>
             )}
@@ -434,12 +454,17 @@ export function EditAlertDialog({
         deliveryMethod: formData.deliveryMethod
       };
 
+      console.log('Updating alert with data:', updateData);
+
       const response = await api.put(`/api/weather/alerts/${alert.id}/update`, updateData);
+
+      console.log('Update response:', response);
 
       toast.success(t('alertUpdatedSuccessfully') || 'Alert updated successfully');
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
+      console.error('Failed to update alert:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to update alert';
       toast.error(errorMessage);
     } finally {
@@ -472,9 +497,9 @@ export function EditAlertDialog({
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Alert Type */}
           <div className="space-y-2">
-            <Label htmlFor="type" className="text-blue-600 font-medium">{t('alertType') || 'Alert Type'}</Label>
+            <Label htmlFor="type" className="text-[#147677] font-medium">{t('alertType') || 'Alert Type'}</Label>
             <Select value={formData.type} onValueChange={(value) => handleInputChange('type', value)}>
-              <SelectTrigger className="border-blue-300 focus:border-blue-600">
+              <SelectTrigger className="border-[#147677]/50 focus:border-[#147677]">
                 <SelectValue placeholder={t('selectAlertType') || 'Select alert type'} />
               </SelectTrigger>
               <SelectContent>
@@ -584,7 +609,7 @@ export function EditAlertDialog({
                 </>
               ) : (
                 <>
-                  <Edit className="h-4 w-4 mr-2" />
+                  <Edit className="h-4 w-4 mr-2 text-white" />
                   {t('updateAlert') || 'Update Alert'}
                 </>
               )}

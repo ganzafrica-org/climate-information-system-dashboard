@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -53,7 +53,7 @@ interface Alert {
   targetAudience?: string;
   deliveryMethod?: string;
   recipientCount?: number;
-  status?: 'draft' | 'scheduled' | 'sent' | 'failed';
+  status?: 'draft' | 'scheduled' | 'sent' | 'failed' | 'pending';
 }
 
 // Send Result Interface
@@ -82,6 +82,60 @@ interface SendAlertDialogProps {
   onSuccess: () => void;
 }
 
+function buildFarmerSendResults(
+  farmerIds: number[],
+  farmers: Farmer[],
+  includeError = false
+) {
+  return farmerIds.map(id => {
+    const farmer = farmers.find(f => f.id === id);
+    return {
+      farmerId: id,
+      farmerName: farmer?.name || 'Unknown',
+      phone: farmer?.phone || 'Unknown',
+      ...(includeError ? { error: '' } : {}),
+    };
+  });
+}
+
+function parseSendAlertResponse(
+  response: any,
+  selectedFarmers: number[],
+  farmers: Farmer[]
+): SendResult {
+  const inner = response?.data && typeof response.data === 'object' ? response.data : response;
+  const resultsNode = inner?.results ?? inner?.data?.results ?? inner?.data ?? {};
+  const successful = resultsNode?.successful ?? inner?.successful ?? [];
+  const failed = resultsNode?.failed ?? inner?.failed ?? [];
+  const hasSuccessfulSends = Array.isArray(successful) && successful.length > 0;
+  const apiStatus = response?.status ?? inner?.status;
+  const explicitSuccess = response?.success ?? inner?.success;
+
+  const success =
+    explicitSuccess === true ||
+    apiStatus === 'success' ||
+    apiStatus === 'warning' ||
+    (explicitSuccess !== false && hasSuccessfulSends);
+
+  const message =
+    response?.message ||
+    inner?.message ||
+    (success ? 'Alert sent successfully' : 'Failed to send alert');
+
+  return {
+    success,
+    message,
+    results: {
+      successful: hasSuccessfulSends
+        ? successful
+        : success
+          ? buildFarmerSendResults(selectedFarmers, farmers)
+          : [],
+      failed: Array.isArray(failed) ? failed : [],
+    },
+  };
+}
+
 export function SendAlertDialog({ 
   open, 
   onOpenChange, 
@@ -90,6 +144,7 @@ export function SendAlertDialog({
 }: SendAlertDialogProps) {
   const { t } = useLanguage();
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const isSendingRef = useRef(false);
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [selectedFarmers, setSelectedFarmers] = useState<number[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -138,7 +193,7 @@ export function SendAlertDialog({
           filters.locationId = locationId;
         } else {
           // If it's not a number, we'll get all farmers and filter client-side
-          }
+        }
       }
   
       // Try different possible endpoints
@@ -171,7 +226,6 @@ export function SendAlertDialog({
       // Handle different response formats based on the API structure
       let farmersData: any[] = [];
       
-      // Check for the actual structure based on your console output
       if (response.data && response.data.farmers && Array.isArray(response.data.farmers)) {
         farmersData = response.data.farmers;
       } else if (response.data && response.data.data && response.data.data.farmers) {
@@ -204,6 +258,7 @@ export function SendAlertDialog({
   
       // Filter by location if needed (client-side filtering)
       let finalFarmers = transformedFarmers.filter(f => f.isActive);
+      
       if (locationValue && locationValue !== 'all' && typeof locationValue === 'string' && isNaN(parseInt(locationValue))) {
         // If location is a string name, filter client-side
         finalFarmers = finalFarmers.filter(f => 
@@ -282,60 +337,25 @@ export function SendAlertDialog({
   };
 
   const handleSendAlert = async () => {
+    if (isSendingRef.current || isActionLoading) {
+      return;
+    }
+
     if (selectedFarmers.length === 0) {
       toast.error(t('pleaseSelectFarmers') || 'Please select at least one farmer');
       return;
     }
 
+    isSendingRef.current = true;
     setIsActionLoading(true);
     try {
-      const response = await api.post(`/api/weather/alerts/${alert?.id}/send`, {
-        farmerIds: selectedFarmers
-      });
+      const response = await api.post(
+        `/api/weather/alerts/${alert?.id}/send`,
+        { farmerIds: selectedFarmers },
+        { timeout: 120000 }
+      );
 
-      // Handle different response formats
-      let result: SendResult;
-      
-      if (response.success !== undefined) {
-        result = response as SendResult;
-      } else if (response.data) {
-        result = response.data as SendResult;
-      } else {
-        // Default success response
-        result = {
-          success: true,
-          message: 'Alert sent successfully',
-          results: {
-            successful: selectedFarmers.map(id => {
-              const farmer = farmers.find(f => f.id === id);
-              return {
-                farmerId: id,
-                farmerName: farmer?.name || 'Unknown',
-                phone: farmer?.phone || 'Unknown'
-              };
-            }),
-            failed: []
-          }
-        };
-      }
-
-      // Ensure results structure is properly initialized
-      if (result.results) {
-        result.results.successful = result.results.successful || [];
-        result.results.failed = result.results.failed || [];
-      } else {
-        result.results = {
-          successful: selectedFarmers.map(id => {
-            const farmer = farmers.find(f => f.id === id);
-            return {
-              farmerId: id,
-              farmerName: farmer?.name || 'Unknown',
-              phone: farmer?.phone || 'Unknown'
-            };
-          }),
-          failed: []
-        };
-      }
+      const result = parseSendAlertResponse(response, selectedFarmers, farmers);
 
       setSendResult(result);
       setShowSendResult(true);
@@ -350,21 +370,21 @@ export function SendAlertDialog({
       }
 
     } catch (error: any) {
-      // Create error result
+      const isTimeout =
+        error.code === 'ECONNABORTED' ||
+        error.isTimeout ||
+        error.message?.toLowerCase().includes('timeout');
+
+      const errorMessage = isTimeout
+        ? (t('alertSendTimeout') || 'Request timed out. Messages may still have been sent — please check the alerts list.')
+        : (error.response?.data?.message || error.message || 'Failed to send alert');
+
       const errorResult: SendResult = {
         success: false,
-        message: error.response?.data?.message || error.message || 'Failed to send alert',
+        message: errorMessage,
         results: {
           successful: [],
-          failed: selectedFarmers.map(id => {
-            const farmer = farmers.find(f => f.id === id);
-            return {
-              farmerId: id,
-              farmerName: farmer?.name || 'Unknown',
-              phone: farmer?.phone || 'Unknown',
-              error: ''
-            };
-          })
+          failed: buildFarmerSendResults(selectedFarmers, farmers, true) as NonNullable<SendResult['results']>['failed'],
         }
       };
 
@@ -372,6 +392,7 @@ export function SendAlertDialog({
       setShowSendResult(true);
       toast.error(errorResult.message);
     } finally {
+      isSendingRef.current = false;
       setIsActionLoading(false);
     }
   };
@@ -404,6 +425,7 @@ export function SendAlertDialog({
   };
 
   const filteredFarmers = getFilteredFarmers();
+
   if (!alert) return null;
 
   return (
@@ -411,7 +433,7 @@ export function SendAlertDialog({
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5 text-blue-600" />
+            <MessageSquare className="h-5 w-5 text-[#147677]" />
             {t('sendAlert')} #{alert.id}
           </DialogTitle>
           <DialogDescription>
@@ -434,7 +456,7 @@ export function SendAlertDialog({
                 </h3>
               </div>
 
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+              <div className="bg-[#147677]/10 rounded-lg p-4 border border-[#147677]/30">
                 {/* Filter out "no_successful_sms_sends" message */}
                 {sendResult.message && 
                  !sendResult.message.toLowerCase().includes('no_successful_sms_sends') &&
@@ -482,7 +504,7 @@ export function SendAlertDialog({
               <div className="flex gap-2">
                 <Button 
                   onClick={() => onOpenChange(false)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  className="bg-[#147677] hover:bg-[#147677]/90 text-white"
                 >
                   {t('close')}
                 </Button>
@@ -495,7 +517,7 @@ export function SendAlertDialog({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold flex items-center gap-2">
-                  <Users className="h-5 w-5 text-blue-600" />
+                  <Users className="h-5 w-5 text-[#147677]" />
                   {t('selectFarmers')} ({filteredFarmers.length})
                 </h3>
                 <Button
@@ -503,7 +525,7 @@ export function SendAlertDialog({
                   size="sm"
                   onClick={handleSelectAllFarmers}
                   disabled={isLoadingFarmers || filteredFarmers.length === 0}
-                  className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                  className="border-[#147677] text-[#147677] hover:bg-[#147677]/10"
                 >
                   {selectedFarmers.length === filteredFarmers.length ? t('unselectAll') : t('selectAll')}
                 </Button>
@@ -511,18 +533,18 @@ export function SendAlertDialog({
 
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-blue-600" />
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-[#147677]" />
                 <Input
                   placeholder={t('searchFarmers') || 'Search farmers...'}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 border-blue-300 focus:border-blue-600"
+                  className="pl-8 border-[#147677]/50 focus:border-[#147677]"
                 />
               </div>
 
               {/* Selected count */}
               <div className="flex items-center justify-between text-sm text-muted-foreground">
-                <span className="text-blue-600 font-medium">{selectedFarmers.length} {t('farmersSelected')}</span>
+                <span className="text-[#147677] font-medium">{selectedFarmers.length} {t('farmersSelected')}</span>
                 <span>
                   {t('location')}: {
                     typeof alert.location === 'object' && alert.location !== null 
@@ -533,15 +555,15 @@ export function SendAlertDialog({
               </div>
 
               {/* Debug info */}
-              <div className="text-xs text-blue-600">
+              <div className="text-xs text-[#147677]">
                 Debug: {farmers.length} total farmers, {filteredFarmers.length} filtered, loading: {isLoadingFarmers.toString()}
               </div>
 
               {/* Farmers list */}
-              <div className="border border-blue-200 rounded-lg max-h-60 overflow-y-auto">
+              <div className="border border-[#147677]/30 rounded-lg max-h-60 overflow-y-auto">
                 {isLoadingFarmers ? (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="animate-spin h-6 w-6 mr-2 text-blue-600" />
+                    <Loader2 className="animate-spin h-6 w-6 mr-2 text-[#147677]" />
                     <span>{t('loadingFarmers')}</span>
                   </div>
                 ) : filteredFarmers.length === 0 ? (
@@ -550,15 +572,15 @@ export function SendAlertDialog({
                     <p className="text-xs mt-2">Total farmers in state: {farmers.length}</p>
                   </div>
                 ) : (
-                  <div className="divide-y divide-blue-100">
+                  <div className="divide-y divide-[#147677]/20">
                     {filteredFarmers.map((farmer) => (
-                      <div key={farmer.id} className="flex items-center space-x-3 p-3 hover:bg-blue-50">
+                      <div key={farmer.id} className="flex items-center space-x-3 p-3 hover:bg-[#147677]/10">
                         <Checkbox
                           checked={selectedFarmers.includes(farmer.id)}
                           onCheckedChange={() => handleSelectFarmer(farmer.id)}
                           style={{ 
-                            backgroundColor: selectedFarmers.includes(farmer.id) ? '#2563eb' : 'transparent',
-                            borderColor: '#2563eb'
+                            backgroundColor: selectedFarmers.includes(farmer.id) ? '#147677' : 'transparent',
+                            borderColor: '#147677'
                           }}
                         />
                         <div className="flex-1 min-w-0">
@@ -574,10 +596,10 @@ export function SendAlertDialog({
               </div>
 
               {/* Message preview */}
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                <h4 className="font-medium mb-2 text-blue-600">{t('messagePreview')}</h4>
+              <div className="bg-[#147677]/10 p-3 rounded-lg border border-[#147677]/30">
+                <h4 className="font-medium mb-2 text-[#147677]">{t('messagePreview')}</h4>
                 <p className="text-sm">{alert.message}</p>
-                <p className="text-xs text-blue-600 mt-1">
+                <p className="text-xs text-[#147677] mt-1">
                   {alert.messageLength} characters • {alert.messageSegments} SMS segments
                 </p>
               </div>
@@ -585,9 +607,10 @@ export function SendAlertDialog({
               {/* Send actions */}
               <div className="flex gap-2">
                 <Button
+                  type="button"
                   onClick={handleSendAlert}
                   disabled={isActionLoading || selectedFarmers.length === 0}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  className="flex-1 bg-[#147677] hover:bg-[#147677]/90 text-white"
                 >
                   <Send className="h-4 w-4 mr-2" />
                   {isActionLoading ? (
@@ -603,9 +626,9 @@ export function SendAlertDialog({
                   variant="outline"
                   onClick={() => onOpenChange(false)}
                   disabled={isActionLoading}
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
+                  className="border-[#147677] text-[#147677] hover:bg-[#147677]/10"
                 >
-                  <X className="h-4 w-4 mr-2" />
+                  <X className="h-4 w-4 mr-2 text-[#147677]" />
                   {t('cancel')}
                 </Button>
               </div>

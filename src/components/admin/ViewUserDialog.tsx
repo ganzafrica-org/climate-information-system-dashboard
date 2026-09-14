@@ -14,6 +14,7 @@ const getUserById = async (userId: string | number): Promise<User> => {
     // Extract the user data from the response.data property
     return response.data;
   } catch (error: any) {
+    console.error('Get user error:', error);
     if (error.response?.data?.message) {
       throw new Error(error.response.data.message);
     } else if (error.message) {
@@ -48,6 +49,7 @@ export default function ViewUserDialog({ open, onOpenChange, user, onClose }: Vi
       const userData = await getUserById(user.id);
       setUserDetails(userData);
     } catch (error: any) {
+      console.error('Failed to fetch user details:', error);
       toast.error(error.message || "Failed to load user details");
       // Fallback to the passed user data
       setUserDetails(user);
