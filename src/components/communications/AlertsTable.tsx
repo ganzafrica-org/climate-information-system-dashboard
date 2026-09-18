@@ -10,24 +10,32 @@ import {
   MoreHorizontal,
   Edit,
   MessageSquare,
+  Search,
   Trash,
   Loader2,
   RefreshCw,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useLanguage } from '@/i18n';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
+import { DataTable, type SortableColumn } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Pagination } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { ViewAlertDialog } from './AlertsDialogs';
 import { SendAlertDialog } from './SendAlertDialog';
 import { EditAlertDialog } from './AlertsDialogs';
 import api from '@/lib/api';
 import { toast } from 'sonner';
+
+// Alert messages are stored with a leading channel prefix (e.g. "IBURIRA: ...");
+// strip it so only the actual message content is displayed.
+const stripMessagePrefix = (message: string) => {
+    const spaceIndex = message.indexOf(' ');
+    return spaceIndex > -1 ? message.substring(spaceIndex).trim() : message;
+};
 
 // Custom badge components
 const StatusBadge = ({ status }: { status: string }) => {
@@ -178,6 +186,7 @@ interface AlertsTableProps {
 export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
     const { t } = useLanguage();
     const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [search, setSearch] = useState(searchTerm);
     const [currentPage, setCurrentPage] = useState(1);
     const [limit, setLimit] = useState(10);
     const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
@@ -211,7 +220,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 sortField,
                 sortOrder,
                 ...(selectedSector !== 'all' && { location: selectedSector }),
-                ...(searchTerm && { search: searchTerm }),
+                ...(search && { search }),
             };
 
             console.log('Fetching alerts with params:', params);
@@ -325,7 +334,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
         } else {
             setCurrentPage(1);
         }
-    }, [selectedSector, searchTerm, sortField, sortOrder, limit]);
+    }, [selectedSector, search, sortField, sortOrder, limit]);
 
     // Refetch when page changes
     useEffect(() => {
@@ -429,163 +438,129 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
     };
 
 
-    if (isLoading && alerts.length === 0) {
-        return (
-            <Card>
-                <CardContent className="flex items-center justify-center py-12">
-                    <div className="text-center">
-                        <Loader2 className="animate-spin h-8 w-8 mx-auto mb-4" />
-                        <p className="text-muted-foreground">{t('loadingAlerts')}</p>
-                    </div>
-                </CardContent>
-            </Card>
-        );
-    }
-
-    // Calculate the actual range being displayed
-    const startIndex = (currentPage - 1) * limit + 1;
-    const endIndex = Math.min(currentPage * limit, totalCount);
-
     return (
         <>
-            <Card>
-                <CardHeader className="p-4">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <CardTitle className="flex items-center gap-2">
-                                <AlertCircle className="h-5 w-5" />
-                                {t("alerts")}
-                            </CardTitle>
-                            <CardDescription>
-                                {totalCount} {t("alertsFound")}
-                            </CardDescription>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-[#147677]" />
+                        {t("listOfAlerts") || t("alerts")}
+                    </h2>
+
+                    <div className="flex w-full sm:w-auto items-center gap-2">
+                        <div className="relative flex-1 sm:flex-none">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                                type="search"
+                                placeholder={t("search")}
+                                className="pl-10 h-10 w-full sm:w-[220px] rounded-full bg-[#F3F4F6] border-0 shadow-none focus-visible:ring-1 focus-visible:ring-[#147677]/30"
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                            />
                         </div>
-                        <div className="flex items-center gap-2">
-                            {selectedAlerts.size > 0 && (
-                                <Button
-                                    variant="destructive"
-                                    size="sm"
-                                    onClick={() => setShowDeleteConfirm(true)}
-                                >
-                                    <Trash className="h-4 w-4 mr-2" />
-                                    {t('delete')} ({selectedAlerts.size})
-                                </Button>
-                            )}
+                        {selectedAlerts.size > 0 && (
                             <Button
-                                variant="outline"
+                                variant="destructive"
                                 size="sm"
-                                onClick={handleRefresh}
-                                disabled={isRefreshing}
+                                onClick={() => setShowDeleteConfirm(true)}
                             >
-                                <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                                {isRefreshing ? t('refreshing') : t('refresh')}
+                                <Trash className="h-4 w-4 mr-2" />
+                                {t('delete')} ({selectedAlerts.size})
                             </Button>
+                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRefresh}
+                            disabled={isRefreshing}
+                        >
+                            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                            {isRefreshing ? t('refreshing') : t('refresh')}
+                        </Button>
+                    </div>
+                </div>
+
+                <DataTable<Alert>
+                    label={t("alerts")}
+                    variant="sheet"
+                    rowHeight={72}
+                    data={alerts}
+                    getRowId={(a) => String(a.id)}
+                    loading={isLoading}
+                    skeletonRows={limit}
+                    selectable
+                    selectedIds={new Set(Array.from(selectedAlerts).map(String))}
+                    onSelectionChange={(ids) => setSelectedAlerts(new Set(Array.from(ids).map(Number)))}
+                    onRowClick={(a) => handleViewDetails(a)}
+                    emptyState={t("noAlertsFound")}
+                    columns={[
+                      { id: "type", header: t("type"), value: (a) => a.type || "", cell: (a) => (
+                        <div>
+                          <div className="font-medium capitalize">{a.type}</div>
+                          {a.category && <div className="text-xs text-muted-foreground">{typeof a.category === 'string' ? a.category : 'General'}</div>}
                         </div>
-                    </div>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                        <DataTable<Alert>
-                            label={t("alerts")}
-                            data={alerts}
-                            getRowId={(a) => String(a.id)}
-                            loading={isLoading}
-                            selectable
-                            selectedIds={new Set(Array.from(selectedAlerts).map(String))}
-                            onSelectionChange={(ids) => setSelectedAlerts(new Set(Array.from(ids).map(Number)))}
-                            onRowClick={(a) => handleViewDetails(a)}
-                            emptyState={t("noAlertsFound")}
-                            columns={[
-                              { id: "type", header: t("type"), value: (a) => a.type || "", cell: (a) => (
-                                <div>
-                                  <div className="font-medium capitalize">{a.type}</div>
-                                  {a.category && <div className="text-xs text-muted-foreground">{typeof a.category === 'string' ? a.category : 'General'}</div>}
-                                </div>
-                              ) },
-                              { id: "message", header: t("message"), value: (a) => (typeof a.message === 'string' ? a.message : ''), cell: (a) => (
-                                <div>
-                                  <div className="text-sm line-clamp-2 max-w-[300px]">{typeof a.message === 'string' ? a.message : 'No message'}</div>
-                                  <div className="text-xs text-muted-foreground mt-1">{a.messageLength} chars • {a.messageSegments} segments</div>
-                                </div>
-                              ) },
-                              { id: "location", header: t("location"), value: (a) => (typeof a.location === 'string' ? a.location : ''), cell: (a) => (
-                                <div>
-                                  <Badge variant="outline" className="text-xs"><MapPin className="h-3 w-3 mr-1" />{typeof a.location === 'string' ? a.location : 'Unknown Location'}</Badge>
-                                  {a.recipientCount && <div className="text-xs text-muted-foreground mt-1">{a.recipientCount} recipients</div>}
-                                </div>
-                              ) },
-                              { id: "priority", header: t("priority"), sortable: false, cell: (a) => <PriorityBadge priority={a.priority || 'medium'} /> },
-                              { id: "isSent", header: t("status"), value: (a) => (a.isSent ? 1 : 0), cell: (a) => (
-                                <div>
-                                  <StatusBadge status={a.status || (a.isSent ? 'sent' : 'draft')} />
-                                  {a.sentAt && <div className="text-xs text-muted-foreground mt-1"><Clock className="h-3 w-3 inline mr-1" />{new Date(a.sentAt).toLocaleString()}</div>}
-                                </div>
-                              ) },
-                              { id: "createdAt", header: t("created"), value: (a) => a.createdAt || "", cell: (a) => (
-                                <div>
-                                  <div className="text-xs text-muted-foreground"><Calendar className="h-3 w-3 inline mr-1" />{new Date(a.createdAt).toLocaleDateString()}</div>
-                                  <div className="text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleTimeString()}</div>
-                                </div>
-                              ) },
-                              rowActionsColumn<Alert>((alert) => (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleViewDetails(alert)}><AlertCircle className="h-4 w-4 mr-2" />{t("viewDetails")}</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleEditAlert(alert)}><Edit className="h-4 w-4 mr-2" />{t("editAlert")}</DropdownMenuItem>
-                                    {!alert.isSent && (
-                                      <DropdownMenuItem onClick={() => handleSendAlert(alert)}><MessageSquare className="h-4 w-4 mr-2" />{t("sendNow")}</DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem destructive onClick={() => handleDeleteAlert(alert.id)}><Trash className="h-4 w-4 mr-2" />{t("delete")}</DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )),
-                            ] as SortableColumn<Alert>[]}
-                            onSortChange={(next) => { if (next) handleSort(next.columnId); }}
-                        />
-                    </div>
-                </CardContent>
+                      ) },
+                      { id: "message", header: t("message"), value: (a) => (typeof a.message === 'string' ? a.message : ''), cell: (a) => (
+                        <div>
+                          <div className="text-sm line-clamp-2 max-w-[300px]">{typeof a.message === 'string' ? stripMessagePrefix(a.message) : 'No message'}</div>
+                          <div className="text-xs text-muted-foreground mt-1">{a.messageLength} chars • {a.messageSegments} segments</div>
+                        </div>
+                      ) },
+                      { id: "location", header: t("location"), value: (a) => (typeof a.location === 'string' ? a.location : ''), cell: (a) => (
+                        <div>
+                          <Badge variant="outline" className="text-xs"><MapPin className="h-3 w-3 mr-1" />{typeof a.location === 'string' ? a.location : 'Unknown Location'}</Badge>
+                          {a.recipientCount && <div className="text-xs text-muted-foreground mt-1">{a.recipientCount} recipients</div>}
+                        </div>
+                      ) },
+                      { id: "priority", header: t("priority"), sortable: false, cell: (a) => <PriorityBadge priority={a.priority || 'medium'} /> },
+                      { id: "isSent", header: t("status"), value: (a) => (a.isSent ? 1 : 0), cell: (a) => (
+                        <div>
+                          <StatusBadge status={a.status || (a.isSent ? 'sent' : 'draft')} />
+                          {a.sentAt && <div className="text-xs text-muted-foreground mt-1"><Clock className="h-3 w-3 inline mr-1" />{new Date(a.sentAt).toLocaleString()}</div>}
+                        </div>
+                      ) },
+                      { id: "createdAt", header: t("created"), value: (a) => a.createdAt || "", cell: (a) => (
+                        <div>
+                          <div className="text-xs text-muted-foreground"><Calendar className="h-3 w-3 inline mr-1" />{new Date(a.createdAt).toLocaleDateString()}</div>
+                          <div className="text-xs text-muted-foreground">{new Date(a.createdAt).toLocaleTimeString()}</div>
+                        </div>
+                      ) },
+                      { id: "__actions", header: t("actions"), width: "96px", sortable: false, cell: (alert) => (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100"><MoreHorizontal className="h-4 w-4 text-slate-500" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewDetails(alert)}><AlertCircle className="h-4 w-4 mr-2 text-[#147677]" />{t("viewDetails")}</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditAlert(alert)}><Edit className="h-4 w-4 mr-2 text-[#147677]" />{t("editAlert")}</DropdownMenuItem>
+                            {!alert.isSent && (
+                              <DropdownMenuItem onClick={() => handleSendAlert(alert)}><MessageSquare className="h-4 w-4 mr-2 text-[#147677]" />{t("sendNow")}</DropdownMenuItem>
+                            )}
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem destructive onClick={() => handleDeleteAlert(alert.id)}><Trash className="h-4 w-4 mr-2" />{t("delete")}</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      ) },
+                    ] as SortableColumn<Alert>[]}
+                    onSortChange={(next) => { if (next) handleSort(next.columnId); }}
+                />
 
                 {alerts.length > 0 && (
-                    <CardFooter className="p-4 flex flex-col sm:flex-row justify-between gap-4">
-                        <div className="text-sm text-muted-foreground">
-                            {t("showing")} {startIndex} - {endIndex} {t("of")} {totalCount} {t("alerts")}
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Select value={String(limit)} onValueChange={(v) => setLimit(Number(v))}>
-                                <SelectTrigger className="h-8 w-[120px]"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="10">10 per page</SelectItem>
-                                    <SelectItem value="25">25 per page</SelectItem>
-                                    <SelectItem value="50">50 per page</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={currentPage === 1}
-                                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                            >
-                                {t("previous")}
-                            </Button>
-                            <span className="text-sm text-muted-foreground">
-                                {currentPage} / {totalPages}
-                            </span>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={currentPage === totalPages}
-                                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                            >
-                                {t("next")}
-                            </Button>
-                        </div>
-                    </CardFooter>
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+                        <p className="text-sm text-slate-500">
+                            {t("showingEntries", { count: isLoading ? 0 : alerts.length, total: totalCount })}
+                        </p>
+                        <Pagination
+                            label={t("alerts")}
+                            variant="boxed"
+                            showEdges
+                            count={Math.max(1, totalPages)}
+                            page={currentPage}
+                            onPageChange={(page) => setCurrentPage(page)}
+                        />
+                    </div>
                 )}
-            </Card>
+            </div>
 
             <ViewAlertDialog
                 open={isViewDialogOpen}

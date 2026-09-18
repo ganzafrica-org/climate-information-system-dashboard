@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import api from '@/lib/api';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { DataTable, rowActionsColumn, type SortableColumn } from '@/components/ui/table';
+import { DataTable, type SortableColumn } from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
 import { MoreHorizontal, RefreshCw, Download, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/i18n';
@@ -55,6 +55,8 @@ export function MessageLogsTable() {
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [logs, setLogs] = useState<MessageLog[]>([]);
     const [summary, setSummary] = useState<ApiResponse['data']['summary'] | null>(null);
+    const [page, setPage] = useState(1);
+    const pageSize = 15;
 
     const extractData = (payload: any): { logs: MessageLog[]; summary: ApiResponse['data']['summary'] | null } => {
         if (!payload) return { logs: [], summary: null };
@@ -126,6 +128,16 @@ export function MessageLogsTable() {
                 .some((v) => String(v).toLowerCase().includes(term));
         });
     }, [logs, searchTerm]);
+
+    useEffect(() => {
+        setPage(1);
+    }, [searchTerm]);
+
+    const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+    const pagedLogs = useMemo(
+        () => filteredLogs.slice((page - 1) * pageSize, page * pageSize),
+        [filteredLogs, page]
+    );
 
     const logStats = useMemo(() => {
         const source = Array.isArray(logs) ? logs : [];
@@ -240,106 +252,108 @@ export function MessageLogsTable() {
     };
 
     return (
-        <Card className="shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-            <CardHeader>
-                <div className="flex items-center justify-between">
-                    <div>
-                        <CardTitle>Message Logs</CardTitle>
-                        <CardDescription>
-                            SMS delivery outcomes and diagnostics
-                            {summary && (
-                                <span className="ml-2 text-sm">
-                                    ({summary.sentCount} sent, {summary.failedCount} failed)
-                                </span>
-                            )}
-                        </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            onClick={handleRefresh}
-                            disabled={isRefreshing || isLoading}
-                        >
-                            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                            {isRefreshing ? 'Updating...' : 'Refresh'}
-                        </Button>
-                        <Button
-                            variant="outline"
-                            onClick={exportLogs}
-                            className="bg-green-600 hover:bg-green-700 text-white hover:text-white"
-                        >
-                            <Download className="h-4 w-4 mr-2" />
-                            Export Data
-                        </Button>
-                    </div>
-                </div>
-            </CardHeader>
-            <CardContent className="p-0">
-                <div className="p-4 bg-white border-b border-gray-200 flex justify-between items-center gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                <div>
+                    <h2 className="text-base font-bold text-slate-900">{t('listOfLogs') || 'Message Logs'}</h2>
                     {summary && (
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <span>Total: {summary.totalEntries}</span>
-                            <span className="text-green-600">Sent: {summary.sentCount}</span>
-                            <span className="text-red-600">Failed: {summary.failedCount}</span>
-                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                            Total: {summary.totalEntries} · <span className="text-green-600">Sent: {summary.sentCount}</span> · <span className="text-red-600">Failed: {summary.failedCount}</span>
+                        </p>
                     )}
-                    <div className="relative ml-auto">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                </div>
+                <div className="flex w-full sm:w-auto items-center gap-2">
+                    <div className="relative flex-1 sm:flex-none">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
                             type="search"
                             placeholder={t('searchLogs') || 'Search logs...'}
-                            className="pl-10 w-[300px] bg-gray-50 border-gray-200"
+                            className="pl-10 h-10 w-full sm:w-[220px] rounded-full bg-[#F3F4F6] border-0 shadow-none focus-visible:ring-1 focus-visible:ring-[#147677]/30"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={isRefreshing || isLoading}
+                    >
+                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? 'Updating...' : 'Refresh'}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={exportLogs}
+                        className="bg-green-600 hover:bg-green-700 text-white hover:text-white"
+                    >
+                        <Download className="h-4 w-4 mr-2" />
+                        Export Data
+                    </Button>
                 </div>
+            </div>
 
-                <div className="p-4">
-                  <DataTable<MessageLog>
-                    label="Message logs"
-                    data={filteredLogs}
-                    getRowId={(l) => `${l.messageId}-${l.id}`}
-                    loading={isLoading}
-                    pagination={{ pageSize: 15 }}
-                    emptyState={t('noLogsFound') || 'No logs found'}
-                    columns={[
-                      { id: 'alertTitle', header: t('alertTitle') || 'Alert Title', value: (l) => l.alertTitle || l.alertType || '', cell: (l) => (
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{l.alertTitle || l.alertType || 'N/A'}</Badge>
-                      ) },
-                      { id: 'farmerName', header: t('farmerName') || 'Farmer Name', value: (l) => l.farmerName || `Farmer ${l.farmerId}`, cell: (l) => l.farmerName || `Farmer ${l.farmerId}` },
-                      { id: 'phoneNumber', header: t('phoneNumber') || 'Phone', value: (l) => l.phoneNumber || '', cell: (l) => <span className="font-mono">{l.phoneNumber}</span> },
-                      { id: 'status', header: t('status') || 'Status', sortable: false, cell: (l) => <StatusBadge log={l} /> },
-                      { id: 'provider', header: t('provider') || 'Provider', value: (l) => l.provider || '', cell: (l) => (
-                        <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{l.provider || 'N/A'}</Badge>
-                      ) },
-                      { id: 'length', header: t('messageLength') || 'Length', numeric: true, value: (l) => getMessageLength(l), cell: (l) => `${getMessageLength(l)} chars` },
-                      { id: 'timestamp', header: t('timestamp') || 'Timestamp', value: (l) => l.timestamp || l.sentAt || l.createdAt || '', cell: (l) => formatTimestamp(l) },
-                      rowActionsColumn<MessageLog>((log) => (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56">
-                            <DropdownMenuItem onClick={() => {
-                              const details = { 'Alert ID': log.alertId, 'Alert Title': log.alertTitle, 'Farmer': log.farmerName, 'Phone': log.phoneNumber, 'Status': log.status, 'Provider': log.provider, 'Message ID': log.messageId, 'Message': log.message, 'Error': log.error || log.errorMessage || 'None' };
-                              toast.info(JSON.stringify(details, null, 2));
-                            }}>View Details</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(log.messageId); toast.success('Message ID copied to clipboard'); }}>Copy Message ID</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toast.info(log.message)}>View Message</DropdownMenuItem>
-                            {(log.error || log.errorMessage) && (
-                              <DropdownMenuItem destructive onClick={() => toast.error(log.error || log.errorMessage || 'Unknown error')}>View Error</DropdownMenuItem>
-                            )}
-                            {log.errorReason && (
-                              <DropdownMenuItem destructive onClick={() => toast.error(log.errorReason!)}>View Error Reason</DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )),
-                    ] as SortableColumn<MessageLog>[]}
-                  />
+            <DataTable<MessageLog>
+                label="Message logs"
+                variant="sheet"
+                rowHeight={56}
+                data={pagedLogs}
+                getRowId={(l) => `${l.messageId}-${l.id}`}
+                loading={isLoading}
+                skeletonRows={pageSize}
+                emptyState={t('noLogsFound') || 'No logs found'}
+                columns={[
+                  { id: 'alertTitle', header: t('alertTitle') || 'Alert Title', value: (l) => l.alertTitle || l.alertType || '', cell: (l) => (
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{l.alertTitle || l.alertType || 'N/A'}</Badge>
+                  ) },
+                  { id: 'farmerName', header: t('farmerName') || 'Farmer Name', value: (l) => l.farmerName || `Farmer ${l.farmerId}`, cell: (l) => l.farmerName || `Farmer ${l.farmerId}` },
+                  { id: 'phoneNumber', header: t('phoneNumber') || 'Phone', value: (l) => l.phoneNumber || '', cell: (l) => <span className="font-mono">{l.phoneNumber}</span> },
+                  { id: 'status', header: t('status') || 'Status', sortable: false, cell: (l) => <StatusBadge log={l} /> },
+                  { id: 'provider', header: t('provider') || 'Provider', value: (l) => l.provider || '', cell: (l) => (
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{l.provider || 'N/A'}</Badge>
+                  ) },
+                  { id: 'length', header: t('messageLength') || 'Length', numeric: true, value: (l) => getMessageLength(l), cell: (l) => `${getMessageLength(l)} chars` },
+                  { id: 'timestamp', header: t('timestamp') || 'Timestamp', width: "160px", value: (l) => l.timestamp || l.sentAt || l.createdAt || '', cell: (l) => formatTimestamp(l) },
+                  { id: '__actions', header: t('actions'), width: "96px", sortable: false, cell: (log) => (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100"><MoreHorizontal className="h-4 w-4 text-slate-500" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-56">
+                        <DropdownMenuItem onClick={() => {
+                          const details = { 'Alert ID': log.alertId, 'Alert Title': log.alertTitle, 'Farmer': log.farmerName, 'Phone': log.phoneNumber, 'Status': log.status, 'Provider': log.provider, 'Message ID': log.messageId, 'Message': log.message, 'Error': log.error || log.errorMessage || 'None' };
+                          toast.info(JSON.stringify(details, null, 2));
+                        }}>View Details</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(log.messageId); toast.success('Message ID copied to clipboard'); }}>Copy Message ID</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => toast.info(log.message)}>View Message</DropdownMenuItem>
+                        {(log.error || log.errorMessage) && (
+                          <DropdownMenuItem destructive onClick={() => toast.error(log.error || log.errorMessage || 'Unknown error')}>View Error</DropdownMenuItem>
+                        )}
+                        {log.errorReason && (
+                          <DropdownMenuItem destructive onClick={() => toast.error(log.errorReason!)}>View Error Reason</DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  ) },
+                ] as SortableColumn<MessageLog>[]}
+            />
+
+            {filteredLogs.length > 0 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+                    <p className="text-sm text-slate-500">
+                        {t("showingEntries", { count: isLoading ? 0 : pagedLogs.length, total: filteredLogs.length })}
+                    </p>
+                    <Pagination
+                        label="Message logs"
+                        variant="boxed"
+                        showEdges
+                        count={totalPages}
+                        page={page}
+                        onPageChange={setPage}
+                    />
                 </div>
-            </CardContent>
-        </Card>
+            )}
+        </div>
     );
 }

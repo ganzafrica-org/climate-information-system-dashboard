@@ -16,16 +16,12 @@ import {
   X,
   Users,
   Plus,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { useLanguage } from '@/i18n';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
+import { DataTable, type SortableColumn } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
@@ -687,11 +683,15 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header section with white background */}
-      <div className="">
-       
-          {/* Right side - Action buttons */}
-          <div className="flex flex-wrap w-full lg:w-auto items-center gap-2">
+      <ErrorBanner />
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+          <h2 className="text-base font-bold text-slate-900">
+            {t("listOfMessages") || "List of Custom Messages"}
+          </h2>
+
+          <div className="flex w-full sm:w-auto items-center gap-2">
             {selectedLocations.length > 0 && (
               <Button
                 onClick={handleOpenMessageDialog}
@@ -704,140 +704,84 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
                 </Badge>
               </Button>
             )}
-  
-        </div>
-      </div>
 
-      <ErrorBanner />
-
-      <Card className="shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-        <CardContent className="p-0">
-          {/* Header with Add Location, All Locations dropdown, and Search - EXACTLY like Farmers table */}
-          <div className="p-4 bg-white border-b border-gray-200 flex justify-end items-center gap-4">
-     
-            
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+            <div className="relative flex-1 sm:flex-none">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="search"
                 placeholder={t("searchLocations") || "Search locations..."}
-                className="pl-10 w-[300px] bg-gray-50 border-gray-200"
+                className="pl-10 h-10 w-full sm:w-[220px] rounded-full bg-[#F3F4F6] border-0 shadow-none focus-visible:ring-1 focus-visible:ring-[#147677]/30"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
           </div>
+        </div>
 
-          <div className="p-4">
-            <DataTable<any>
+        <DataTable<any>
+          label={t("locations") || "Locations"}
+          variant="sheet"
+          rowHeight={56}
+          data={locations || []}
+          getRowId={(l: any) => String(l.id)}
+          loading={isLoading}
+          skeletonRows={limit}
+          selectable
+          selectedIds={new Set((selectedLocations || []).map(String))}
+          onSelectionChange={(ids) => setSelectedLocations(Array.from(ids).map(Number))}
+          onRowClick={(l: any) => handleViewLocation(l.id)}
+          emptyState={
+            <div className="flex flex-col items-center space-y-2">
+              <MapPin className="h-10 w-10 text-gray-300" />
+              <div className="text-slate-600 font-medium">{apiError ? (t("errorLoadingLocations") || "Error loading locations") : (t("noLocationsFound") || "No locations found")}</div>
+            </div>
+          }
+          columns={[
+            { id: "name", header: t("locationName") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-semibold text-slate-900">{l.name}</span> },
+            { id: "status", header: t("status") || "Status", value: (l: any) => (l.isActive ? 1 : 0), cell: (l: any) => <StatusBadge status={l.isActive ? "active" : "inactive"} /> },
+            { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
+              <span className="text-sm font-mono text-slate-600">
+                {l.coordinates || (l.latitude && l.longitude) ? `${l.latitude}, ${l.longitude}` : <span className="text-gray-400 italic">{t("noCoordinates") || "No coordinates"}</span>}
+              </span>
+            ) },
+            { id: "createdAt", header: t("createdAt") || "Created At", width: "140px", value: (l: any) => l.createdAt || "", cell: (l: any) => new Date(l.createdAt).toLocaleDateString() },
+            { id: "__actions", header: t("actions"), width: "96px", sortable: false, cell: (location: any) => (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100"><MoreHorizontal className="h-4 w-4 text-slate-500" /></Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => handleViewLocation(location.id)}><Eye className="h-4 w-4 mr-2 text-[#147677]" />{t("viewDetails") || "View Details"}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleEditLocation(location)}><Edit className="h-4 w-4 mr-2 text-[#147677]" />{t("editLocation") || "Edit Location"}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleOpenCustomMessageDialog(location)}><MessageSquare className="h-4 w-4 mr-2 text-[#147677]" />{t("sendCustomMessage") || "Send Custom Message"}</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    if (location.latitude && location.longitude) window.open(`https://maps.google.com/?q=${location.latitude},${location.longitude}`, '_blank');
+                    else toast.error(t('noCoordinatesAvailable') || 'No coordinates available for this location');
+                  }}><Navigation className="h-4 w-4 mr-2 text-[#147677]" />{t("viewOnMap") || "View on Map"}</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem destructive onClick={() => handleDeleteLocation(location.id)}><Trash className="h-4 w-4 mr-2" />{t("delete") || "Delete"}</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) },
+          ] as SortableColumn<any>[]}
+        />
+
+        {totalCount > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+            <p className="text-sm text-slate-500">
+              {t("showingEntries", { count: isLoading ? 0 : locations.length, total: totalCount })}
+            </p>
+            <Pagination
               label={t("locations") || "Locations"}
-              data={locations || []}
-              getRowId={(l: any) => String(l.id)}
-              loading={isLoading}
-              selectable
-              selectedIds={new Set((selectedLocations || []).map(String))}
-              onSelectionChange={(ids) => setSelectedLocations(Array.from(ids).map(Number))}
-              onRowClick={(l: any) => handleViewLocation(l.id)}
-              emptyState={
-                <div className="flex flex-col items-center space-y-3">
-                  <MapPin className="h-12 w-12 text-gray-300" />
-                  <div className="text-gray-500 font-medium">{apiError ? (t("errorLoadingLocations") || "Error loading locations") : (t("noLocationsFound") || "No locations found")}</div>
-                  <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
-                </div>
-              }
-              columns={[
-                { id: "name", header: t("locationName") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-medium text-gray-900">{l.name}</span> },
-                { id: "status", header: t("status") || "Status", value: (l: any) => (l.isActive ? 1 : 0), cell: (l: any) => <StatusBadge status={l.isActive ? "active" : "inactive"} /> },
-                { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
-                  <span className="text-sm font-mono text-gray-600">
-                    {l.coordinates || (l.latitude && l.longitude) ? `${l.latitude}, ${l.longitude}` : <span className="text-gray-400 italic">{t("noCoordinates") || "No coordinates"}</span>}
-                  </span>
-                ) },
-                { id: "createdAt", header: t("createdAt") || "Created At", value: (l: any) => l.createdAt || "", cell: (l: any) => new Date(l.createdAt).toLocaleDateString() },
-                rowActionsColumn<any>((location: any) => (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56">
-                      <DropdownMenuItem onClick={() => handleViewLocation(location.id)}><Eye className="h-4 w-4 mr-2" />{t("viewDetails") || "View Details"}</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleEditLocation(location)}><Edit className="h-4 w-4 mr-2" />{t("editLocation") || "Edit Location"}</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleOpenCustomMessageDialog(location)}><MessageSquare className="h-4 w-4 mr-2" style={{ color: '#adc9e3' }} />{t("sendCustomMessage") || "Send Custom Message"}</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => {
-                        if (location.latitude && location.longitude) window.open(`https://maps.google.com/?q=${location.latitude},${location.longitude}`, '_blank');
-                        else toast.error(t('noCoordinatesAvailable') || 'No coordinates available for this location');
-                      }}><Navigation className="h-4 w-4 mr-2" />{t("viewOnMap") || "View on Map"}</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem destructive onClick={() => handleDeleteLocation(location.id)}><Trash className="h-4 w-4 mr-2" />{t("delete") || "Delete"}</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )),
-              ] as SortableColumn<any>[]}
+              variant="boxed"
+              showEdges
+              count={Math.max(1, totalPages)}
+              page={currentPage}
+              onPageChange={(page) => setCurrentPage(page)}
             />
           </div>
-
-
-          {/* Pagination Footer - Matching the provided design exactly */}
-          {totalCount > 0 && (
-            <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-gray-200">
-              <div className="flex items-center text-sm text-gray-600 gap-2">
-                <span>
-                  {locations.length === 0 ? "0" : `${Math.min((currentPage - 1) * limit + 1, totalCount)}-${Math.min(currentPage * limit, totalCount)}`} of {totalCount} row(s) selected.
-                </span>
-              </div>
-              
-              <div className="flex items-center space-x-4">
-                <span className="text-sm text-gray-600">
-                  Page {currentPage} of {totalPages}
-                </span>
-                
-                <div className="flex items-center space-x-1">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(1)}
-                    className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                    title="First page"
-                  >
-                    <ChevronsLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={currentPage === 1}
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                    title="Previous page"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                    className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                    title="Next page"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={currentPage === totalPages}
-                    onClick={() => setCurrentPage(totalPages)}
-                    className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                    title="Last page"
-                  >
-                    <ChevronsRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </div>
 
       <div className="text-xs text-muted-foreground text-center mt-4">
         {t("dataLastUpdated") || "Data last updated"}: {new Date().toLocaleString()}
