@@ -229,7 +229,18 @@ export function ViewAlertDialog({
             </div>
             <div className="bg-[#147677]/10 rounded-lg p-4 border border-[#147677]/30">
               <p className="text-sm leading-relaxed">
-                {typeof alert.message === 'string' ? alert.message : 'No message content available'}
+                {(() => {
+                  const msg = typeof alert.message === 'string' ? alert.message : 'No message';
+                  const colonIndex = msg.indexOf(' ');
+                  if (colonIndex > -1) {
+                    return (
+                      <>
+                        <p className="text-sm leading-relaxed">{msg.substring(colonIndex)}</p>
+                      </>
+                    );
+                  }
+                  return <span>{msg}</span>;
+                })()}         
               </p>
             </div>
           </div>

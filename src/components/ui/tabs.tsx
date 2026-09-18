@@ -222,7 +222,7 @@ export function Tabs({
         {...tabs.tabListProps}
         ref={rowRef}
         aria-label={label}
-        className="relative flex w-full gap-1 border-b border-border bg-muted/40 px-1 pt-1"
+        className="relative flex w-full gap-1 bg-muted/40 px-1 pt-1"
       >
         <motion.span
           layout

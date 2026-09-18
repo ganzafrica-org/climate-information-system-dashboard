@@ -5,18 +5,17 @@ import { useRouter } from "next/router";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useLanguage } from "@/i18n";
 import { useAuth } from "@/hooks/useAuth";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DataTable, type SortableColumn } from "@/components/ui/table";
+import { Pagination } from "@/components/ui/pagination";
 import {
     ArrowUpDown, ChevronDown, Download, Edit, Loader2, MapPin, MessageSquare,
-    MoreHorizontal, Phone, Plus, Search, Trash, Upload, User, ChevronLeft, ChevronRight,
-    ChevronsLeft, ChevronsRight, RefreshCw, AlertTriangle, WifiOff
+    MoreHorizontal, Phone, Plus, Search, Trash, Upload, User,
+    RefreshCw, AlertTriangle, WifiOff
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -224,11 +223,6 @@ const Locations: NextPage = () => {
         }
     };
 
-    const handleLimitChange = (newLimit: number) => {
-        setLimit(newLimit);
-        setCurrentPage(1);
-    };
-
     // Custom status badge component for default locations
     const DefaultBadge = ({ isDefault }: { isDefault: boolean }) => {
         if (isDefault) {
@@ -283,162 +277,108 @@ const Locations: NextPage = () => {
                                 <Download className="h-4 w-4 mr-2" />
                                 {isExporting ? (t("exporting") || "Exporting...") : (t("exportData") || "Export Data")}
                             </Button>
-                        </div>
-                    </div>
-                </div>
 
-                <Card className="shadow-sm border border-gray-200 rounded-lg overflow-hidden">
-                    <CardContent className="p-0">
-                        {/* Header with Add Location and Search */}
-                        <div className="p-4 bg-white border-b border-gray-200 flex justify-end items-center gap-4">
                             {user?.role === 'admin' && (
-                                <Button 
-                                    variant="primary" 
-                                    onClick={() => setCreateDialogOpen(true)} 
-                                    style={{ backgroundColor: '#147677', borderColor: '#147677' }}
-                                    className="hover:opacity-90 text-white"
+                                <Button
+                                    variant="primary"
+                                    onClick={() => setCreateDialogOpen(true)}
+                                    className="rounded-lg"
                                 >
                                     <Plus className="h-4 w-4 mr-2" />
                                     {t("addLocation") || "Add Location"}
                                 </Button>
                             )}
-                            
-                            <div className="relative">
-                                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                                <Input
-                                    type="search"
-                                    placeholder={t("searchLocations") || "Search locations..."}
-                                    className="pl-10 w-[300px] bg-gray-50 border-gray-200"
-                                    value={searchTerm}
-                                    onChange={(e) => setSearchTerm(e.target.value)}
-                                />
-                            </div>
                         </div>
+                    </div>
+                </div>
 
-                        <div className="p-4">
-                          <DataTable<any>
-                            label="Locations"
-                            data={locations}
-                            getRowId={(l) => String(l.id)}
-                            loading={isLoading}
-                            onRowClick={(l) => handleViewLocation(l.id)}
-                            emptyState={
-                              <div className="flex flex-col items-center space-y-3">
-                                <MapPin className="h-12 w-12 text-gray-300" />
-                                <div className="text-gray-500 font-medium">{t("noLocationsFound") || "No locations found"}</div>
-                                <div className="text-sm text-gray-400">{t("tryAdjustingFilters") || "Try adjusting your search criteria"}</div>
-                              </div>
-                            }
-                            columns={[
-                              { id: "name", header: t("name") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-medium text-gray-900">{l.name}</span> },
-                              { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
-                                <span className="text-sm text-gray-600 font-mono">
-                                  {l.lat && l.lon ? `${l.lat.toFixed(6)}, ${l.lon.toFixed(6)}` : <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>}
-                                </span>
-                              ) },
-                              { id: "createdAt", header: t("createdAt") || "Created Date", value: (l: any) => l.createdAt || "", cell: (l: any) => l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '-' },
-                              rowActionsColumn<any>((location: any) => (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-56">
-                                    <DropdownMenuItem onClick={() => handleViewLocation(location.id)}>
-                                      <MapPin className="h-4 w-4 mr-2" />
-                                      {t("viewLocation") || "View Location"}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
+                        <h2 className="text-base font-bold text-slate-900">
+                            {t("listOfLocations") || "List of Locations"}
+                        </h2>
+
+                        <div className="relative flex-1 sm:flex-none w-full sm:w-auto">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            <Input
+                                type="search"
+                                placeholder={t("searchLocations") || "Search locations..."}
+                                className="pl-10 h-10 w-full sm:w-[220px] rounded-full bg-[#F3F4F6] border-0 shadow-none focus-visible:ring-1 focus-visible:ring-[#147677]/30"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <DataTable<any>
+                        label="Locations"
+                        variant="sheet"
+                        rowHeight={56}
+                        data={locations}
+                        getRowId={(l) => String(l.id)}
+                        loading={isLoading}
+                        skeletonRows={limit}
+                        onRowClick={(l) => handleViewLocation(l.id)}
+                        emptyState={
+                          <div className="flex flex-col items-center space-y-2">
+                            <MapPin className="h-10 w-10 text-gray-300" />
+                            <div className="text-slate-600 font-medium">{t("noLocationsFound") || "No locations found"}</div>
+                          </div>
+                        }
+                        columns={[
+                          { id: "index", header: "#", width: "72px", numeric: true, value: (l: any) => l.id },
+                          { id: "name", header: t("name") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-semibold text-slate-900">{l.name}</span> },
+                          { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
+                            <span className="text-sm text-slate-600 font-mono">
+                              {l.lat && l.lon ? `${l.lat.toFixed(6)}, ${l.lon.toFixed(6)}` : <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>}
+                            </span>
+                          ) },
+                          { id: "createdAt", header: t("createdAt") || "Created Date", width: "140px", value: (l: any) => l.createdAt || "", cell: (l: any) => l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '-' },
+                          { id: "__actions", header: t("actions"), width: "96px", sortable: false, cell: (location: any) => (
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100">
+                                  <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuItem className="cursor-pointer" onClick={() => handleViewLocation(location.id)}>
+                                  <MapPin className="h-4 w-4 mr-2 text-[#147677]" />
+                                  {t("viewLocation") || "View Location"}
+                                </DropdownMenuItem>
+                                {user?.role === 'admin' && (
+                                  <>
+                                    <DropdownMenuItem className="cursor-pointer" onClick={() => handleEditLocation(location)}>
+                                      <Edit className="h-4 w-4 mr-2 text-[#147677]" />
+                                      {t("editLocation") || "Edit Location"}
                                     </DropdownMenuItem>
-                                    {user?.role === 'admin' && (
-                                      <>
-                                        <DropdownMenuItem onClick={() => handleEditLocation(location)}>
-                                          <Edit className="h-4 w-4 mr-2" />
-                                          {t("editLocation") || "Edit Location"}
-                                        </DropdownMenuItem>
-                                        <DropdownMenuSeparator />
-                                        <DropdownMenuItem destructive onClick={() => handleDeleteLocation(location.id)}>
-                                          <Trash className="h-4 w-4 mr-2" />
-                                          {t("delete") || "Delete"}
-                                        </DropdownMenuItem>
-                                      </>
-                                    )}
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )),
-                            ] as SortableColumn<any>[]}
-                          />
-                        </div>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem className="cursor-pointer" onClick={() => handleDeleteLocation(location.id)}>
+                                      <Trash className="h-4 w-4 mr-2 text-[#e46064]" />
+                                      <span className="text-[#e46064]">{t("delete") || "Delete"}</span>
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          ) },
+                        ] as SortableColumn<any>[]}
+                    />
 
-
-                        {/* Pagination Footer - Matching the provided design exactly */}
-                        {totalCount > 0 && (
-                            <div className="flex items-center justify-between px-6 py-4 bg-white border-t border-gray-200">
-                                <div className="flex items-center text-sm text-gray-600 gap-2">
-                                    <span>
-                                        {locations.length === 0 ? "0" : `${Math.min((currentPage - 1) * limit + 1, totalCount)}-${Math.min(currentPage * limit, totalCount)}`} of {totalCount} row(s) selected.
-                                    </span>
-                                    <span>{t("rowsPerPage") || "Rows per page"}</span>
-                                    <Select value={String(limit)} onValueChange={(v) => handleLimitChange(parseInt(v))}>
-                                        <SelectTrigger className="ml-2 h-8 w-[72px]"><SelectValue /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="10">10</SelectItem>
-                                            <SelectItem value="20">20</SelectItem>
-                                            <SelectItem value="50">50</SelectItem>
-                                            <SelectItem value="100">100</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                
-                                <div className="flex items-center space-x-4">
-                                    <span className="text-sm text-gray-600">
-                                        Page {currentPage} of {totalPages}
-                                    </span>
-                                    
-                                    <div className="flex items-center space-x-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={currentPage === 1}
-                                            onClick={() => handlePageChange(1)}
-                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                                            title="First page"
-                                        >
-                                            <ChevronsLeft className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={currentPage === 1}
-                                            onClick={() => handlePageChange(currentPage - 1)}
-                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                                            title="Previous page"
-                                        >
-                                            <ChevronLeft className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={currentPage === totalPages}
-                                            onClick={() => handlePageChange(currentPage + 1)}
-                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                                            title="Next page"
-                                        >
-                                            <ChevronRight className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            disabled={currentPage === totalPages}
-                                            onClick={() => handlePageChange(totalPages)}
-                                            className="h-8 w-8 p-0 hover:bg-gray-100 disabled:opacity-50"
-                                            title="Last page"
-                                        >
-                                            <ChevronsRight className="h-4 w-4" />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4">
+                        <p className="text-sm text-slate-500">
+                            {t("showingEntries", { count: isLoading ? 0 : locations.length, total: totalCount })}
+                        </p>
+                        <Pagination
+                            label="Locations"
+                            variant="boxed"
+                            showEdges
+                            count={totalPages}
+                            page={currentPage}
+                            onPageChange={handlePageChange}
+                        />
+                    </div>
+                </div>
 
                 <div className="text-xs text-muted-foreground text-center mt-4">
                     {t("dataLastUpdated") || "Data last updated"}: {new Date().toLocaleString()}

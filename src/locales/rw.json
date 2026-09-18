@@ -781,6 +781,11 @@
 
   "noFarmersFound": "Nta bahinzi babonetse",
   "listOfFarmers": "Urutonde rw'Abahinzi",
+  "listOfLocations": "Urutonde rw'Ahantu",
+  "listOfAlerts": "Urutonde rw'Imiburo y'Ikirere",
+  "listOfMessages": "Urutonde rw'Ubutumwa",
+  "listOfScheduledMessages": "Urutonde rw'Ubutumwa Bwateganyijwe",
+  "listOfLogs": "Urutonde rw'Amateka y'Ubutumwa",
   "showingEntries": "Byerekanwe {{count}} muri {{total}}",
 
   "adminAccessRequired": "Kwinjira kwa mutegetsi byifuzwa",

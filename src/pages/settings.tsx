@@ -139,15 +139,7 @@ const Settings: NextPage = () => {
                                 >
                                     <SettingsIcon className="h-4 w-4 mr-2" />
                                     {t('general')}
-                                </Button>
-                                <Button
-                                    variant={activeTab === 'account' ? 'secondary' : 'ghost'}
-                                    className="w-full justify-start"
-                                    onClick={() => setActiveTab('account')}
-                                >
-                                    <User className="h-4 w-4 mr-2" />
-                                    {t('account')}
-                                </Button>
+                                </Button> 
                                 <Button
                                     variant={activeTab === 'notifications' ? 'secondary' : 'ghost'}
                                     className="w-full justify-start"
@@ -157,14 +149,6 @@ const Settings: NextPage = () => {
                                     {t('notifications')}
                                 </Button>
                                 <Button
-                                    variant={activeTab === 'dataManagement' ? 'secondary' : 'ghost'}
-                                    className="w-full justify-start"
-                                    onClick={() => setActiveTab('dataManagement')}
-                                >
-                                    <Database className="h-4 w-4 mr-2" />
-                                    {t('dataManagement')}
-                                </Button>
-                                <Button
                                     variant={activeTab === 'security' ? 'secondary' : 'ghost'}
                                     className="w-full justify-start"
                                     onClick={() => setActiveTab('security')}
@@ -172,14 +156,7 @@ const Settings: NextPage = () => {
                                     <Shield className="h-4 w-4 mr-2" />
                                     {t('security')}
                                 </Button>
-                                <Button
-                                    variant={activeTab === 'about' ? 'secondary' : 'ghost'}
-                                    className="w-full justify-start"
-                                    onClick={() => setActiveTab('about')}
-                                >
-                                    <InfoIcon className="h-4 w-4 mr-2" />
-                                    {t('about')}
-                                </Button>
+                                
                             </nav>
                         </CardContent>
                     </Card>
@@ -257,24 +234,17 @@ const Settings: NextPage = () => {
                                                 </select>
                                             </div>
                                         </div>
+                                        <div className="flex justify-end">
+                                          <Button className="ml-auto mt-6">
+                                            <Save className="h-4 w-4 mr-2" />
+                                            {t('saveChanges')}
+                                          </Button>
+                                        </div>
                                     </div>
-                                </CardContent>
-                                <CardFooter>
-                                    <Button className="ml-auto">
-                                        <Save className="h-4 w-4 mr-2" />
-                                        {t('saveChanges')}
-                                    </Button>
-                                </CardFooter>
-                            </>
-                        )}
 
-                        {activeTab === 'account' && (
-                            <>
-                                <CardHeader>
-                                    <CardTitle>{t('accountSettings')}</CardTitle>
-                                    <CardDescription>{t('accountSettingsDesc')}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
+                                     <Separator/>
+      
+                                    <CardContent className="space-y-6">
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4">
                                             <div className="bg-ganz-primary rounded-full h-16 w-16 flex items-center justify-center">
@@ -455,8 +425,45 @@ const Settings: NextPage = () => {
                                         </form>
                                     </div>
                                 </CardContent>
+                                                 
+                                     <Separator />
+
+                                    <div className="space-y-2">
+                                        <h3 className="text-base font-medium">{t('sessionManagement')}</h3>
+                                        <p className="text-sm text-muted-foreground mb-2">
+                                            {t('sessionManagementDesc')}
+                                        </p>
+                                        <div className="space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="font-medium">{t('currentSession')}</div>
+                                                    <div className="text-sm text-muted-foreground">Kigali, Rwanda • Chrome • Windows</div>
+                                                </div>
+                                                <div className="text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                                                    {t('active')}
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="font-medium">{t('mobileSession')}</div>
+                                                    <div className="text-sm text-muted-foreground">Kigali, Rwanda • Mobile App • Android</div>
+                                                </div>
+                                                <div className="text-xs px-2 py-1 bg-muted rounded-full">
+                                                    {t('inactive')}
+                                                </div>
+                                            </div>
+
+                                            <Button variant="outline" className="mt-2">
+                                                <LogOut className="h-4 w-4 mr-2" />
+                                                {t('logoutAllSessions')}
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                </CardContent> 
                             </>
-                        )}
+                        )} 
                         {activeTab === 'notifications' && (
                             <>
                                 <CardHeader>
@@ -521,135 +528,7 @@ const Settings: NextPage = () => {
                             </>
                         )}
 
-                        {activeTab === 'dataManagement' && (
-                            <>
-                                <CardHeader>
-                                    <CardTitle>{t('dataManagement')}</CardTitle>
-                                    <CardDescription>{t('dataManagementDesc')}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('dataSources')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('dataSourcesDesc')}
-                                        </p>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center justify-between p-3 rounded-md border">
-                                                <div>
-                                                    <div className="font-medium">OpenWeatherMap API</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {t('weatherDataProvider')}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-sm">
-                          <span className="text-green-600 flex items-center gap-1">
-                            <Check className="h-4 w-4" />
-                              {t('connected')}
-                          </span>
-                                                    <Button variant="outline" size="sm">
-                                                        {t('configure')}
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between p-3 rounded-md border">
-                                                <div>
-                                                    <div className="font-medium">Rwanda Agricultural Board</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {t('agriculturalDataProvider')}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-sm">
-                          <span className="text-green-600 flex items-center gap-1">
-                            <Check className="h-4 w-4" />
-                              {t('connected')}
-                          </span>
-                                                    <Button variant="outline" size="sm">
-                                                        {t('configure')}
-                                                    </Button>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between p-3 rounded-md border">
-                                                <div>
-                                                    <div className="font-medium">Local Weather Stations</div>
-                                                    <div className="text-sm text-muted-foreground">
-                                                        {t('localWeatherStations')}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-sm">
-                          <span className="text-amber-600 flex items-center gap-1">
-                            <AlertTriangle className="h-4 w-4" />
-                              {t('partialConnection')}
-                          </span>
-                                                    <Button variant="outline" size="sm">
-                                                        {t('configure')}
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('dataUpdateSettings')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('dataUpdateSettingsDesc')}
-                                        </p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('weatherUpdateFrequency')}</label>
-                                                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                                                    <option value="15min">{t('every15Minutes')}</option>
-                                                    <option value="30min">{t('every30Minutes')}</option>
-                                                    <option value="1hour" selected>{t('hourly')}</option>
-                                                    <option value="3hours">{t('every3Hours')}</option>
-                                                </select>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-sm font-medium">{t('forecastHorizon')}</label>
-                                                <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50">
-                                                    <option value="3days">{t('3days')}</option>
-                                                    <option value="7days" selected>{t('7days')}</option>
-                                                    <option value="14days">{t('14days')}</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('dataMaintenance')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('dataMaintenanceDesc')}
-                                        </p>
-                                        <div className="flex flex-wrap gap-2">
-                                            <Button variant="outline">
-                                                <RefreshCw className="h-4 w-4 mr-2" />
-                                                {t('syncAllData')}
-                                            </Button>
-                                            <Button variant="outline">
-                                                <Database className="h-4 w-4 mr-2" />
-                                                {t('exportSystemData')}
-                                            </Button>
-                                            <Button variant="outline" className="text-red-600 hover:text-red-700 hover:bg-red-100 dark:hover:bg-red-900/20">
-                                                <Trash className="h-4 w-4 mr-2" />
-                                                {t('clearCachedData')}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                                <CardFooter>
-                                    <Button className="ml-auto">
-                                        <Save className="h-4 w-4 mr-2" />
-                                        {t('saveChanges')}
-                                    </Button>
-                                </CardFooter>
-                            </>
-                        )}
+                        
                         {activeTab === 'security' && (
                             <>
                                 <CardHeader>
@@ -753,68 +632,7 @@ const Settings: NextPage = () => {
                                     </Button>
                                 </CardFooter>
                             </>
-                        )}
-                        {activeTab === 'about' && (
-                            <>
-                                <CardHeader>
-                                    <CardTitle>{t('about')}</CardTitle>
-                                    <CardDescription>{t('aboutSystemDesc')}</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="flex flex-col items-center justify-center py-6">
-                                        <div className="h-16 w-16 rounded-full bg-ganz-primary flex items-center justify-center mb-4">
-                                            <div className="h-10 w-10 text-white">
-                                                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                                                    <path d="M7 17.9999C11.5714 17.9999 19 15.9999 19 6.99994C19 6.99994 14.5 12.9999 7 12.9999V17.9999Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                    <path d="M7 13C7 13 3 10 3 7C3 7 8.5 5 12 3C12 3 12.5 8.5 7 13Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                </svg>
-                                            </div>
-                                        </div>
-                                        <h2 className="text-2xl font-bold">GanzAfrica</h2>
-                                        <p className="text-muted-foreground">{t('climateInformationSystem')}</p>
-                                        <div className="mt-2 text-sm">
-                                            v1.0.0
-                                        </div>
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('aboutSystem')}</h3>
-                                        <p className="text-sm mb-2">
-                                            {t('systemDescription')}
-                                        </p>
-                                        <p className="text-sm mb-4">
-                                            {t('systemPurpose')}
-                                        </p>
-
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('contact')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('contactDesc')}
-                                        </p>
-                                        <div className="space-y-2">
-                                            <div className="flex items-center gap-2">
-                                                <Mail className="h-4 w-4 text-muted-foreground" />
-                                                <span>support@ganzafrica.org</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Phone className="h-4 w-4 text-muted-foreground" />
-                                                <span>+250 788 XXX XXX</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <Globe className="h-4 w-4 text-muted-foreground" />
-                                                <span>www.ganzafrica.org</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </>
-                        )}
+                        )} 
                     </Card>
                 </div>
 
