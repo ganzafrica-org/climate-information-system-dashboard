@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -28,19 +28,20 @@ import {
   AlertTriangle,
   Info,
   FileText,
-  Activity,
-  Users,
   Loader2
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { isPlaceholderSms } from '@/lib/alertMessage';
+import { fetchFarmerSmsForAlert } from '@/lib/farmerSms';
 
 // Alert Interface
 interface Alert {
   id: number;
   type: string;
   message: string;
+  farmerSms?: string;
   messageLength: number;
   messageSegments: number;
   isSent: boolean;
@@ -74,12 +75,42 @@ export function ViewAlertDialog({
   onDelete 
 }: ViewAlertDialogProps) {
   const { t } = useLanguage();
+  const [displayMessage, setDisplayMessage] = useState('');
+  const [isLoadingMessage, setIsLoadingMessage] = useState(false);
+
+  useEffect(() => {
+    if (!open || !alert) {
+      setDisplayMessage('');
+      setIsLoadingMessage(false);
+      return;
+    }
+
+    const existing = alert.farmerSms && !isPlaceholderSms(alert.farmerSms) ? alert.farmerSms : '';
+    setDisplayMessage(existing);
+    setIsLoadingMessage(!existing);
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const msg = await fetchFarmerSmsForAlert(alert.id);
+        if (!cancelled && msg) setDisplayMessage(msg);
+      } catch {
+        // Keep any SMS already loaded from the table.
+      } finally {
+        if (!cancelled) setIsLoadingMessage(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, alert]);
 
   if (!alert) return null;
 
   const handleCopyMessage = () => {
-    const messageText = typeof alert.message === 'string' ? alert.message : 'No message content';
-    navigator.clipboard.writeText(messageText);
+    if (!displayMessage) return;
+    navigator.clipboard.writeText(displayMessage);
     toast.success(t('messageCopied') || 'Message copied to clipboard');
   };
 
@@ -153,7 +184,7 @@ export function ViewAlertDialog({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {getPriorityIcon(alert.priority)}
-            {t('alertDetails')} #{alert.id}
+            {t('alertDetails')}
           </DialogTitle>
           <DialogDescription>
             {t('viewAlertInformation')}
@@ -185,7 +216,7 @@ export function ViewAlertDialog({
               </div>
               <div className="flex items-center gap-2 text-muted-foreground mt-1">
                 <Calendar className="h-4 w-4 text-[#147677]" />
-                <span>{t('createdOn')} {new Date(alert.createdAt).toLocaleDateString()}</span>
+                <span>{t('created')} {new Date(alert.createdAt).toLocaleDateString()}</span>
                 <Clock className="h-4 w-4 ml-2 text-[#147677]" />
                 <span>{new Date(alert.createdAt).toLocaleTimeString()}</span>
               </div>
@@ -222,145 +253,30 @@ export function ViewAlertDialog({
                 <MessageSquare className="h-4 w-4 text-[#147677]" />
                 {t('alertMessage')}
               </h3>
-              <Button variant="outline" size="sm" onClick={handleCopyMessage} className="border-[#147677] text-[#147677] hover:bg-[#147677]/10">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCopyMessage}
+                disabled={!displayMessage}
+                className="border-[#147677] text-[#147677] hover:bg-[#147677]/10"
+              >
                 <Copy className="h-4 w-4 mr-2 text-[#147677]" />
                 {t('copy')}
               </Button>
             </div>
-            <div className="bg-[#147677]/10 rounded-lg p-4 border border-[#147677]/30">
-              <p className="text-sm leading-relaxed">
-                {(() => {
-                  const msg = typeof alert.message === 'string' ? alert.message : 'No message';
-                  const colonIndex = msg.indexOf(' ');
-                  if (colonIndex > -1) {
-                    return (
-                      <>
-                        <p className="text-sm leading-relaxed">{msg.substring(colonIndex)}</p>
-                      </>
-                    );
-                  }
-                  return <span>{msg}</span>;
-                })()}         
-              </p>
+            <div className="bg-[#147677]/10 rounded-lg p-4 border border-[#147677]/30 min-h-[72px]">
+              {isLoadingMessage ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t('loading')}
+                </div>
+              ) : (
+                <p className={`text-sm leading-relaxed whitespace-pre-wrap ${displayMessage ? '' : 'text-slate-400'}`}>
+                  {displayMessage || t('notSentYet')}
+                </p>
+              )}
             </div>
           </div>
-
-          {/* Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Message Details */}
-            <div>
-              <h4 className="font-bold mb-3 flex items-center gap-2">
-                <FileText className="h-4 w-4 text-[#147677]" />
-                {t('messageDetails')}
-              </h4>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                  <span className="text-muted-foreground">{t('messageLength')}:</span>
-                  <span className="font-medium">{alert.messageLength} characters</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                  <span className="text-muted-foreground">{t('segments')}:</span>
-                  <span className="font-medium">{alert.messageSegments}</span>
-                </div>
-                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                  <span className="text-muted-foreground">{t('alertId')}:</span>
-                  <span className="font-medium">#{alert.id}</span>
-                </div>
-                {alert.targetAudience && (
-                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                    <span className="text-muted-foreground">{t('targetAudience')}:</span>
-                    <span className="font-medium">{alert.targetAudience}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Delivery Info */}
-            <div>
-              <h4 className="font-bold mb-3 flex items-center gap-2">
-                <Activity className="h-4 w-4 text-[#147677]" />
-                {t('deliveryInfo')}
-              </h4>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                  <span className="text-muted-foreground">{t('status')}:</span>
-                  <Badge 
-                    variant={getStatusColor(currentStatus)} 
-                    className={`flex items-center gap-1 ${
-                      currentStatus === 'draft' || currentStatus === 'pending' || currentStatus === 'scheduled'
-                        ? 'border-[#147677] text-[#147677]' : ''
-                    }`}
-                  >
-                    {getStatusIcon(currentStatus)}
-                    {currentStatus}
-                  </Badge>
-                </div>
-                {alert.sentAt ? (
-                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                    <span className="text-muted-foreground">{t('sentAt')}:</span>
-                    <span className="font-medium">{new Date(alert.sentAt).toLocaleString()}</span>
-                  </div>
-                ) : (
-                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                    <span className="text-muted-foreground">{t('status')}:</span>
-                    <span className="font-medium">{t('pending')}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                  <span className="text-muted-foreground">{t('location')}:</span>
-                  <span className="font-medium">
-                    {typeof alert.location === 'object' && alert.location !== null 
-                      ? alert.location.name 
-                      : (alert.location || 'Unknown Location')}
-                  </span>
-                </div>
-                {alert.recipientCount && (
-                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                    <span className="text-muted-foreground">{t('recipients')}:</span>
-                    <span className="font-medium flex items-center gap-1">
-                      <Users className="h-3 w-3 text-[#147677]" />
-                      {alert.recipientCount}
-                    </span>
-                  </div>
-                )}
-                {alert.deliveryMethod && (
-                  <div className="flex justify-between items-center p-2 bg-[#147677]/10 rounded border border-[#147677]/30">
-                    <span className="text-muted-foreground">{t('deliveryMethod')}:</span>
-                    <span className="font-medium">{alert.deliveryMethod}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Timeline */}
-          {alert.updatedAt && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="font-bold mb-3 flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-[#147677]" />
-                  {t('timeline')}
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 text-sm">
-                    <div className="w-2 h-2 bg-[#147677] rounded-full"></div>
-                    <span className="text-muted-foreground">
-                      {t('created')}: {new Date(alert.createdAt).toLocaleString()}
-                    </span>
-                  </div>
-                  {alert.updatedAt !== alert.createdAt && (
-                    <div className="flex items-center gap-3 text-sm">
-                      <div className="w-2 h-2 bg-[#147677] rounded-full"></div>
-                      <span className="text-muted-foreground">
-                        {t('updated')}: {new Date(alert.updatedAt).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-4">

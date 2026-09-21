@@ -29,20 +29,15 @@ import { SendAlertDialog } from './SendAlertDialog';
 import { EditAlertDialog } from './AlertsDialogs';
 import api from '@/lib/api';
 import { toast } from 'sonner';
-
-// Alert messages are stored with a leading channel prefix (e.g. "IBURIRA: ...");
-// strip it so only the actual message content is displayed.
-const stripMessagePrefix = (message: string) => {
-    const spaceIndex = message.indexOf(' ');
-    return spaceIndex > -1 ? message.substring(spaceIndex).trim() : message;
-};
+import { truncateSms } from '@/lib/alertMessage';
+import { fetchFarmerSmsMap } from '@/lib/farmerSms';
 
 // Custom badge components
 const StatusBadge = ({ status }: { status: string }) => {
     switch (status?.toLowerCase()) {
         case 'sent':
             return (
-                <Badge style={{ backgroundColor: '#ECFDF6', color: '#16a34a', border: '1px solid #ECFDF6' }} className="hover:opacity-80">
+                <Badge className="border-[#ECFDF6] bg-[#ECFDF6] text-[#16a34a] hover:border-[#16a34a] hover:bg-[#16a34a] hover:text-white">
                     Sent
                 </Badge>
             );
@@ -147,6 +142,7 @@ interface Alert {
   id: number;
   type: string;
   message: string;
+  farmerSms?: string;
   messageLength: number;
   messageSegments: number;
   isSent: boolean;
@@ -265,6 +261,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 id: alert.id || Date.now(),
                 type: alert.type || 'weather',
                 message: alert.message || '',
+                farmerSms: '',
                 messageLength: alert.messageLength || alert.message?.length || 0,
                 messageSegments: alert.messageSegments || 1,
                 isSent: alert.isSent || alert.status === 'sent' || false,
@@ -283,7 +280,13 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 status: alert.status || (alert.isSent ? 'sent' : 'draft')
             }));
 
-            setAlerts(transformedAlerts);
+            const farmerSmsMap = await fetchFarmerSmsMap(transformedAlerts.map((alert) => alert.id));
+            const alertsWithSms = transformedAlerts.map((alert) => ({
+                ...alert,
+                farmerSms: farmerSmsMap[alert.id] || '',
+            }));
+
+            setAlerts(alertsWithSms);
             setTotalCount(paginationData.total || transformedAlerts.length);
             setTotalPages(paginationData.totalPages || Math.ceil((paginationData.total || transformedAlerts.length) / limit));
             setCurrentPage(paginationData.page || page);
@@ -500,11 +503,14 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                           {a.category && <div className="text-xs text-muted-foreground">{typeof a.category === 'string' ? a.category : 'General'}</div>}
                         </div>
                       ) },
-                      { id: "message", header: t("message"), value: (a) => (typeof a.message === 'string' ? a.message : ''), cell: (a) => (
-                        <div>
-                          <div className="text-sm line-clamp-2 max-w-[300px]">{typeof a.message === 'string' ? stripMessagePrefix(a.message) : 'No message'}</div>
-                          <div className="text-xs text-muted-foreground mt-1">{a.messageLength} chars • {a.messageSegments} segments</div>
-                        </div>
+                      { id: "message", header: t("message"), value: (a) => a.farmerSms || '', cell: (a) => (
+                        a.farmerSms ? (
+                          <div className="text-sm line-clamp-2 max-w-[360px]" title={a.farmerSms}>
+                            {truncateSms(a.farmerSms, 80)}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-slate-400">{t('notSentYet')}</span>
+                        )
                       ) },
                       { id: "location", header: t("location"), value: (a) => (typeof a.location === 'string' ? a.location : ''), cell: (a) => (
                         <div>
