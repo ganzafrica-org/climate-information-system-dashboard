@@ -41,6 +41,7 @@ interface Alert {
   id: number;
   type: string;
   message: string;
+  farmerSms?: string;
   messageLength: number;
   messageSegments: number;
   isSent: boolean;
@@ -598,9 +599,8 @@ export function SendAlertDialog({
               {/* Message preview */}
               <div className="bg-[#147677]/10 p-3 rounded-lg border border-[#147677]/30">
                 <h4 className="font-medium mb-2 text-[#147677]">{t('messagePreview')}</h4>
-                <p className="text-sm">{alert.message}</p>
-                <p className="text-xs text-[#147677] mt-1">
-                  {alert.messageLength} characters • {alert.messageSegments} SMS segments
+                <p className={`text-sm whitespace-pre-wrap ${alert.farmerSms ? '' : 'text-slate-400'}`}>
+                  {alert.farmerSms || t('notSentYet')}
                 </p>
               </div>
 

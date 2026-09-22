@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from 'react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +7,23 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { DataTable, type SortableColumn } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
-import { MoreHorizontal, RefreshCw, Download, Search } from 'lucide-react';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Eye,
+    Filter,
+    MessageSquare,
+    MoreHorizontal,
+    Phone,
+    Search,
+    User,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/i18n';
 
@@ -34,80 +50,95 @@ interface MessageLog {
     createdAt?: string;
 }
 
-interface ApiResponse {
-    status: string;
-    data: {
-        summary: {
-            totalEntries: number;
-            returned: number;
-            sentCount: number;
-            failedCount: number;
-            byAlert: Record<string, { sent: number; failed: number; total: number }>;
-        };
-        results: MessageLog[];
-    };
-}
+type LogSummary = {
+    total: number;
+    sent: number;
+    failed: number;
+    pending: number;
+};
 
-export function MessageLogsTable() {
+type StatusFilter = 'all' | 'sent' | 'failed' | 'pending';
+
+const normalizeSummary = (raw: any, logs: MessageLog[]): LogSummary => {
+    const sentFromLogs = logs.filter((l) => l.status === 'sent' || l.success === true).length;
+    const failedFromLogs = logs.filter((l) => l.status === 'failed' || l.success === false).length;
+    const pendingFromLogs = logs.filter((l) => l.status === 'pending').length;
+    return {
+        total: Number(raw?.total ?? raw?.totalEntries ?? logs.length) || logs.length,
+        sent: Number(raw?.sent ?? raw?.sentCount ?? sentFromLogs) || sentFromLogs,
+        failed: Number(raw?.failed ?? raw?.failedCount ?? failedFromLogs) || failedFromLogs,
+        pending: Number(raw?.pending ?? pendingFromLogs) || pendingFromLogs,
+    };
+};
+
+export type MessageLogsTableHandle = {
+    refresh: () => Promise<void>;
+    exportLogs: () => void;
+    isBusy: boolean;
+};
+
+export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChange?: (busy: boolean) => void }>(function MessageLogsTable({ onBusyChange }, ref) {
     const { t } = useLanguage();
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [logs, setLogs] = useState<MessageLog[]>([]);
-    const [summary, setSummary] = useState<ApiResponse['data']['summary'] | null>(null);
+    const [summary, setSummary] = useState<LogSummary>({ total: 0, sent: 0, failed: 0, pending: 0 });
     const [page, setPage] = useState(1);
+    const [selectedLog, setSelectedLog] = useState<MessageLog | null>(null);
+    const [detailsOpen, setDetailsOpen] = useState(false);
     const pageSize = 15;
 
-    const extractData = (payload: any): { logs: MessageLog[]; summary: ApiResponse['data']['summary'] | null } => {
-        if (!payload) return { logs: [], summary: null };
-        
-        // Handle the specific API response structure
-        if (payload.data?.results && Array.isArray(payload.data.results)) {
-            return {
-                logs: payload.data.results,
-                summary: payload.data.summary || null
-            };
-        }
-        
-        // Fallback extraction methods
-        const logs = Array.isArray(payload) ? payload :
-                    Array.isArray(payload.logs) ? payload.logs :
-                    Array.isArray(payload.data) ? payload.data :
-                    Array.isArray(payload.items) ? payload.items :
-                    Array.isArray(payload.results) ? payload.results :
-                    Array.isArray(payload.rows) ? payload.rows :
-                    Array.isArray(payload.records) ? payload.records :
-                    Array.isArray(payload?.data?.logs) ? payload.data.logs :
-                    Array.isArray(payload?.data?.items) ? payload.data.items :
-                    Array.isArray(payload?.data?.results) ? payload.data.results :
-                    Array.isArray(payload?.data?.rows) ? payload.data.rows :
-                    Array.isArray(payload?.data?.records) ? payload.data.records : [];
-        
-        return { logs, summary: null };
+    const extractPage = (payload: any): { logs: MessageLog[]; summary: any; total: number; pageCount: number } => {
+        if (!payload) return { logs: [], summary: null, total: 0, pageCount: 1 };
+        const root = payload.data ?? payload;
+        const logs = Array.isArray(root?.results) ? root.results
+            : Array.isArray(root?.messages) ? root.messages
+            : Array.isArray(payload.results) ? payload.results
+            : Array.isArray(payload) ? payload
+            : [];
+        const pagination = root?.pagination || payload.pagination;
+        const total = Number(pagination?.total ?? root?.summary?.total ?? logs.length) || logs.length;
+        const pageCount = Number(pagination?.totalPages ?? Math.max(1, Math.ceil(total / 200))) || 1;
+        return { logs, summary: root?.summary ?? payload.summary, total, pageCount };
     };
 
     const fetchLogs = async () => {
         setIsLoading(true);
         try {
-            const response = await api.get<any>(
-                '/api/weather/admin/logs/messages',
-                {
-                    params: { _ts: Date.now() },
-                    headers: { 'Cache-Control': 'no-cache' }
-                }
-            );
-            const data = response as any;
-            console.log('Logs API raw payload:', data);
-            
-            const { logs: extractedLogs, summary: extractedSummary } = extractData(data);
-            const logsArray = Array.isArray(extractedLogs) ? extractedLogs : [];
-            setLogs(logsArray);
-            setSummary(extractedSummary);
-            console.log('Parsed logs count:', logsArray.length);
-            
+            const allLogs: MessageLog[] = [];
+            let collectedSummary: any = null;
+            let pageNum = 1;
+            let pageCount = 1;
+
+            do {
+                const payload = await api.get<any>(
+                    '/api/weather/admin/logs/messages',
+                    {
+                        params: {
+                            page: pageNum,
+                            limit: 200,
+                            sortField: 'createdAt',
+                            sortOrder: 'desc',
+                            _ts: Date.now(),
+                        },
+                    }
+                );
+                const extracted = extractPage(payload);
+                if (extracted.summary) collectedSummary = extracted.summary;
+                allLogs.push(...extracted.logs);
+                pageCount = extracted.pageCount;
+                pageNum += 1;
+            } while (pageNum <= pageCount && pageNum <= 25);
+
+            setLogs(allLogs);
+            setSummary(normalizeSummary(collectedSummary, allLogs));
         } catch (error: any) {
             console.error('Failed to fetch message logs:', error);
-            toast.error(t('failedToLoadLogs') || 'Failed to load logs');
+            toast.error(t('failedToLoadLogs'));
+            setLogs([]);
+            setSummary({ total: 0, sent: 0, failed: 0, pending: 0 });
         } finally {
             setIsLoading(false);
         }
@@ -118,20 +149,32 @@ export function MessageLogsTable() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    useEffect(() => {
+        onBusyChange?.(isRefreshing || isLoading);
+    }, [isRefreshing, isLoading, onBusyChange]);
+
     const filteredLogs = useMemo(() => {
         const source = Array.isArray(logs) ? logs : [];
-        if (!searchTerm) return source;
+        const byStatus = source.filter((l) => {
+            if (statusFilter === 'all') return true;
+            const status = (l.status || '').toLowerCase();
+            if (statusFilter === 'sent') return status === 'sent' || (status !== 'failed' && status !== 'pending' && l.success === true);
+            if (statusFilter === 'failed') return status === 'failed';
+            if (statusFilter === 'pending') return status === 'pending';
+            return true;
+        });
+        if (!searchTerm) return byStatus;
         const term = searchTerm.toLowerCase();
-        return source.filter((l) => {
+        return byStatus.filter((l) => {
             return [l.message, l.phoneNumber, l.messageId, l.alertId?.toString(), l.farmerName, l.level, l.alertTitle, l.alertType, l.status, l.provider]
                 .filter(Boolean)
                 .some((v) => String(v).toLowerCase().includes(term));
         });
-    }, [logs, searchTerm]);
+    }, [logs, searchTerm, statusFilter]);
 
     useEffect(() => {
         setPage(1);
-    }, [searchTerm]);
+    }, [searchTerm, statusFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
     const pagedLogs = useMemo(
@@ -139,68 +182,37 @@ export function MessageLogsTable() {
         [filteredLogs, page]
     );
 
-    const logStats = useMemo(() => {
-        const source = Array.isArray(logs) ? logs : [];
-        let sentCount = 0;
-        let failedCount = 0;
-
-        source.forEach((log) => {
-            const status = log.status?.toLowerCase();
-            const success = log.success;
-            const level = log.level?.toLowerCase();
-            const hasError = log.error || log.errorMessage;
-
-            // Count as sent/success
-            if (status === 'sent' || status === 'delivered' || status === 'success' || success === true || level === 'info') {
-                sentCount++;
-            }
-            // Count as failed
-            else if (status === 'failed' || status === 'error' || success === false || level === 'error' || hasError) {
-                failedCount++;
-            }
-        });
-
-        return { total: source.length, sentCount, failedCount };
-    }, [logs]);
-
     const StatusBadge = ({ log }: { log: MessageLog }) => {
-        // Determine status from multiple possible fields
-        const status = log.status?.toLowerCase();
-        const success = log.success;
-        const level = log.level?.toLowerCase();
-        const hasError = log.error || log.errorMessage;
-        
-        // Success cases
-        if (status === 'sent' || status === 'delivered' || status === 'success' || success === true || level === 'info') {
+        const status = (log.status || '').toLowerCase();
+        const hasError = Boolean(log.error || log.errorMessage);
+
+        if (status === 'sent' || status === 'success' || (log.success === true && status !== 'failed')) {
             return (
-                <Badge style={{ backgroundColor: '#ECFDF6', color: '#16a34a', border: '1px solid #ECFDF6' }}>
-                    {t('success') || 'Success'}
+                <Badge className="max-w-full truncate border-[#ECFDF6] bg-[#ECFDF6] text-[#16a34a] hover:border-[#16a34a] hover:bg-[#16a34a] hover:text-white">
+                    {t('sent')}
                 </Badge>
             );
         }
-        
-        // Failure cases
-        if (status === 'failed' || status === 'error' || success === false || level === 'error' || hasError) {
+
+        if (status === 'failed' || log.success === false || hasError) {
             return (
-                <Badge style={{ backgroundColor: '#FEE2E2', color: '#DC2626', border: '1px solid #FEE2E2' }}>
-                    {t('failed') || 'Failed'}
+                <Badge className="border-[#FEE2E2] bg-[#FEF2F2] text-[#DC2626]">
+                    {t('failed')}
                 </Badge>
             );
         }
-        
-        // Pending/processing cases
+
         if (status === 'pending' || status === 'processing' || status === 'queued') {
             return (
-                <Badge style={{ backgroundColor: '#FEF3C7', color: '#D97706', border: '1px solid #FEF3C7' }}>
-                    {t('pending') || 'Pending'}
+                <Badge className="border-[#FEF3C7] bg-[#FEF3C7] text-[#D97706]">
+                    {t('pending')}
                 </Badge>
             );
         }
-        
-        // Unknown/other cases
+
         return (
-            <Badge style={{ backgroundColor: '#F3F4F6', color: '#6B7280', border: '1px solid #E5E7EB' }}>
-                {status || level || t('unknown') || 'Unknown'}
+            <Badge className="border-[#E5E7EB] bg-[#F3F4F6] text-[#6B7280]">
+                {log.status || t('pending')}
             </Badge>
         );
     };
@@ -241,98 +253,136 @@ export function MessageLogsTable() {
         api.exportAsCSV(exportData, `message_logs_${new Date().toISOString().split('T')[0]}.csv`);
     };
 
-    const formatTimestamp = (log: MessageLog) => {
-        const timestamp = log.timestamp || log.sentAt || log.createdAt;
-        if (!timestamp) return '-';
-        return new Date(timestamp).toLocaleString();
-    };
+    useImperativeHandle(ref, () => ({
+        refresh: handleRefresh,
+        exportLogs,
+        isBusy: isRefreshing || isLoading,
+    }), [handleRefresh, exportLogs, isRefreshing, isLoading]);
 
     const getMessageLength = (log: MessageLog) => {
         return log.messageLength ?? log.message?.length ?? 0;
     };
 
+    const formatTimestamp = (log: MessageLog) => {
+        const timestamp = log.timestamp || log.sentAt || log.createdAt;
+        if (!timestamp) return '-';
+        return new Date(timestamp).toLocaleString(undefined, {
+            month: 'numeric',
+            day: 'numeric',
+            year: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+        });
+    };
+
+    const formatProvider = (provider?: string) => {
+        if (!provider) return 'N/A';
+        return provider.split(':')[0];
+    };
+
+    const openDetails = (log: MessageLog) => {
+        setSelectedLog(log);
+        setDetailsOpen(true);
+    };
+
+    const statusFilters = [
+        { id: 'all' as const, label: t('allStatuses'), count: summary.total },
+        { id: 'sent' as const, label: t('sentCountLabel'), count: summary.sent },
+        { id: 'failed' as const, label: t('failedCountLabel'), count: summary.failed },
+        { id: 'pending' as const, label: t('pendingCountLabel'), count: summary.pending },
+    ];
+
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <div>
-                    <h2 className="text-base font-bold text-slate-900">{t('listOfLogs') || 'Message Logs'}</h2>
-                    {summary && (
-                        <p className="text-xs text-slate-500 mt-0.5">
-                            Total: {summary.totalEntries} · <span className="text-green-600">Sent: {summary.sentCount}</span> · <span className="text-red-600">Failed: {summary.failedCount}</span>
-                        </p>
-                    )}
-                </div>
+                <h2 className="text-base font-bold text-slate-900">
+                    {t('listOfLogs')}
+                </h2>
+
                 <div className="flex w-full sm:w-auto items-center gap-2">
                     <div className="relative flex-1 sm:flex-none">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
                             type="search"
-                            placeholder={t('searchLogs') || 'Search logs...'}
+                            placeholder={t('search')}
                             className="pl-10 h-10 w-full sm:w-[220px] rounded-full bg-[#F3F4F6] border-0 shadow-none focus-visible:ring-1 focus-visible:ring-[#147677]/30"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRefresh}
-                        disabled={isRefreshing || isLoading}
-                    >
-                        <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-                        {isRefreshing ? 'Updating...' : 'Refresh'}
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={exportLogs}
-                        className="bg-green-600 hover:bg-green-700 text-white hover:text-white"
-                    >
-                        <Download className="h-4 w-4 mr-2" />
-                        Export Data
-                    </Button>
+
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button
+                                variant="primary"
+                                size="icon"
+                                className="h-10 w-10 rounded-lg shrink-0"
+                                title={statusFilters.find((item) => item.id === statusFilter)?.label}
+                            >
+                                <Filter className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                            {statusFilters.map((item) => (
+                                <DropdownMenuItem
+                                    key={item.id}
+                                    onClick={() => setStatusFilter(item.id)}
+                                    className={statusFilter === item.id ? 'text-[#147677] font-medium' : ''}
+                                >
+                                    {item.label} ({item.count})
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </div>
 
             <DataTable<MessageLog>
                 label="Message logs"
                 variant="sheet"
-                rowHeight={56}
+                rowHeight={52}
                 data={pagedLogs}
-                getRowId={(l) => `${l.messageId}-${l.id}`}
+                getRowId={(l) => String(l.id ?? `${l.messageId || 'log'}-${l.phoneNumber}-${l.createdAt}`)}
                 loading={isLoading}
                 skeletonRows={pageSize}
-                emptyState={t('noLogsFound') || 'No logs found'}
+                emptyState={t('noLogsFound')}
                 columns={[
-                  { id: 'alertTitle', header: t('alertTitle') || 'Alert Title', value: (l) => l.alertTitle || l.alertType || '', cell: (l) => (
-                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{l.alertTitle || l.alertType || 'N/A'}</Badge>
+                  { id: 'alertTitle', header: t('alertTitle') || 'Alert Title', width: 'minmax(110px, 1fr)', value: (l) => l.alertTitle || l.alertType || '', cell: (l) => (
+                    <span className="block truncate" title={l.alertTitle || l.alertType || undefined}>{l.alertTitle || l.alertType || 'N/A'}</span>
                   ) },
-                  { id: 'farmerName', header: t('farmerName') || 'Farmer Name', value: (l) => l.farmerName || `Farmer ${l.farmerId}`, cell: (l) => l.farmerName || `Farmer ${l.farmerId}` },
-                  { id: 'phoneNumber', header: t('phoneNumber') || 'Phone', value: (l) => l.phoneNumber || '', cell: (l) => <span className="font-mono">{l.phoneNumber}</span> },
-                  { id: 'status', header: t('status') || 'Status', sortable: false, cell: (l) => <StatusBadge log={l} /> },
-                  { id: 'provider', header: t('provider') || 'Provider', value: (l) => l.provider || '', cell: (l) => (
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">{l.provider || 'N/A'}</Badge>
+                  { id: 'farmerName', header: t('farmerName') || 'Farmer Name', width: 'minmax(150px, 1.2fr)', value: (l) => l.farmerName || `Farmer ${l.farmerId}`, cell: (l) => (
+                    <span className="block truncate">{l.farmerName || `Farmer ${l.farmerId}`}</span>
                   ) },
-                  { id: 'length', header: t('messageLength') || 'Length', numeric: true, value: (l) => getMessageLength(l), cell: (l) => `${getMessageLength(l)} chars` },
-                  { id: 'timestamp', header: t('timestamp') || 'Timestamp', width: "160px", value: (l) => l.timestamp || l.sentAt || l.createdAt || '', cell: (l) => formatTimestamp(l) },
-                  { id: '__actions', header: t('actions'), width: "96px", sortable: false, cell: (log) => (
+                  { id: 'phoneNumber', header: t('phone') || 'Phone', width: '130px', value: (l) => l.phoneNumber || '', cell: (l) => (
+                    <span className="font-mono whitespace-nowrap">{l.phoneNumber}</span>
+                  ) },
+                  { id: 'status', header: t('status') || 'Status', width: '110px', sortable: false, cell: (l) => <StatusBadge log={l} /> },
+                  { id: 'provider', header: t('provider') || 'Provider', width: '160px', value: (l) => formatProvider(l.provider), cell: (l) => (
+                    <span
+                      className="block truncate text-xs font-medium text-[#B45309]"
+                      title={l.provider || undefined}
+                    >
+                      {formatProvider(l.provider)}
+                    </span>
+                  ) },
+                  { id: 'length', header: t('messageLength') || 'Length', width: '88px', numeric: true, value: (l) => getMessageLength(l), cell: (l) => (
+                    <span className="whitespace-nowrap">{getMessageLength(l)}</span>
+                  ) },
+                  { id: 'timestamp', header: t('timestamp') || 'Timestamp', width: '158px', value: (l) => l.timestamp || l.sentAt || l.createdAt || '', cell: (l) => (
+                    <span className="block truncate whitespace-nowrap" title={formatTimestamp(l)}>{formatTimestamp(l)}</span>
+                  ) },
+                  { id: '__actions', header: t('actions'), width: '96px', sortable: false, cell: (log) => (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100"><MoreHorizontal className="h-4 w-4 text-slate-500" /></Button>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-gray-100">
+                          <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                        </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-56">
-                        <DropdownMenuItem onClick={() => {
-                          const details = { 'Alert ID': log.alertId, 'Alert Title': log.alertTitle, 'Farmer': log.farmerName, 'Phone': log.phoneNumber, 'Status': log.status, 'Provider': log.provider, 'Message ID': log.messageId, 'Message': log.message, 'Error': log.error || log.errorMessage || 'None' };
-                          toast.info(JSON.stringify(details, null, 2));
-                        }}>View Details</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { navigator.clipboard.writeText(log.messageId); toast.success('Message ID copied to clipboard'); }}>Copy Message ID</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => toast.info(log.message)}>View Message</DropdownMenuItem>
-                        {(log.error || log.errorMessage) && (
-                          <DropdownMenuItem destructive onClick={() => toast.error(log.error || log.errorMessage || 'Unknown error')}>View Error</DropdownMenuItem>
-                        )}
-                        {log.errorReason && (
-                          <DropdownMenuItem destructive onClick={() => toast.error(log.errorReason!)}>View Error Reason</DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem onClick={() => openDetails(log)} className="cursor-pointer">
+                          <Eye className="h-4 w-4 mr-2 text-[#147677]" />
+                          {t('viewDetails')}
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   ) },
@@ -354,6 +404,67 @@ export function MessageLogsTable() {
                     />
                 </div>
             )}
+
+            <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+                <DialogContent className="sm:max-w-[600px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5" style={{ color: '#147677' }} />
+                            {t('messageDetails')}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {t('logDetails')}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedLog && (
+                        <div className="space-y-6">
+                            <div className="flex items-start gap-4">
+                                <div className="rounded-full h-16 w-16 flex items-center justify-center shrink-0" style={{ backgroundColor: '#147677' }}>
+                                    <User className="h-8 w-8 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <h3 className="text-xl font-semibold truncate">
+                                        {selectedLog.farmerName || `Farmer ${selectedLog.farmerId}`}
+                                    </h3>
+                                    <div className="flex items-center gap-2 text-muted-foreground mt-1">
+                                        <Phone className="h-4 w-4" style={{ color: '#147677' }} />
+                                        <span>{selectedLog.phoneNumber || '—'}</span>
+                                    </div>
+                                    <p className="text-sm text-slate-500 mt-1">
+                                        {formatTimestamp(selectedLog)}
+                                    </p>
+                                </div>
+                                <StatusBadge log={selectedLog} />
+                            </div>
+
+                            <Separator />
+
+                            <div>
+                                <h4 className="font-medium mb-2">{t('message')}</h4>
+                                <p className="rounded-xl bg-[#F3F4F6] px-4 py-3 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">
+                                    {selectedLog.message || '—'}
+                                </p>
+                            </div>
+
+                            {(selectedLog.error || selectedLog.errorMessage || selectedLog.errorReason) && (
+                                <div className="rounded-xl bg-[#FEF2F2] border border-[#FECACA] px-4 py-3">
+                                    <p className="text-xs font-medium text-[#DC2626] mb-1">{t('error')}</p>
+                                    <p className="text-sm text-[#991B1B]">
+                                        {selectedLog.error || selectedLog.errorMessage || selectedLog.errorReason}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDetailsOpen(false)}>
+                            {t('close')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
-}
+});

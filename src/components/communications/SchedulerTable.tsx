@@ -1,525 +1,556 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Play,
-  Square,
-  RotateCcw,
-  Zap,
-  Activity,
-  Clock,
-  MapPin,
-  Users,
-  Calendar,
-  Settings,
   Loader2,
-  AlertCircle,
-  CheckCircle,
-  XCircle,
-  Info,
-  RefreshCw
+  Moon,
+  Pause,
+  Play,
+  Plus,
+  RotateCcw,
+  Clock,
+  Send,
 } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useLanguage } from '@/i18n';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import api from '@/lib/api';
+import type { Location } from '@/types/farmer';
 
 interface SchedulerStatus {
   isRunning: boolean;
   isInitialized: boolean;
-  autoStarted: boolean;
-  currentKigaliTime: string;
-  timezone: string;
-  frequency: string;
-  scheduleTimes: string[];
-  uptime?: string;
+  currentKigaliTime?: string;
+  timezone?: string;
+  frequency?: string;
+  scheduleTimes?: string[];
   nextAlert?: string;
-  features?: any;
-  systemInfo?: {
-    nodeVersion: string;
-    platform: string;
-    memoryUsage: any;
-    environment: string;
-  };
 }
 
-interface BroadcastResult {
-  success: boolean;
-  timestamp: string;
-  completedAt?: string;
-  duration?: string;
-  triggerTime: string;
-  summary?: {
-    totalFarmers: number;
-    totalLocations: number;
-    locationsProcessed: number;
-    totalFarmersSent: number;
-    totalFarmersFailed: number;
-    successRate: number;
-    messageType: string;
-    scheduledTime: string;
-  };
-  locations?: any[];
-  message?: string;
-  error?: string;
-}
+const DEFAULT_TIMES = ['19:00'];
+
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  if (Number.isNaN(h) || Number.isNaN(m)) return 0;
+  return h * 60 + m;
+};
+
+const normalizeTime = (raw: string) => {
+  const value = (raw || '').trim();
+  const ampm = value.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (ampm) {
+    let hours = Number(ampm[1]);
+    const minutes = ampm[2];
+    const period = ampm[3].toUpperCase();
+    if (period === 'PM' && hours < 12) hours += 12;
+    if (period === 'AM' && hours === 12) hours = 0;
+    return `${String(hours).padStart(2, '0')}:${minutes}`;
+  }
+  const match = value.match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return '19:00';
+  return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}`;
+};
+
+const isEveningTime = (hhmm: string) => Number(normalizeTime(hhmm).split(':')[0]) >= 12;
+
+const formatDisplayTime = (hhmm: string) => {
+  const [hours, minutes] = normalizeTime(hhmm).split(':').map(Number);
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hour12 = hours % 12 || 12;
+  return `${String(hour12).padStart(2, '0')}:${String(minutes).padStart(2, '0')} ${period}`;
+};
+
+const kigaliMinutesNow = (currentKigaliTime?: string) => {
+  if (currentKigaliTime) {
+    const parsed = new Date(currentKigaliTime);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.getHours() * 60 + parsed.getMinutes();
+    }
+    const match = currentKigaliTime.match(/(\d{1,2}):(\d{2})/);
+    if (match) return Number(match[1]) * 60 + Number(match[2]);
+  }
+  const now = new Date();
+  const kigali = new Date(now.toLocaleString('en-US', { timeZone: 'Africa/Kigali' }));
+  return kigali.getHours() * 60 + kigali.getMinutes();
+};
 
 export function WeatherSchedulerTable() {
   const { t } = useLanguage();
-  
   const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
+  const [scheduleTimes, setScheduleTimes] = useState<string[]>(DEFAULT_TIMES);
   const [isLoading, setIsLoading] = useState(true);
   const [isActionLoading, setIsActionLoading] = useState<string | null>(null);
-  const [lastBroadcast, setLastBroadcast] = useState<BroadcastResult | null>(null);
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [locations, setLocations] = useState<Location[]>([]);
 
-  useEffect(() => {
-    fetchSchedulerStatus();
-    
-    // Auto-refresh every 30 seconds if enabled
-    const interval = autoRefresh ? setInterval(fetchSchedulerStatus, 30000) : null;
-    
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [autoRefresh]);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editIndex, setEditIndex] = useState<number | null>(null);
+  const [editValue, setEditValue] = useState('19:00');
+
+  const [sendOpen, setSendOpen] = useState(false);
+  const [alertType, setAlertType] = useState('heavy_rainfall');
+  const [locationId, setLocationId] = useState('');
+  const [message, setMessage] = useState('');
+
+  const alertTypes = [
+    { value: 'heavy_rainfall', label: t('heavyRainfall') },
+    { value: 'drought', label: t('drought') },
+    { value: 'strong_winds', label: t('strongWinds') },
+    { value: 'flood', label: t('flood') },
+    { value: 'general', label: t('generalWeather') },
+  ];
+
+  const timeMeta = (hhmm: string) => {
+    const hours = Number(normalizeTime(hhmm).split(':')[0]);
+    if (hours >= 17) {
+      return { title: t('eveningAlert'), subtitle: t('dailyWeatherUpdate'), tint: 'bg-[#E0E7FF] text-[#4338CA]' };
+    }
+    return { title: t('daytimeAlert'), subtitle: t('dailyWeatherUpdate'), tint: 'bg-[#E7F4F4] text-[#147677]' };
+  };
+
+  const fetchLocations = async () => {
+    try {
+      const response = await api.get('/api/users/locations/all', { params: { limit: 100 } });
+      const data = response.data;
+      const list = data?.locations || data?.data?.locations || (Array.isArray(data) ? data : []);
+      setLocations(list);
+    } catch {
+      setLocations([]);
+    }
+  };
 
   const fetchSchedulerStatus = async () => {
     try {
       const response = await api.get('/api/weather/scheduler/status');
-      
-      console.log('Scheduler API Response:', response.data); // Debug log
-      
-      // Check if the response has the expected structure
-      if (response.data && typeof response.data === 'object') {
-        // Check if it's the nested structure (with status and data fields)
-        if (response.data.status === 'success' && response.data.data) {
-          setSchedulerStatus(response.data.data);
-        } 
-        // Check if it's the direct structure (data directly in response.data)
-        else if (response.data.isRunning !== undefined || response.data.isInitialized !== undefined) {
-          setSchedulerStatus(response.data);
-        }
-        // Fallback for other structures
-        else if (response.data.data) {
-          setSchedulerStatus(response.data.data);
-        } else {
-          throw new Error('Invalid response structure');
-        }
-      } else {
-        throw new Error('No data received from API');
+      const payload = response.data;
+      const data =
+        payload?.data && typeof payload.data === 'object' && (payload.data.isRunning !== undefined || payload.data.scheduleTimes)
+          ? payload.data
+          : payload;
+
+      if (data && typeof data === 'object') {
+        setSchedulerStatus(data);
+        const times = Array.isArray(data.scheduleTimes) && data.scheduleTimes.length
+          ? data.scheduleTimes.map(normalizeTime).filter(isEveningTime)
+          : DEFAULT_TIMES;
+        setScheduleTimes(times.length ? times : DEFAULT_TIMES);
       }
     } catch (error: any) {
-      console.error('Failed to fetch scheduler status:', error);
-      
-      // Handle 501 error (controller not implemented)
-      if (error.response?.status === 501) {
-        toast.error('Weather Scheduler Controller not implemented');
-      } else {
-        const errorMessage = error.response?.data?.message || error.message || 'Failed to load scheduler status';
-        toast.error(errorMessage);
+      if (error.response?.status !== 501) {
+        toast.error(error.response?.data?.message || t('failedToLoadScheduler'));
       }
-      
       setSchedulerStatus(null);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSchedulerAction = async (action: 'start' | 'stop' | 'restart' | 'trigger') => {
-    setIsActionLoading(action);
-    
-    try {
-      let endpoint = '';
-      
-      switch (action) {
-        case 'start':
-          endpoint = '/api/weather/scheduler/start';
-          break;
-        case 'stop':
-          endpoint = '/api/weather/scheduler/stop';
-          break;
-        case 'restart':
-          endpoint = '/api/weather/scheduler/restart';
-          break;
-        case 'trigger':
-          endpoint = '/api/weather/scheduler/trigger';
-          break;
-      }
+  useEffect(() => {
+    fetchSchedulerStatus();
+    fetchLocations();
+    const interval = setInterval(fetchSchedulerStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
-      const response = await api.post(endpoint);
-      
-      console.log(`${action} Response:`, response.data); // Debug log
-      
-      // Check if response is successful (200-299 status codes are already handled by axios)
-      if (response.data) {
-        // Handle success, warning, or any other response status
-        if (response.data.status === 'success' || response.data.status === 'warning') {
-          // Show the actual API message
-          toast.success(response.data.message || `${action} completed successfully`);
-        } else if (response.data.status === 'error') {
-          // Handle API-level errors gracefully
-          toast.error(response.data.message || `${action} failed`);
-        } else {
-          // Handle responses without status field
-          toast.success(response.data.message || `${action} completed successfully`);
-        }
-        
-        // Update scheduler status if included in response
-        if (response.data.data?.schedulerStatus) {
-          setSchedulerStatus(response.data.data.schedulerStatus);
-        }
-        
-        // Store broadcast result for trigger action
-        if (action === 'trigger' && response.data.data?.broadcastResult) {
-          setLastBroadcast(response.data.data.broadcastResult);
-        }
-        
-        // Always refresh status after action (even if there was an API-level error)
-        setTimeout(() => fetchSchedulerStatus(), 1000); // Small delay to allow backend to update
+  const nextBroadcast = useMemo(() => {
+    const sorted = [...scheduleTimes].map(normalizeTime).sort((a, b) => toMinutes(a) - toMinutes(b));
+    if (!sorted.length) return { time: '19:00', when: t('today') };
+    const now = kigaliMinutesNow(schedulerStatus?.currentKigaliTime);
+    const upcoming = sorted.find((time) => toMinutes(time) > now);
+    if (upcoming) return { time: upcoming, when: t('today') };
+    return { time: sorted[0], when: t('tomorrow') };
+  }, [scheduleTimes, schedulerStatus?.currentKigaliTime, t]);
+
+  const persistTimes = async (times: string[]) => {
+    const eveningTimes = times.filter(isEveningTime);
+    setScheduleTimes(eveningTimes);
+    try {
+      await api.post('/api/weather/scheduler/schedule', { scheduleTimes: eveningTimes });
+    } catch {
+      // Backend may not expose a schedule updater; keep the times in the UI.
+    }
+  };
+
+  const handleSchedulerAction = async (action: 'start' | 'stop' | 'restart') => {
+    setIsActionLoading(action);
+    try {
+      const response = await api.post(`/api/weather/scheduler/${action}`);
+      const payload = response.data;
+      if (payload?.status === 'error') {
+        toast.error(payload.message || t('schedulerActionFailed'));
       } else {
-        // Handle empty response
-        toast.warning(`${action} request completed but no response data received`);
-        setTimeout(() => fetchSchedulerStatus(), 1000);
+        toast.success(payload?.message || t('schedulerActionCompleted'));
       }
+      if (payload?.data?.schedulerStatus) {
+        setSchedulerStatus(payload.data.schedulerStatus);
+      }
+      setTimeout(() => fetchSchedulerStatus(), 800);
     } catch (error: any) {
-      console.error(`Failed to ${action} scheduler:`, error);
-      
-      // Handle different HTTP status codes
-      if (error.response?.status === 501) {
-        toast.error(`Weather Scheduler Controller not implemented`);
-      } else if (error.response?.status === 403) {
-        toast.error('Admin access required for this action');
-      } else if (error.response?.status === 404) {
-        toast.error(`${action} endpoint not found`);
-      } else if (error.response?.status >= 500) {
-        toast.error(`Server error: Unable to ${action} scheduler`);
-      } else if (error.response?.data?.message) {
-        // Show API error message if available
-        toast.error(error.response.data.message);
-      } else if (error.message) {
-        // Show generic error message
-        toast.error(`Network error: ${error.message}`);
+      if (error.response?.status === 403) {
+        toast.error(t('adminAccessRequired'));
       } else {
-        // Fallback error message
-        toast.error(`Unable to ${action} scheduler. Please try again.`);
+        toast.error(error.response?.data?.message || t('schedulerActionFailed'));
       }
-      
-      // Refresh status even after errors to get current state
-      setTimeout(() => fetchSchedulerStatus(), 1000);
+      setTimeout(() => fetchSchedulerStatus(), 800);
     } finally {
       setIsActionLoading(null);
     }
   };
 
-  const formatTime = (timeString: string) => {
+  const handleSendAlert = async () => {
+    if (!locationId) {
+      toast.error(t('pleaseSelectLocation'));
+      return;
+    }
+    if (!message.trim()) {
+      toast.error(t('pleaseEnterMessage'));
+      return;
+    }
+
+    setIsActionLoading('trigger');
     try {
-      return new Date(timeString).toLocaleString();
-    } catch {
-      return timeString;
+      const requestData = {
+        message: message.trim(),
+        locationId: Number(locationId),
+        locationIds: [Number(locationId)],
+        type: alertType,
+      };
+
+      const endpoints = [
+        '/api/weather/messaging/custom',
+        '/api/weather/messaging/emergency',
+        '/api/messaging/custom',
+      ];
+
+      let response = null;
+      for (const endpoint of endpoints) {
+        try {
+          response = await api.post(endpoint, requestData);
+          break;
+        } catch (error: any) {
+          if (error.response?.status === 404) continue;
+          throw error;
+        }
+      }
+
+      if (!response) {
+        throw new Error(t('failedToSendMessage'));
+      }
+
+      toast.success(response.data?.message || t('alertSentSuccessfully'));
+      setMessage('');
+      setSendOpen(false);
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || t('failedToSendMessage'));
+    } finally {
+      setIsActionLoading(null);
     }
   };
 
-  const getStatusBadge = (isRunning: boolean, isInitialized: boolean) => {
-    if (!isInitialized) {
-      return (
-        <Badge 
-          variant="secondary" 
-          className="bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border-t shadow-sm"
-        >
-          Not Initialized
-        </Badge>
-      );
+  const openEdit = (index: number | null) => {
+    setEditIndex(index);
+    setEditValue(index === null ? '19:00' : scheduleTimes[index] || '19:00');
+    setEditOpen(true);
+  };
+
+  const saveTime = async () => {
+    const next = normalizeTime(editValue);
+    if (!isEveningTime(next)) {
+      toast.error(t('eveningTimesOnly'));
+      return;
     }
-    
-    return isRunning ? (
-      <Badge 
-        variant="default" 
-        className="bg-gradient-to-r from-green-900 to-emerald-950 text-white border-3  hover:shadow-xl transition-all duration-200"
-      >
-        <Activity className="h-3 w-3 mr-1" />
-        Running
-      </Badge>
-    ) : (
-      <Badge 
-        variant="destructive"
-        className="bg-gradient-to-r from-red-400 to-rose-500 text-white border-3"
-      >
-        <XCircle className="h-3 w-3 mr-1" />
-        Stopped
-      </Badge>
-    );
+    if (editIndex === null) {
+      if (scheduleTimes.includes(next)) {
+        toast.error(t('timeAlreadyScheduled'));
+        return;
+      }
+      await persistTimes([...scheduleTimes, next].sort((a, b) => toMinutes(a) - toMinutes(b)));
+    } else {
+      const updated = scheduleTimes.map((time, index) => (index === editIndex ? next : time));
+      await persistTimes(updated.sort((a, b) => toMinutes(a) - toMinutes(b)));
+    }
+    setEditOpen(false);
+  };
+
+  const removeTime = async (index: number) => {
+    if (scheduleTimes.length <= 1) {
+      toast.error(t('keepOneBroadcastTime'));
+      return;
+    }
+    await persistTimes(scheduleTimes.filter((_, i) => i !== index));
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <Loader2 className="animate-spin h-8 w-8 mx-auto" />
-          <p className="mt-2 text-muted-foreground">Loading scheduler status...</p>
-        </div>
+      <div className="flex items-center justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-[#147677]" />
       </div>
     );
   }
 
+  const isRunning = Boolean(schedulerStatus?.isRunning);
+
   return (
-    <div className="space-y-6">  
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Status Card */}
-        <Card className="bg-white border-t">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-green-900" >
-                  <Activity className="h-5 w-5 text-white" />
-                </div>
-                Scheduler Status
-              </CardTitle>
-              {schedulerStatus && getStatusBadge(schedulerStatus.isRunning, schedulerStatus.isInitialized)}
-            </div>
-          </CardHeader>
-          <CardContent>
-            {!schedulerStatus ? (
-              <div className="text-center py-4">
-                <AlertCircle className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">Controller not available</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Current Time (Kigali)</p>
-                    <p className="text-xs text-muted-foreground font-mono">{schedulerStatus.currentKigaliTime}</p>
-                  </div>
-                </div>
-                <div className="flex items-center border-t ">
-                  <MapPin className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-sm font-medium">Timezone</p>
-                    <p className="text-xs text-muted-foreground">{schedulerStatus.timezone}</p>
-                  </div>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={fetchSchedulerStatus}
-                    disabled={isActionLoading !== null}
-                  >
-                    <RefreshCw className={`h-3 w-3 ${isActionLoading === 'refresh' ? 'animate-spin' : ''}`} />
-                  </Button>
-                  <div className="text-xs text-muted-foreground">
-                    Auto-refresh: {autoRefresh ? 'ON' : 'OFF'}
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Schedule Times Card */}
-        <Card className="bg-white border-t ">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#F89D2D]">
-                <Calendar className="h-5 w-5 text-white" />
-              </div>
-              Daily Schedule
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Broadcast Times</span>
-              </div>
-              <div className="space-y-2">
-                {schedulerStatus?.scheduleTimes?.map((time, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <Badge variant="outline" className="text-xs">
-                      {time === '06:00' ? '6:00 AM' : time === '19:00' ? '7:00 PM' : time}
-                    </Badge>
-                    <span className="text-xs text-muted-foreground">Daily</span>
-                  </div>
-                )) || (
-                  <p className="text-xs text-muted-foreground">No schedule available</p>
-                )}
-              </div>
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground">
-                  {schedulerStatus?.frequency || 'Schedule not configured'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Manual Trigger Card */}
-        <Card className="bg-white border-t ">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-[#147677]" >
-                <Zap className="h-5 w-5 text-white" />
-              </div>
-              Manual Broadcast
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Zap className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">Trigger Weather Alert</span>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Send weather messages to all farmers immediately, outside of the scheduled times.
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1.35fr_0.85fr] gap-4">
+        <div className="bg-white rounded-2xl border border-gray-100 px-6 py-6">
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-400">
+                {t('automaticBroadcastSchedule')}
+              </h2>
+              <p className="text-sm text-slate-500 mt-1">
+                {t('chooseWhenAlertsSent')}
               </p>
-              <Button
-                onClick={() => handleSchedulerAction('trigger')}
-                disabled={isActionLoading !== null}
-                variant="secondary"
-                className="w-full flex items-center gap-2 bg-[#147677] hover:bg-[#147677]/90 text-white"
-                size="sm"
-              >
-                {isActionLoading === 'trigger' ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Zap className="h-3 w-3" />
-                )}
-                Trigger Now
-              </Button>
-              <div className="text-xs text-muted-foreground">
-                Admin access required
-              </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <Badge className={cn(
+                'border-0 uppercase',
+                isRunning
+                  ? 'bg-[#ECFDF6] text-[#16a34a] hover:bg-[#16a34a] hover:text-white'
+                  : 'bg-[#FEF2F2] text-[#DC2626]'
+              )}>
+                {isRunning ? t('active') : t('paused')}
+              </Badge>
+              <Button
+                className="h-9 rounded-lg bg-[#147677] hover:bg-[#147677]/90 text-white"
+                onClick={() => setSendOpen(true)}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {t('sendAlert')}
+              </Button>
+            </div>
+          </div>
 
-      {/* Control Actions Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Scheduler Controls</CardTitle>
-          <CardDescription>
-            Admin-only controls for managing the weather scheduler
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            <Button
-              onClick={() => handleSchedulerAction('start')}
-              disabled={isActionLoading !== null || (schedulerStatus?.isRunning ?? false)}
-              className="flex items-center gap-2"
-              variant={schedulerStatus?.isRunning ? "secondary" : "default"}
+          <div className="mt-5 space-y-3">
+            {scheduleTimes.map((time, index) => {
+              const meta = timeMeta(time);
+              return (
+                <div
+                  key={`${time}-${index}`}
+                  className="flex items-center gap-4 rounded-2xl border border-gray-100 px-4 py-4"
+                >
+                  <div className={cn('h-11 w-11 rounded-full flex items-center justify-center shrink-0', meta.tint)}>
+                    {Number(normalizeTime(time).split(':')[0]) >= 17 ? (
+                      <Moon className="h-5 w-5" />
+                    ) : (
+                      <Clock className="h-5 w-5" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-900">{meta.title}</p>
+                    <p className="text-sm text-slate-400">{meta.subtitle}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-slate-900">{formatDisplayTime(time)}</p>
+                    <button
+                      type="button"
+                      onClick={() => openEdit(index)}
+                      className="text-sm font-medium text-[#147677] hover:underline"
+                    >
+                      {t('edit')}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={() => openEdit(null)}
+              className="w-full rounded-2xl border border-dashed border-gray-200 px-4 py-4 text-sm font-medium text-slate-500 hover:border-[#147677]/40 hover:text-[#147677]"
             >
-              {isActionLoading === 'start' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-              Start Scheduler
-            </Button>
-            
+              <span className="inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                {t('addAnotherBroadcastTime')}
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 px-6 py-6">
+          <p className="text-xs font-semibold tracking-[0.14em] text-slate-400 uppercase">
+            {t('nextBroadcast')}
+          </p>
+          <p className="text-4xl font-bold text-slate-900 mt-2">
+            {formatDisplayTime(nextBroadcast.time)}
+          </p>
+          <p className="text-sm text-slate-400 mt-1 pb-5 border-b border-gray-100">
+            {nextBroadcast.when} · {t('kigaliTime')}
+          </p>
+
+          <p className="text-sm font-semibold text-slate-900 mt-5 mb-3">
+            {t('schedulerControls')}
+          </p>
+          <div className="space-y-3">
+            {isRunning ? (
+              <Button
+                variant="outline"
+                className="w-full h-12 justify-start rounded-xl border-gray-200 text-slate-800"
+                onClick={() => handleSchedulerAction('stop')}
+                disabled={isActionLoading !== null}
+              >
+                {isActionLoading === 'stop' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Pause className="h-4 w-4" />}
+                {t('pauseScheduler')}
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full h-12 justify-start rounded-xl border-gray-200 text-slate-800"
+                onClick={() => handleSchedulerAction('start')}
+                disabled={isActionLoading !== null}
+              >
+                {isActionLoading === 'start' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                {t('resumeScheduler')}
+              </Button>
+            )}
             <Button
-              onClick={() => handleSchedulerAction('stop')}
-              disabled={isActionLoading !== null || !(schedulerStatus?.isRunning ?? false)}
-              variant="destructive"
-              className="flex items-center gap-2"
-            >
-              {isActionLoading === 'stop' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Square className="h-4 w-4" />
-              )}
-              Stop Scheduler
-            </Button>
-            
-            <Button
+              variant="outline"
+              className="w-full h-12 justify-start rounded-xl border-gray-200 text-slate-800"
               onClick={() => handleSchedulerAction('restart')}
               disabled={isActionLoading !== null}
-              variant="outline"
-              className="flex items-center gap-2"
             >
-              {isActionLoading === 'restart' ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <RotateCcw className="h-4 w-4" />
-              )}
-              Restart Scheduler
+              {isActionLoading === 'restart' ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+              {t('restartScheduler')}
             </Button>
           </div>
-          
-          <Alert className="mt-4">
-            <Info className="h-4 w-4" />
-            <AlertDescription>
-              <strong>Admin Access Required:</strong> 
-              The scheduler automatically sends weather updates at 6:00 AM and 7:00 PM Kigali time daily.
-            </AlertDescription>
-          </Alert>
-        </CardContent>
-      </Card>
+          <p className="text-sm text-slate-400 mt-4">
+            {isRunning ? t('automaticAlertsEnabled') : t('automaticAlertsPaused')}
+          </p>
+        </div>
+      </div>
 
-      {/* Last Broadcast Results */}
-      {lastBroadcast && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Last Broadcast Results
-            </CardTitle>
-            <CardDescription>
-              Results from the most recent manual broadcast trigger
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {lastBroadcast.success ? (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <span className="font-medium">Broadcast Completed Successfully</span>
-                </div>
-                
-                {lastBroadcast.summary && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <div className="font-medium">Total Farmers</div>
-                      <div className="text-lg">{lastBroadcast.summary.totalFarmers}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Messages Sent</div>
-                      <div className="text-lg text-green-600">{lastBroadcast.summary.totalFarmersSent}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Failed</div>
-                      <div className="text-lg text-red-600">{lastBroadcast.summary.totalFarmersFailed}</div>
-                    </div>
-                    <div>
-                      <div className="font-medium">Success Rate</div>
-                      <div className="text-lg">{lastBroadcast.summary.successRate}%</div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="text-xs text-muted-foreground">
-                  <div>Started: {formatTime(lastBroadcast.timestamp)}</div>
-                  {lastBroadcast.completedAt && (
-                    <div>Completed: {formatTime(lastBroadcast.completedAt)}</div>
-                  )}
-                  {lastBroadcast.duration && (
-                    <div>Duration: {lastBroadcast.duration}</div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 text-red-600">
-                <XCircle className="h-5 w-5" />
-                <span>Broadcast Failed: {lastBroadcast.message || lastBroadcast.error}</span>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" style={{ color: '#147677' }} />
+              {t('sendWeatherAlertNow')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('sendAlertNowHint')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label className="text-slate-500 font-medium">{t('alertType')}</Label>
+              <Select value={alertType} onValueChange={setAlertType}>
+                <SelectTrigger className="mt-1.5 h-12 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {alertTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-slate-500 font-medium">{t('location')}</Label>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger className="mt-1.5 h-12 rounded-xl">
+                  <SelectValue placeholder={t('selectLocation')} />
+                </SelectTrigger>
+                <SelectContent>
+                  {locations.map((location) => (
+                    <SelectItem key={location.id} value={String(location.id)}>
+                      {location.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label className="text-slate-500 font-medium">{t('message')}</Label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                rows={5}
+                placeholder={t('writeWeatherAlertMessage')}
+                className="mt-1.5 w-full rounded-xl border border-input bg-white px-3 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-[#147677]/30 resize-none"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendOpen(false)}>
+              {t('close')}
+            </Button>
+            <Button
+              onClick={handleSendAlert}
+              disabled={isActionLoading === 'trigger'}
+              className="bg-[#147677] hover:bg-[#147677]/90 text-white"
+            >
+              {isActionLoading === 'trigger' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {t('sendAlert')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>
+              {editIndex === null ? t('addAnotherBroadcastTime') : t('editBroadcastTime')}
+            </DialogTitle>
+            <DialogDescription>
+              {t('kigaliTime')}
+            </DialogDescription>
+          </DialogHeader>
+          <Input
+            type="time"
+            min="12:00"
+            value={editValue}
+            onChange={(e) => setEditValue(e.target.value)}
+            className="h-12 rounded-xl"
+          />
+          {editIndex !== null && scheduleTimes.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                removeTime(editIndex);
+                setEditOpen(false);
+              }}
+              className="text-sm text-[#DC2626] text-left"
+            >
+              {t('removeBroadcastTime')}
+            </button>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)}>
+              {t('close')}
+            </Button>
+            <Button
+              onClick={saveTime}
+              className="bg-[#147677] hover:bg-[#147677]/90 text-white"
+            >
+              {t('save')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
