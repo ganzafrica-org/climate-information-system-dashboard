@@ -265,7 +265,7 @@ export function SortableTable<T>({
     <div
       className={
         isSheet
-          ? `overflow-hidden ${className}`
+          ? `overflow-x-auto ${className}`
           : `overflow-hidden rounded-[14px] border border-border mx-3 pb-3 bg-card shadow-sm    ${className}`
       }
     >
@@ -306,7 +306,7 @@ export function SortableTable<T>({
               const active = state !== "none";
               const end = column.align === "end";
               const sheetHeader = `flex w-full items-center gap-1.5 px-1 ${end ? "flex-row-reverse" : ""}`;
-              const sheetLabel = "truncate text-sm font-semibold text-slate-800";
+              const sheetLabel = "truncate whitespace-nowrap text-sm font-semibold text-slate-800";
 
               return (
                 <div
@@ -434,8 +434,8 @@ export function SortableTable<T>({
                   if (target.closest('button, a, input, select, textarea, [role="menu"], [role="menuitem"]')) return;
                   onRowClick(row);
                 } : undefined}
-                className={`absolute inset-x-0 top-0 grid items-center gap-x-2 transition-colors duration-150 ${
-                  isSheet ? "px-5" : "px-4"
+                className={`absolute inset-x-0 top-0 grid items-center transition-colors duration-150 ${
+                  isSheet ? "gap-x-3 px-5" : "gap-x-2 px-4"
                 } ${onRowClick ? "cursor-pointer hover:bg-muted/50" : ""} ${
                   isMarked || (selectable && selected.has(id)) ? "bg-muted dark:bg-card/[0.06]" : ""
                 }`}
@@ -498,7 +498,7 @@ export function SortableTable<T>({
                       key={column.id}
                       role="cell"
                       className={`min-w-0 px-2.5 ${
-                        column.cell ? "overflow-visible" : "truncate"
+                        column.id === "__actions" ? "overflow-visible" : "overflow-hidden truncate"
                       } ${
                         isSheet ? "text-sm" : "text-[13px]"
                       } ${
