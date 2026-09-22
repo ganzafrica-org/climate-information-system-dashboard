@@ -191,17 +191,7 @@ const Training = () => {
                         </CardContent>
                     </Card>
                 ) : (
-                  <>
-                    <Tabs
-                        value={activeTab}
-                        defaultValue="modules"
-                        onValueChange={setActiveTab}
-                        items={[
-                            { value: 'modules', label: <span className="inline-flex items-center"><LayoutGrid className="h-4 w-4 mr-2" />{t('trainingModules')}</span> },
-                        ]}
-                        renderPanel={() => null}
-                    />
-
+                  <>                  
                     <div>
                         {activeTab === 'modules' && (
                           <div className="space-y-4 mt-4">

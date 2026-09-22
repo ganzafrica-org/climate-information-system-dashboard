@@ -402,6 +402,7 @@
 
   "generalSettings": "General Settings",
   "generalSettingsDesc": "Configure your system preferences",
+  "profile": "Profile",
   "languageSettingDesc": "Select your preferred language for the application",
   "appearance": "Appearance",
   "themeSettingDesc": "Choose the application theme",
