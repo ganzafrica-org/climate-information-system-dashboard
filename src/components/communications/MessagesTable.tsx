@@ -685,7 +685,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
     <div className="space-y-4 md:space-y-6">
       <ErrorBanner />
 
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
+      <div className="bg-white border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 py-5">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
           <h2 className="text-base font-bold text-slate-900">
             {t("listOfMessages") || "List of Custom Messages"}
@@ -783,14 +783,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
         )}
       </div>
 
-      <div className="text-xs text-muted-foreground text-center mt-4">
-        {t("dataLastUpdated") || "Data last updated"}: {new Date().toLocaleString()}
-        {apiError && (
-          <div className="text-red-500 mt-1">
-            ⚠️ {t("apiConnectionIssue") || "API connection issue detected"}
-          </div>
-        )}
-      </div>
+      
 
       {/* Emergency Message Dialog */}
       <Dialog open={messageDialogOpen} onOpenChange={setMessageDialogOpen}>

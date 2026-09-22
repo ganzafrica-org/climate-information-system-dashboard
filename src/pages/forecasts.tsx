@@ -113,7 +113,7 @@ const Forecasts: NextPage = () => {
           </div>
         )}
 
-        <div className="flex h-[640px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm max-lg:h-auto max-lg:flex-col">
+        <div className="flex h-[680px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm max-lg:h-auto max-lg:flex-col">
           {/* LEFT PANEL */}
           <aside className="w-[300px] shrink-0 overflow-y-auto border-r border-border p-4 max-lg:w-full max-lg:border-b max-lg:border-r-0">
             <Group label={t("metric") || "Metric"}>

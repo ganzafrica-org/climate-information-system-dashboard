@@ -443,7 +443,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
 
     return (
         <>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
+            <div className="bg-white border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
                     <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                         <AlertCircle className="h-5 w-5 text-[#147677]" />

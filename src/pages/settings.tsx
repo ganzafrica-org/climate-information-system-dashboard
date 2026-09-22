@@ -10,11 +10,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import {
     Bell,
     Check,
     ChevronDown,
+    Clock,
     Database,
     Globe,
     HelpCircle,
@@ -38,6 +40,7 @@ const Settings: NextPage = () => {
     const { t, locale, changeLanguage } = useLanguage();
     const { user, updateProfile, changePassword } = useAuth();
     const [activeTab, setActiveTab] = useState('general');
+    const [activeGeneralTab, setActiveGeneralTab] = useState('profile');
 
     const [profileData, setProfileData] = useState({
         phone: user?.phone || '',
@@ -168,302 +171,314 @@ const Settings: NextPage = () => {
                                     <CardTitle>{t('generalSettings')}</CardTitle>
                                     <CardDescription>{t('generalSettingsDesc')}</CardDescription>
                                 </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('language')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('languageSettingDesc')}
-                                        </p>
-                                        <div className="flex items-center gap-4">
-                                            <div
-                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 cursor-pointer ${
-                                                    locale === 'en' ? 'bg-muted/50 border-primary' : ''
-                                                }`}
-                                                onClick={() => changeLanguage('en')}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Globe className="h-4 w-4" />
-                                                    <span>English</span>
-                                                </div>
-                                                {locale === 'en' && <Check className="h-4 w-4 text-primary" />}
-                                            </div>
-                                            <div
-                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 cursor-pointer ${
-                                                    locale === 'rw' ? 'bg-muted/50 border-primary' : ''
-                                                }`}
-                                                onClick={() => changeLanguage('rw')}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    <Globe className="h-4 w-4" />
-                                                    <span>Kinyarwanda</span>
-                                                </div>
-                                                {locale === 'rw' && <Check className="h-4 w-4 text-primary" />}
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <Separator />
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('defaultValues')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('defaultValuesDesc')}
-                                        </p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-2">
-                                                <Label htmlFor="defaultLocation">{t('defaultLocation')}</Label>
-                                                <select
-                                                    id="defaultLocation"
-                                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                                >
-                                                    <option value="all">{t('allSectors')}</option>
-                                                    {['Kinigi', 'Muhoza', 'Cyuve', 'Gataraga'].map(sector => (
-                                                        <option key={sector} value={sector}>{sector}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="defaultCrop">{t('defaultCrop')}</Label>
-                                                <select
-                                                    id="defaultCrop"
-                                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                                >
-                                                    <option value="all">{t('allCrops')}</option>
-                                                    {['Maize', 'Potatoes', 'Beans', 'Vegetables'].map(crop => (
-                                                        <option key={crop} value={crop}>{crop}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div className="flex justify-end">
-                                          <Button className="ml-auto mt-6">
-                                            <Save className="h-4 w-4 mr-2" />
-                                            {t('saveChanges')}
-                                          </Button>
-                                        </div>
-                                    </div>
+                                <CardContent>
+                                    <Tabs
+                                        defaultValue="profile"
+                                        value={activeGeneralTab}
+                                        onValueChange={setActiveGeneralTab}
+                                        items={[
+                                            { value: 'profile', label: <span className="inline-flex items-center"><User className="h-4 w-4 mr-2" />{t('profile') || 'Profile'}</span> },
+                                            { value: 'languages', label: <span className="inline-flex items-center"><Globe className="h-4 w-4 mr-2" />{t('language') || 'Languages'}</span> },
+                                            { value: 'session management', label: <span className="inline-flex items-center"><Clock className="h-4 w-4 mr-2" />{t('sessionManagement') || 'Session Management'}</span> },
+                                        ]}
+                                        renderPanel={(value) =>
+                                            value === 'profile' ? (
+                                                <div className="space-y-6 p-4">
+                                                    <div className="space-y-4">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="bg-ganz-primary rounded-full h-16 w-16 flex items-center justify-center">
+                                                                <User className="h-8 w-8 text-white" />
+                                                            </div>
+                                                            <div>
+                                                                <h3 className="text-lg font-medium">{user?.username}</h3>
+                                                                <p className="text-sm text-muted-foreground">{user?.phone}</p>
+                                                                <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+                                                            </div>
+                                                        </div>
 
-                                     <Separator/>
-      
-                                    <CardContent className="space-y-6">
-                                    <div className="space-y-4">
-                                        <div className="flex items-center gap-4">
-                                            <div className="bg-ganz-primary rounded-full h-16 w-16 flex items-center justify-center">
-                                                <User className="h-8 w-8 text-white" />
-                                            </div>
-                                            <div>
-                                                <h3 className="text-lg font-medium">{user?.username}</h3>
-                                                <p className="text-sm text-muted-foreground">{user?.phone}</p>
-                                                <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
-                                            </div>
-                                        </div>
+                                                        <form onSubmit={handleProfileUpdate} className="space-y-4">
+                                                            {profileError && (
+                                                                <Alert variant="destructive">
+                                                                    <AlertDescription>{profileError}</AlertDescription>
+                                                                </Alert>
+                                                            )}
 
-                                        <form onSubmit={handleProfileUpdate} className="space-y-4">
-                                            {profileError && (
-                                                <Alert variant="destructive">
-                                                    <AlertDescription>{profileError}</AlertDescription>
-                                                </Alert>
-                                            )}
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                <div className="space-y-2">
+                                                                    <Label htmlFor="username">{t('username')}</Label>
+                                                                    <Input
+                                                                        id="username"
+                                                                        value={user?.username || ''}
+                                                                        disabled
+                                                                        className="bg-muted"
+                                                                    />
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {t('usernameCannotBeChanged') || 'Username cannot be changed'}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="space-y-2">
+                                                                    <Label htmlFor="role">{t('role')}</Label>
+                                                                    <Input
+                                                                        id="role"
+                                                                        value={user?.role || ''}
+                                                                        disabled
+                                                                        className="bg-muted capitalize"
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-2 md:col-span-2">
+                                                                    <Label htmlFor="phone">{t('phone')}</Label>
+                                                                    <Input
+                                                                        id="phone"
+                                                                        type="tel"
+                                                                        placeholder="+250788123456"
+                                                                        value={profileData.phone}
+                                                                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
+                                                                        disabled={profileLoading}
+                                                                    />
+                                                                    <p className="text-xs text-muted-foreground">
+                                                                        {t('phoneFormat') || 'Format: +250XXXXXXXXX'}
+                                                                    </p>
+                                                                </div>
+                                                            </div>
 
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="username">{t('username')}</Label>
-                                                    <Input
-                                                        id="username"
-                                                        value={user?.username || ''}
-                                                        disabled
-                                                        className="bg-muted"
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {t('usernameCannotBeChanged') || 'Username cannot be changed'}
-                                                    </p>
+                                                            <div className="flex justify-end">
+                                                                <Button type="submit" disabled={profileLoading}>
+                                                                    {profileLoading ? (
+                                                                        <>
+                                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                                            {t('updating') || 'Updating...'}
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Save className="h-4 w-4 mr-2" />
+                                                                            {t('updateProfile') || 'Update Profile'}
+                                                                        </>
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+
+                                                    <Separator />
+
+                                                    <div className="space-y-4">
+                                                        <h3 className="text-base font-medium">{t('changePassword')}</h3>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {t('changePasswordDesc')}
+                                                        </p>
+
+                                                        <form onSubmit={handlePasswordChange} className="space-y-4">
+                                                            {passwordError && (
+                                                                <Alert variant="destructive">
+                                                                    <AlertDescription>{passwordError}</AlertDescription>
+                                                                </Alert>
+                                                            )}
+
+                                                            <div className="space-y-4">
+                                                                <div className="space-y-2">
+                                                                    <Label htmlFor="currentPassword">{t('currentPassword')}</Label>
+                                                                    <div className="relative">
+                                                                        <Input
+                                                                            id="currentPassword"
+                                                                            type={showCurrentPassword ? 'text' : 'password'}
+                                                                            placeholder="••••••••"
+                                                                            value={passwordData.currentPassword}
+                                                                            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                                                                            disabled={passwordLoading}
+                                                                            className="pr-10"
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                                                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                                            disabled={passwordLoading}
+                                                                        >
+                                                                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                                        </button>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor="newPassword">{t('newPassword')}</Label>
+                                                                        <div className="relative">
+                                                                            <Input
+                                                                                id="newPassword"
+                                                                                type={showNewPassword ? 'text' : 'password'}
+                                                                                placeholder="••••••••"
+                                                                                value={passwordData.newPassword}
+                                                                                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                                                                                disabled={passwordLoading}
+                                                                                className="pr-10"
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setShowNewPassword(!showNewPassword)}
+                                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                                                disabled={passwordLoading}
+                                                                            >
+                                                                                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor="confirmPassword">{t('confirmNewPassword')}</Label>
+                                                                        <div className="relative">
+                                                                            <Input
+                                                                                id="confirmPassword"
+                                                                                type={showConfirmPassword ? 'text' : 'password'}
+                                                                                placeholder="••••••••"
+                                                                                value={passwordData.confirmPassword}
+                                                                                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                                                                                disabled={passwordLoading}
+                                                                                className="pr-10"
+                                                                            />
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                                                                                disabled={passwordLoading}
+                                                                            >
+                                                                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="flex justify-end">
+                                                                <Button type="submit" disabled={passwordLoading}>
+                                                                    {passwordLoading ? (
+                                                                        <>
+                                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                                            {t('changingPassword') || 'Changing Password...'}
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <Lock className="h-4 w-4 mr-2" />
+                                                                            {t('changePassword')}
+                                                                        </>
+                                                                    )}
+                                                                </Button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
                                                 </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="role">{t('role')}</Label>
-                                                    <Input
-                                                        id="role"
-                                                        value={user?.role || ''}
-                                                        disabled
-                                                        className="bg-muted capitalize"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2 md:col-span-2">
-                                                    <Label htmlFor="phone">{t('phone')}</Label>
-                                                    <Input
-                                                        id="phone"
-                                                        type="tel"
-                                                        placeholder="+250788123456"
-                                                        value={profileData.phone}
-                                                        onChange={(e) => setProfileData({ ...profileData, phone: e.target.value })}
-                                                        disabled={profileLoading}
-                                                    />
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {t('phoneFormat') || 'Format: +250XXXXXXXXX'}
-                                                    </p>
-                                                </div>
-                                            </div>
+                                            ) : value === 'languages' ? (
+                                                <div className="space-y-6 p-4">
+                                                    <div className="space-y-2">
+                                                        <h3 className="text-base font-medium">{t('language')}</h3>
+                                                        <p className="text-sm text-muted-foreground mb-2">
+                                                            {t('languageSettingDesc')}
+                                                        </p>
+                                                        <div className="flex items-center gap-4">
+                                                            <div
+                                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 cursor-pointer ${
+                                                                    locale === 'en' ? 'bg-muted/50 border-primary' : ''
+                                                                }`}
+                                                                onClick={() => changeLanguage('en')}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <Globe className="h-4 w-4" />
+                                                                    <span>English</span>
+                                                                </div>
+                                                                {locale === 'en' && <Check className="h-4 w-4 text-primary" />}
+                                                            </div>
+                                                            <div
+                                                                className={`flex items-center justify-between rounded-md border px-3 py-2 w-48 cursor-pointer ${
+                                                                    locale === 'rw' ? 'bg-muted/50 border-primary' : ''
+                                                                }`}
+                                                                onClick={() => changeLanguage('rw')}
+                                                            >
+                                                                <div className="flex items-center gap-2">
+                                                                    <Globe className="h-4 w-4" />
+                                                                    <span>Kinyarwanda</span>
+                                                                </div>
+                                                                {locale === 'rw' && <Check className="h-4 w-4 text-primary" />}
+                                                            </div>
+                                                        </div>
+                                                    </div>
 
-                                            <div className="flex justify-end">
-                                                <Button type="submit" disabled={profileLoading}>
-                                                    {profileLoading ? (
-                                                        <>
-                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                            {t('updating') || 'Updating...'}
-                                                        </>
-                                                    ) : (
-                                                        <>
+                                                    <Separator />
+                                                    <div className="space-y-2">
+                                                        <h3 className="text-base font-medium">{t('defaultValues')}</h3>
+                                                        <p className="text-sm text-muted-foreground mb-2">
+                                                            {t('defaultValuesDesc')}
+                                                        </p>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="defaultLocation">{t('defaultLocation')}</Label>
+                                                                <select
+                                                                    id="defaultLocation"
+                                                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                                >
+                                                                    <option value="all">{t('allSectors')}</option>
+                                                                    {['Kinigi', 'Muhoza', 'Cyuve', 'Gataraga'].map(sector => (
+                                                                        <option key={sector} value={sector}>{sector}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                            <div className="space-y-2">
+                                                                <Label htmlFor="defaultCrop">{t('defaultCrop')}</Label>
+                                                                <select
+                                                                    id="defaultCrop"
+                                                                    className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                                >
+                                                                    <option value="all">{t('allCrops')}</option>
+                                                                    {['Maize', 'Potatoes', 'Beans', 'Vegetables'].map(crop => (
+                                                                        <option key={crop} value={crop}>{crop}</option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex justify-end">
+                                                          <Button className="ml-auto mt-6">
                                                             <Save className="h-4 w-4 mr-2" />
-                                                            {t('updateProfile') || 'Update Profile'}
-                                                        </>
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </div>
-
-                                    <Separator />
-
-                                    <div className="space-y-4">
-                                        <h3 className="text-base font-medium">{t('changePassword')}</h3>
-                                        <p className="text-sm text-muted-foreground">
-                                            {t('changePasswordDesc')}
-                                        </p>
-
-                                        <form onSubmit={handlePasswordChange} className="space-y-4">
-                                            {passwordError && (
-                                                <Alert variant="destructive">
-                                                    <AlertDescription>{passwordError}</AlertDescription>
-                                                </Alert>
-                                            )}
-
-                                            <div className="space-y-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="currentPassword">{t('currentPassword')}</Label>
-                                                    <div className="relative">
-                                                        <Input
-                                                            id="currentPassword"
-                                                            type={showCurrentPassword ? 'text' : 'password'}
-                                                            placeholder="••••••••"
-                                                            value={passwordData.currentPassword}
-                                                            onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
-                                                            disabled={passwordLoading}
-                                                            className="pr-10"
-                                                        />
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                                            disabled={passwordLoading}
-                                                        >
-                                                            {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                        </button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="newPassword">{t('newPassword')}</Label>
-                                                        <div className="relative">
-                                                            <Input
-                                                                id="newPassword"
-                                                                type={showNewPassword ? 'text' : 'password'}
-                                                                placeholder="••••••••"
-                                                                value={passwordData.newPassword}
-                                                                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
-                                                                disabled={passwordLoading}
-                                                                className="pr-10"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setShowNewPassword(!showNewPassword)}
-                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                                                disabled={passwordLoading}
-                                                            >
-                                                                {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <Label htmlFor="confirmPassword">{t('confirmNewPassword')}</Label>
-                                                        <div className="relative">
-                                                            <Input
-                                                                id="confirmPassword"
-                                                                type={showConfirmPassword ? 'text' : 'password'}
-                                                                placeholder="••••••••"
-                                                                value={passwordData.confirmPassword}
-                                                                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
-                                                                disabled={passwordLoading}
-                                                                className="pr-10"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                                                                disabled={passwordLoading}
-                                                            >
-                                                                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                                            </button>
+                                                            {t('saveChanges')}
+                                                          </Button>
                                                         </div>
                                                     </div>
                                                 </div>
-                                            </div>
+                                            ) : value === 'session management' ? (
+                                                <div className="space-y-2 p-4">
+                                                    <h3 className="text-base font-medium">{t('sessionManagement')}</h3>
+                                                    <p className="text-sm text-muted-foreground mb-2">
+                                                        {t('sessionManagementDesc')}
+                                                    </p>
+                                                    <div className="space-y-3">
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <div className="font-medium">{t('currentSession')}</div>
+                                                                <div className="text-sm text-muted-foreground">Kigali, Rwanda • Chrome • Windows</div>
+                                                            </div>
+                                                            <div className="text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full">
+                                                                {t('active')}
+                                                            </div>
+                                                        </div>
 
-                                            <div className="flex justify-end">
-                                                <Button type="submit" disabled={passwordLoading}>
-                                                    {passwordLoading ? (
-                                                        <>
-                                                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                                            {t('changingPassword') || 'Changing Password...'}
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <Lock className="h-4 w-4 mr-2" />
-                                                            {t('changePassword')}
-                                                        </>
-                                                    )}
-                                                </Button>
-                                            </div>
-                                        </form>
-                                    </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <div className="font-medium">{t('mobileSession')}</div>
+                                                                <div className="text-sm text-muted-foreground">Kigali, Rwanda • Mobile App • Android</div>
+                                                            </div>
+                                                            <div className="text-xs px-2 py-1 bg-muted rounded-full">
+                                                                {t('inactive')}
+                                                            </div>
+                                                        </div>
+
+                                                        <Button variant="outline" className="mt-2">
+                                                            <LogOut className="h-4 w-4 mr-2" />
+                                                            {t('logoutAllSessions')}
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            ) : null
+                                        }
+                                    />
                                 </CardContent>
-                                                 
-                                     <Separator />
-
-                                    <div className="space-y-2">
-                                        <h3 className="text-base font-medium">{t('sessionManagement')}</h3>
-                                        <p className="text-sm text-muted-foreground mb-2">
-                                            {t('sessionManagementDesc')}
-                                        </p>
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <div className="font-medium">{t('currentSession')}</div>
-                                                    <div className="text-sm text-muted-foreground">Kigali, Rwanda • Chrome • Windows</div>
-                                                </div>
-                                                <div className="text-xs px-2 py-1 bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 rounded-full">
-                                                    {t('active')}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <div className="font-medium">{t('mobileSession')}</div>
-                                                    <div className="text-sm text-muted-foreground">Kigali, Rwanda • Mobile App • Android</div>
-                                                </div>
-                                                <div className="text-xs px-2 py-1 bg-muted rounded-full">
-                                                    {t('inactive')}
-                                                </div>
-                                            </div>
-
-                                            <Button variant="outline" className="mt-2">
-                                                <LogOut className="h-4 w-4 mr-2" />
-                                                {t('logoutAllSessions')}
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                </CardContent> 
                             </>
-                        )} 
+                        )}
                         {activeTab === 'notifications' && (
                             <>
                                 <CardHeader>
@@ -478,7 +493,6 @@ const Settings: NextPage = () => {
                                             {[
                                                 'systemAlerts',
                                                 'weeklyReports',
-                                                'farmerRegistrations',
                                                 'messageDeliveryReports'
                                             ].map(notification => (
                                                 <div key={notification} className="flex items-center justify-between">
@@ -503,7 +517,6 @@ const Settings: NextPage = () => {
                                             {[
                                                 'weatherAlerts',
                                                 'systemUpdates',
-                                                'userActions',
                                                 'dataUpdates'
                                             ].map(notification => (
                                                 <div key={notification} className="flex items-center justify-between">
