@@ -5,10 +5,10 @@ import dynamic from "next/dynamic"
 import { useRouter } from "next/router"
 import { useQuery } from "@tanstack/react-query"
 import {
-  Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
+  Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts"
 import {
-  CalendarX, ChevronDown, ChevronUp, CloudOff, CloudRain, Download, Droplets, Plus, Sun, Thermometer, X, type LucideIcon,
+  CalendarX, ChevronDown, ChevronUp, CloudOff, CloudRain, Download, Droplets, Info, Plus, Sun, Thermometer, TriangleAlert, X, type LucideIcon,
 } from "lucide-react"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { SectorMenu } from "@/components/weather/SectorMenu"
@@ -17,7 +17,7 @@ import { DateRangePicker, type DateRange } from "@/components/ui/calendar"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { FeatureCollection } from "@/lib/soil"
 import {
-  SECTORS, NO_DATA_FILL, addDays, minusYear, periodStats, previousSeason, rainRamp, seasonOf, seasonRange, tempRamp,
+  SECTORS, NO_DATA_FILL, addDays, coverageDiffers, minusYear, periodStats, previousSeason, rainRamp, seasonOf, seasonRange, tempRamp,
   useSectorHistory, type PeriodStats, type Season,
 } from "@/lib/weather"
 import { dayMonth, downloadCsv, escapeHtml, fmtInt, fromIso, monthName, useWx } from "@/lib/weatherFormat"
@@ -46,12 +46,13 @@ const RAIN_BAR = "#3b7dd8"
 const LY_BAR = "#c9d9ee"
 const TEMP_LINE = "#e0702f"
 const BAND: Record<Season, [string, string]> = { A: ["#e8f3f3", "#0f5f60"], B: ["#eef5e7", "#3d6b1f"], C: ["#f8f2e4", "#8a5a00"] }
+const LOW_COVERAGE = 0.8
 const PRESETS = ["thisSeason", "lastSeason", "last12", "year", "custom"] as const
 type Preset = (typeof PRESETS)[number]
 
 const kigaliToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Kigali" }).format(new Date())
 
-type ChartRow = { ym: string; rain: number | null; ly: number | null; temp: number | null }
+type ChartRow = { ym: string; rain: number | null; ly: number | null; temp: number | null; days: number; expectedDays: number }
 
 const Historical: NextPage = () => {
   const { w, lang } = useWx()
@@ -146,15 +147,24 @@ const Historical: NextPage = () => {
     }
     return w(`preset.${preset}`)
   })()
-  const periodText = `${w("periodText", { name: periodName, from: dt(start), to: dt(end) })}${main ? ` · ${w("daysOfRecords", { n: main.count })}` : ""}`
+  const periodText = `${w("periodText", { name: periodName, from: dt(start), to: dt(end) })}${main ? ` · ${w("daysRecorded", { n: main.count, m: main.expectedDays })}` : ""}`
+  const missingDays = main ? main.expectedDays - main.count : 0
+
+  // Sectors compared side by side: fall back to rain per recorded day when their coverage differs
+  const compared = sectors.map((s) => allStats[s]).filter((x): x is PeriodStats => !!x)
+  const comparePerDay = !single && compared.some((a) => compared.some((b) => coverageDiffers(a, b)))
+  const lyPerDay = !!(main && ly && coverageDiffers(main, ly))
 
   let answer = ""
   if (main) {
     if (single) {
       let cmp = ""
       if (ly) {
-        const p = pct(main.total, ly.total)
-        cmp = p == null ? "" : Math.abs(p) < 3 ? w("ansSame") : w(p > 0 ? "ansMore" : "ansLess", { p: Math.abs(p) })
+        // Different numbers of recorded days make totals unfair, so compare rain per recorded day
+        const perDay = coverageDiffers(main, ly)
+        const p = perDay ? pct(main.perDay, ly.perDay) : pct(main.total, ly.total)
+        const sfx = perDay ? "PerDay" : ""
+        cmp = p == null ? "" : Math.abs(p) < 3 ? w(`ansSame${sfx}`) : w(`${p > 0 ? "ansMore" : "ansLess"}${sfx}`, { p: Math.abs(p) })
       }
       answer = w("ansSingle", { s: primary, mm: fmtInt(main.total), from: dt(start), to: dt(end), cmp })
       if (main.months.length > 1) {
@@ -164,10 +174,18 @@ const Historical: NextPage = () => {
       }
       if (wantLY && !lyQ.isLoading && !ly) answer += ` ${w("noPrev")}`
     } else {
-      const ranked = sectors.map((s) => [s, allStats[s]] as const).filter((x): x is readonly [string, PeriodStats] => !!x[1]).sort((a, b) => b[1].total - a[1].total)
-      answer = w("ansMulti", { s: ranked[0][0], mm: fmtInt(ranked[0][1].total), from: dt(start), to: dt(end) })
-      const rest = ranked.slice(1).map(([s, x]) => w("ansOther", { s, mm: fmtInt(x.total) }))
-      if (rest.length) answer += ` ${rest.join(", ")}.`
+      const withStats = sectors.map((s) => [s, allStats[s]] as const).filter((x): x is readonly [string, PeriodStats] => !!x[1])
+      if (comparePerDay) {
+        const ranked = [...withStats].sort((a, b) => b[1].perDay - a[1].perDay)
+        answer = w("ansMultiPerDay", { s: ranked[0][0], v: ranked[0][1].perDay, from: dt(start), to: dt(end) })
+        const rest = ranked.slice(1).map(([s, x]) => w("ansOtherPerDay", { s, v: x.perDay }))
+        if (rest.length) answer += ` ${rest.join(", ")}.`
+      } else {
+        const ranked = [...withStats].sort((a, b) => b[1].total - a[1].total)
+        answer = w("ansMulti", { s: ranked[0][0], mm: fmtInt(ranked[0][1].total), from: dt(start), to: dt(end) })
+        const rest = ranked.slice(1).map(([s, x]) => w("ansOther", { s, mm: fmtInt(x.total) }))
+        if (rest.length) answer += ` ${rest.join(", ")}.`
+      }
     }
   }
 
@@ -184,11 +202,14 @@ const Historical: NextPage = () => {
         return [
           {
             icon: Droplets, iconColor: "#2f6cbc", label: w("totalRain"), value: fmtInt(main.total), unit: "mm", bg: "#fff",
-            meaning: w("rainyMeaning", { n: main.rainyDays, k: Math.round((main.rainyDays / main.count) * 10) }),
-            rows: rowsFor((x) => `${fmtInt(x.total)} mm`, (x) => {
-              const p = pct(main.total, x.total)
-              return `${fmtInt(x.total)} mm${p == null ? "" : ` (${p >= 0 ? "+" : ""}${p}%)`}`
-            }),
+            meaning: `${w("rainyMeaning", { n: main.rainyDays, k: Math.round((main.rainyDays / main.count) * 10) })} ${w("daysRecorded", { n: main.count, m: main.expectedDays })}.`,
+            rows: rowsFor(
+              (x) => `${fmtInt(x.total)} mm${comparePerDay ? ` · ${w("daysShort", { n: x.count })}` : ""}`,
+              (x) => {
+                const p = lyPerDay ? pct(main.perDay, x.perDay) : pct(main.total, x.total)
+                return `${fmtInt(x.total)} mm${lyPerDay ? ` · ${w("daysShort", { n: x.count })}` : ""}${p == null ? "" : ` (${p >= 0 ? "+" : ""}${p}%)`}`
+              }
+            ),
           },
           {
             icon: Thermometer, iconColor: TEMP_LINE, label: w("avgTemp"), value: `${main.avgMax}° / ${main.avgMin}°`, unit: w("highLow"), bg: "#fff",
@@ -224,11 +245,17 @@ const Historical: NextPage = () => {
     const byYm = new Map((allStats[s]?.months ?? []).map((m) => [m.ym, m]))
     return months.map((ym) => {
       const m = byYm.get(ym)
-      return { ym, rain: m ? m.rain : null, ly: wantLY && ly ? lyByMonth[ym.slice(5)] ?? null : null, temp: m ? m.tavg : null }
+      return {
+        ym, rain: m ? m.rain : null, ly: wantLY && ly ? lyByMonth[ym.slice(5)] ?? null : null, temp: m ? m.tavg : null,
+        days: m?.days ?? 0, expectedDays: m?.expectedDays ?? 0,
+      }
     })
   }
   const allRain = sectors.flatMap((s) => allStats[s]?.months.map((m) => m.rain) ?? []).concat(ly?.months.map((m) => m.rain) ?? [])
-  const yMax = Math.max(50, Math.ceil(Math.max(0, ...allRain) / 50) * 50)
+  // Round the axis top so its quarter ticks land on round numbers (25 / 50 / 100 mm steps)
+  const rainPeak = Math.max(0, ...allRain)
+  const tickStep = rainPeak <= 200 ? 25 : rainPeak <= 400 ? 50 : 100
+  const yMax = Math.max(100, Math.ceil(rainPeak / (4 * tickStep)) * 4 * tickStep)
   const allTemp = sectors.flatMap((s) => allStats[s]?.months.map((m) => m.tavg) ?? [])
   const tDomain: [number, number] = allTemp.length ? [Math.floor(Math.min(...allTemp)) - 2, Math.ceil(Math.max(...allTemp)) + 2] : [5, 25]
   const bands = (() => {
@@ -240,6 +267,8 @@ const Historical: NextPage = () => {
     })
     return out
   })()
+  const lowCoverage = (r: { days: number; expectedDays: number }) => r.expectedDays > 0 && r.days > 0 && r.days / r.expectedDays < LOW_COVERAGE
+  const anyLowMonth = sectors.some((s) => allStats[s]?.months.some(lowCoverage))
   const tickLabel = (ym: string) => {
     const i = months.indexOf(ym)
     const showYear = months.length <= 6 || ym.endsWith("-01") || i === 0
@@ -248,7 +277,9 @@ const Historical: NextPage = () => {
 
   // ---- map ----
   const isRain = metric === "rain"
-  const mapVal = (x: PeriodStats) => (isRain ? x.total : (x.avgMax + x.avgMin) / 2)
+  const allWithStats = SECTORS.map((s) => allStats[s]).filter((x): x is PeriodStats => !!x)
+  const mapPerDay = isRain && allWithStats.some((a) => allWithStats.some((b) => coverageDiffers(a, b)))
+  const mapVal = (x: PeriodStats) => (isRain ? (mapPerDay ? x.perDay : x.total) : (x.avgMax + x.avgMin) / 2)
   const vals = SECTORS.map((s) => allStats[s]).filter((x): x is PeriodStats => !!x).map(mapVal)
   const vlo = vals.length ? Math.min(...vals) : 0
   const vhi = vals.length ? Math.max(...vals) : 1
@@ -261,11 +292,11 @@ const Historical: NextPage = () => {
       const v = mapVal(x)
       const t = (v - vlo) / Math.max(1, vhi - vlo)
       fills[s] = isRain ? rainRamp(t) : tempRamp(t)
-      labels[s] = isRain ? `${fmtInt(x.total)} mm` : `${Math.round(v)}°`
+      labels[s] = isRain ? (mapPerDay ? w("mmPerDay", { v: x.perDay }) : `${fmtInt(x.total)} mm`) : `${Math.round(v)}°`
     })
     return { mapFills: fills, mapLabels: labels }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allStats, isRain, vlo, vhi])
+  }, [allStats, isRain, mapPerDay, vlo, vhi, lang])
 
   const popupHtml = useCallback(
     (s: string) => {
@@ -283,7 +314,7 @@ const Historical: NextPage = () => {
       if (!x) return `<div style="font-size:15px;font-weight:700;">${escapeHtml(s)}</div><div style="font-size:14px;color:#64748b;margin-top:4px;">${escapeHtml(w("histNoData", { s }))}</div>${btn}`
       return `<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">${escapeHtml(s)}</div>`
         + row(w("totalRain"), `${fmtInt(x.total)} mm`) + row(w("rainyD"), x.rainyDays) + row(w("heavyD"), x.heavyDays)
-        + row(w("avgTemp"), `${x.avgMax}° / ${x.avgMin}°`) + btn
+        + row(w("avgTemp"), `${x.avgMax}° / ${x.avgMin}°`) + row(w("daysRecCol"), `${x.count} / ${x.expectedDays}`) + btn
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [allStats, sectors.join(","), primary, lang]
@@ -296,12 +327,12 @@ const Historical: NextPage = () => {
   // ---- table + CSV ----
   const tableRows = months.flatMap((ym) => sectors.map((s, j) => {
     const m = allStats[s]?.months.find((x) => x.ym === ym)
-    return { ym, first: j === 0, sector: s, rain: m?.rain, ly: wantLY && ly ? lyByMonth[ym.slice(5)] : undefined, rainy: m?.rainyDays, heavy: m?.heavy, hi: m?.tmax, lo: m?.tmin }
+    return { ym, first: j === 0, sector: s, rain: m?.rain, days: m ? `${m.days}/${m.expectedDays}` : undefined, ly: wantLY && ly ? lyByMonth[ym.slice(5)] : undefined, rainy: m?.rainyDays, heavy: m?.heavy, hi: m?.tmax, lo: m?.tmin }
   }))
   const showLyCol = wantLY && !!ly
   const exportCsv = () => {
-    const header = ["Month", "Sector", "Rain_mm", ...(showLyCol ? ["Rain_last_year_mm"] : []), "RainyDays", "HeavyDays", "AvgHigh_C", "AvgLow_C"]
-    const rows = tableRows.map((r) => [r.ym, r.sector, r.rain ?? "", ...(showLyCol ? [r.ly ?? ""] : []), r.rainy ?? "", r.heavy ?? "", r.hi ?? "", r.lo ?? ""])
+    const header = ["Month", "Sector", "DaysRecorded", "Rain_mm", ...(showLyCol ? ["Rain_last_year_mm"] : []), "RainyDays", "HeavyDays", "AvgHigh_C", "AvgLow_C"]
+    const rows = tableRows.map((r) => [r.ym, r.sector, r.days ?? "", r.rain ?? "", ...(showLyCol ? [r.ly ?? ""] : []), r.rainy ?? "", r.heavy ?? "", r.hi ?? "", r.lo ?? ""])
     downloadCsv(`historical_${sectors.join("-")}_${start}_${end}.csv`, [header, ...rows])
   }
 
@@ -383,7 +414,15 @@ const Historical: NextPage = () => {
               </div>
             )}
           </div>
-          <div className="text-sm text-slate-600">{periodText}</div>
+          <div className="flex flex-col gap-1.5">
+            <div className="text-sm text-slate-600">{periodText}</div>
+            <div className="flex items-start gap-1.5 text-[13px] leading-snug text-slate-500"><Info className="mt-px h-3.5 w-3.5 shrink-0" />{w("dataNote")}</div>
+            {isLive && missingDays > 0 && main && main.coverage < 0.9 && (
+              <div className="flex items-start gap-1.5 rounded-lg border border-[#f3d3a8] bg-[#fff7ed] px-2.5 py-1.5 text-[13px] leading-snug text-[#7c2d12]">
+                <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0 text-[#b45309]" />{w("gapWarning", { k: missingDays })}
+              </div>
+            )}
+          </div>
         </div>
 
         {isDown && <StateCard icon={CloudOff} tone="error" title={w("downTitle")} text={w("downHistText")} retryLabel={w("retry")} onRetry={() => histQ.refetch()} />}
@@ -404,7 +443,10 @@ const Historical: NextPage = () => {
           <>
             {/* Answer + stat cards */}
             <section className="flex flex-col gap-[18px] rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
-              <p className="max-w-[900px] text-[19px] font-semibold leading-[1.35] tracking-[-0.01em] text-slate-900 md:text-[22px]">{answer}</p>
+              <div className="flex flex-col gap-1.5">
+                <p className="max-w-[900px] text-[19px] font-semibold leading-[1.35] tracking-[-0.01em] text-slate-900 md:text-[22px]">{answer}</p>
+                {(comparePerDay || lyPerDay) && <p className="text-sm text-slate-500">{w(comparePerDay ? "perDayNote" : "lyPerDayNote")}</p>}
+              </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
                 {stats.map((s) => (
                   <div key={s.label} className="flex flex-col gap-1.5 rounded-xl border border-gray-200 p-4" style={{ background: s.bg }}>
@@ -437,6 +479,11 @@ const Historical: NextPage = () => {
                   <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: RAIN_BAR }} />{w("bars")}</span>
                   <span className="inline-flex items-center gap-1.5"><span className="h-[3px] w-4 rounded-sm" style={{ background: TEMP_LINE }} />{w("line")}</span>
                   {showLyCol && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: LY_BAR }} />{w("lastYearBars")}</span>}
+                  {anyLowMonth && (
+                    <span className="inline-flex items-center gap-1.5">
+                      <span className="h-3 w-3 rounded-sm" style={{ background: `repeating-linear-gradient(45deg, ${RAIN_BAR} 0 2px, #a9c6ef 2px 5px)` }} />{w("lowCoverageBars")}
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="mt-2.5 overflow-x-auto">
@@ -468,7 +515,16 @@ const Historical: NextPage = () => {
                           <YAxis yAxisId="temp" orientation="right" domain={tDomain} ticks={[0, 0.5, 1].map((t) => Math.round(tDomain[0] + (tDomain[1] - tDomain[0]) * t))} tick={{ fontSize: 12, fill: "#c25a1f" }} tickFormatter={(v) => `${v}°`} tickLine={false} axisLine={false} width={36} />
                           <Tooltip content={<ChartTooltip w={w} ymName={ymName} showLy={showLyCol} />} cursor={{ fill: "rgba(15,23,42,0.04)" }} />
                           {showLyCol && <Bar yAxisId="rain" dataKey="ly" fill={LY_BAR} radius={[2, 2, 0, 0]} maxBarSize={30} isAnimationActive={false} />}
+                          <defs>
+                            <pattern id={`lowcov-${s}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                              <rect width="6" height="6" fill="#a9c6ef" />
+                              <line x1="0" y1="0" x2="0" y2="6" stroke={RAIN_BAR} strokeWidth="2.5" />
+                            </pattern>
+                          </defs>
                           <Bar yAxisId="rain" dataKey="rain" fill={RAIN_BAR} radius={[2, 2, 0, 0]} maxBarSize={30} isAnimationActive={false}>
+                            {chartRows(s).map((r) => (
+                              <Cell key={r.ym} fill={lowCoverage(r) ? `url(#lowcov-${s})` : RAIN_BAR} />
+                            ))}
                             {months.length <= 13 && <LabelList dataKey="rain" position="top" fontSize={12} fontWeight={600} fill="#1d4f8a" />}
                           </Bar>
                           <Line yAxisId="temp" dataKey="temp" stroke={TEMP_LINE} strokeWidth={2.5} dot={{ r: 4, fill: "#fff", stroke: TEMP_LINE, strokeWidth: 2 }} connectNulls isAnimationActive={false} />
@@ -486,7 +542,7 @@ const Historical: NextPage = () => {
         {!isLoading && !isDown && (
           <section className="min-w-0 rounded-2xl border border-gray-200 bg-white px-5 py-[18px]">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-[17px] font-bold text-slate-900">{w("mapHist", { m: isRain ? w("totalRainM") : w("avgTempM") })}</h2>
+              <h2 className="text-[17px] font-bold text-slate-900">{w("mapHist", { m: isRain ? w(mapPerDay ? "perDayM" : "totalRainM") : w("avgTempM") })}</h2>
               <div role="radiogroup" className="inline-grid grid-cols-2 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
                 {(["rain", "temp"] as const).map((m) => (
                   <button key={m} role="radio" aria-checked={metric === m} onClick={() => setMetric(m)} className={`rounded-md px-3 py-1.5 text-sm font-medium ${metric === m ? "bg-[#147677] text-white" : "text-slate-600"}`}>{w(m)}</button>
@@ -511,15 +567,15 @@ const Historical: NextPage = () => {
             </div>
             {vals.length > 0 && (
               <div className="mt-2.5 flex items-center gap-2 text-[13px] text-slate-600">
-                <span>{isRain ? `${w("drier")} ${fmtInt(vlo)}` : `${w("cooler")} ${Math.round(vlo)}°`}</span>
+                <span>{isRain ? `${w("drier")} ${mapPerDay ? vlo.toFixed(1) : fmtInt(vlo)}` : `${w("cooler")} ${Math.round(vlo)}°`}</span>
                 <span
                   className="h-2.5 flex-1 rounded-[5px] border border-black/[0.08]"
                   style={{ background: `linear-gradient(90deg,${(isRain ? rainRamp : tempRamp)(0)},${(isRain ? rainRamp : tempRamp)(0.5)},${(isRain ? rainRamp : tempRamp)(1)})` }}
                 />
-                <span>{isRain ? `${fmtInt(vhi)} mm ${w("wetter")}` : `${Math.round(vhi)}° ${w("warmer")}`}</span>
+                <span>{isRain ? `${mapPerDay ? w("mmPerDay", { v: vhi.toFixed(1) }) : `${fmtInt(vhi)} mm`} ${w("wetter")}` : `${Math.round(vhi)}° ${w("warmer")}`}</span>
               </div>
             )}
-            <p className="mt-1.5 text-[13px] text-slate-500">{w("mapHintHist")}</p>
+            <p className="mt-1.5 text-[13px] text-slate-500">{w("mapHintHist")}{mapPerDay ? ` ${w("perDayNote")}` : ""}</p>
           </section>
         )}
 
@@ -531,11 +587,12 @@ const Historical: NextPage = () => {
             </button>
             {tableOpen && (
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm tabular-nums">
+                <table className="w-full min-w-[720px] text-sm tabular-nums">
                   <thead>
                     <tr className="border-b border-gray-200 text-left font-semibold text-slate-600">
                       <th className="p-2 font-semibold">{w("month")}</th>
                       <th className="p-2 font-semibold">{w("sector")}</th>
+                      <th className="p-2 text-right font-semibold">{w("daysRecCol")}</th>
                       <th className="p-2 text-right font-semibold">{w("rainMm")}</th>
                       {showLyCol && <th className="p-2 text-right font-semibold">{w("lastYear")}</th>}
                       <th className="p-2 text-right font-semibold">{w("rainyD")}</th>
@@ -549,6 +606,7 @@ const Historical: NextPage = () => {
                       <tr key={`${r.ym}-${r.sector}`} className={`border-t ${r.first ? "border-gray-200" : "border-[#f3f5f6]"}`}>
                         <td className="px-2 py-[7px] font-semibold text-slate-900">{r.first ? ymName(r.ym, false) : ""}</td>
                         <td className="px-2 py-[7px] text-slate-700">{r.sector}</td>
+                        <td className="px-2 py-[7px] text-right text-slate-500">{r.days ?? "–"}</td>
                         <td className="px-2 py-[7px] text-right font-semibold">{r.rain ?? "–"}</td>
                         {showLyCol && <td className="px-2 py-[7px] text-right text-slate-500">{r.ly ?? "–"}</td>}
                         <td className="px-2 py-[7px] text-right">{r.rainy ?? "–"}</td>
@@ -579,6 +637,7 @@ function ChartTooltip({ active, payload, w, ymName, showLy }: { active?: boolean
       <div className="flex justify-between gap-4 text-slate-600"><span>{w("rain")}</span><b className="tabular-nums text-slate-900">{r.rain ?? "–"} mm</b></div>
       {showLy && <div className="flex justify-between gap-4 text-slate-600"><span>{w("lastYear")}</span><b className="tabular-nums text-slate-900">{r.ly ?? "–"} mm</b></div>}
       <div className="flex justify-between gap-4 text-slate-600"><span>{w("avgTemp")}</span><b className="tabular-nums text-slate-900">{r.temp != null ? `${r.temp}°C` : "–"}</b></div>
+      {r.expectedDays > 0 && <div className="mt-1 text-xs text-slate-500">{w("daysRecorded", { n: r.days, m: r.expectedDays })}</div>}
     </div>
   )
 }

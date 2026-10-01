@@ -239,11 +239,18 @@ export type MonthStats = {
   tmax: number
   tmin: number
   tavg: number
+  /** Days with a record vs calendar days of this month inside the period. */
   days: number
+  expectedDays: number
 }
 
 export type PeriodStats = {
+  /** Days with a record vs calendar days in the period; history only has days someone saved. */
   count: number
+  expectedDays: number
+  coverage: number
+  /** Average rain per recorded day, for fair comparisons when coverage differs. */
+  perDay: number
   total: number
   rainyDays: number
   heavyDays: number
@@ -278,6 +285,7 @@ export function periodStats(records: DailyRecord[] | undefined, start: string, e
     tmin: Math.round(mean(rs.map((r) => r.min))),
     tavg: Math.round(mean(rs.map((r) => r.avg)) * 10) / 10,
     days: rs.length,
+    expectedDays: daysInMonthWithin(ym, start, end),
   }))
 
   // Longest run of consecutive calendar days under 1 mm (a missing day breaks the run).
@@ -295,9 +303,14 @@ export function periodStats(records: DailyRecord[] | undefined, start: string, e
     prev = r.date
   }
 
+  const expectedDays = dayDiff(start, end) + 1
+  const rawTotal = recs.reduce((s, r) => s + r.rain, 0)
   return {
     count: recs.length,
-    total: Math.round(recs.reduce((s, r) => s + r.rain, 0)),
+    expectedDays,
+    coverage: recs.length / Math.max(1, expectedDays),
+    perDay: Math.round((rawTotal / recs.length) * 10) / 10,
+    total: Math.round(rawTotal),
     rainyDays: recs.filter((r) => r.rain >= RAINY_DAY_MM).length,
     heavyDays: recs.filter((r) => r.rain >= HEAVY_DAY_MM).length,
     hotDays: recs.filter((r) => r.max >= HOT_DAY_C).length,
@@ -314,6 +327,17 @@ const parseDay = (iso: string) => new Date(`${iso}T00:00:00`)
 export function dayDiff(a: string, b: string) {
   return Math.round((parseDay(b).getTime() - parseDay(a).getTime()) / 864e5)
 }
+function daysInMonthWithin(ym: string, start: string, end: string) {
+  const first = `${ym}-01`
+  const last = isoDay(new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0))
+  const from = first > start ? first : start
+  const to = last < end ? last : end
+  return to < from ? 0 : dayDiff(from, to) + 1
+}
+
+/** Coverage differs enough that totals can't be compared fairly (10 percentage points). */
+export const coverageDiffers = (a: PeriodStats, b: PeriodStats) => Math.abs(a.coverage - b.coverage) > 0.1
+
 export function addDays(iso: string, n: number) {
   const d = parseDay(iso)
   d.setDate(d.getDate() + n)
