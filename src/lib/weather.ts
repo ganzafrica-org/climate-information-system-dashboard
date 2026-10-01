@@ -1,7 +1,93 @@
 import { useQuery } from "@tanstack/react-query"
 import api from "@/lib/api"
+import type { ApiResponse, WeatherData } from "@/types/weather"
 
-// Per-sector weather (from GET /api/weather/sectors) for the choropleth pages.
+// Shared data + helpers for the Forecast and Historical weather pages.
+//   GET /api/weather/sectors              -> all 15 sectors, per-day forecast
+//   GET /api/weather/location/:id         -> one sector: overview, advice, 3-hourly, alerts
+//   GET /api/weather/historical/sectors   -> all 15 sectors, one row per day
+
+export const SECTORS = [
+  "Busogo", "Cyuve", "Gacaca", "Gashaki", "Gataraga", "Kimonyi", "Kinigi", "Muhoza",
+  "Muko", "Musanze", "Nkotsi", "Nyange", "Remera", "Rwaza", "Shingiro",
+] as const
+
+// ---------------------------------------------------------------------------
+// Thresholds (placeholders, to confirm with the agronomy team)
+// ---------------------------------------------------------------------------
+
+export type ChanceCat = "unlikely" | "possible" | "likely"
+export type AmountCat = "dry" | "light" | "moderate" | "heavy"
+
+export const chanceCat = (pct: number): ChanceCat => (pct < 30 ? "unlikely" : pct <= 60 ? "possible" : "likely")
+export const amountCat = (mm: number): AmountCat => (mm < 1 ? "dry" : mm < 10 ? "light" : mm < 30 ? "moderate" : "heavy")
+
+export const RAINY_DAY_MM = 1
+export const HEAVY_DAY_MM = 30
+export const HOT_DAY_C = 25
+export const STRONG_WIND_KMH = 30
+
+/** OpenWeatherMap (metric) reports wind in m/s. */
+export const msToKmh = (ms: number | null | undefined) => Math.round((ms ?? 0) * 3.6)
+
+export type FieldCat = "good" | "maybe" | "avoid"
+export function fieldCat(rainChance: number, rainfall: number): FieldCat {
+  const c = chanceCat(rainChance)
+  const a = amountCat(rainfall)
+  if (c === "unlikely" && a === "dry") return "good"
+  if (c === "likely" || a === "moderate" || a === "heavy") return "avoid"
+  return "maybe"
+}
+
+// ---------------------------------------------------------------------------
+// Conditions
+// ---------------------------------------------------------------------------
+
+export type Condition = "clear" | "clouds" | "drizzle" | "rain" | "thunderstorm" | "fog"
+
+/** Map OpenWeatherMap `main` (or a description) onto the icon set used by both pages. */
+export function conditionOf(main?: string | null, description?: string | null): Condition {
+  const s = `${main || ""} ${description || ""}`.toLowerCase()
+  if (s.includes("thunder")) return "thunderstorm"
+  if (s.includes("drizzle")) return "drizzle"
+  if (s.includes("rain") || s.includes("shower")) return "rain"
+  if (s.includes("clear") || s.includes("sun")) return "clear"
+  if (/(mist|fog|haze|smoke|dust|sand|ash)/.test(s)) return "fog"
+  return "clouds"
+}
+
+// ---------------------------------------------------------------------------
+// Colors
+// ---------------------------------------------------------------------------
+
+export const RAIN_FILL: Record<AmountCat, string> = {
+  dry: "#eef1f3", light: "#c9def3", moderate: "#7fb0e2", heavy: "#2f6cbc",
+}
+export const NO_DATA_FILL = "#d9dee2"
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t
+const clamp01 = (t: number) => Math.max(0, Math.min(1, t))
+function mixc(a: number[], b: number[], t: number) {
+  const k = clamp01(t)
+  return `rgb(${a.map((v, i) => Math.round(lerp(v, b[i], k))).join(",")})`
+}
+
+/** Cool blue -> pale -> warm orange/red. */
+export function tempRamp(t: number) {
+  t = clamp01(t)
+  return t < 0.5 ? mixc([120, 170, 220], [250, 240, 215], t / 0.5) : mixc([250, 240, 215], [226, 96, 52], (t - 0.5) / 0.5)
+}
+/** Very light -> deep blue. */
+export function rainRamp(t: number) {
+  t = clamp01(t)
+  return t < 0.5 ? mixc([238, 244, 250], [134, 182, 230], t / 0.5) : mixc([134, 182, 230], [23, 72, 150], (t - 0.5) / 0.5)
+}
+/** Day-list temperature bar (pale yellow -> orange). */
+export const warmRamp = (t: number) => mixc([247, 214, 120], [236, 116, 58], t)
+
+// ---------------------------------------------------------------------------
+// Forecast: all sectors
+// ---------------------------------------------------------------------------
 
 export type SectorDay = {
   dt: number
@@ -13,10 +99,13 @@ export type SectorDay = {
   humidity?: number
   windSpeed?: number
   condition?: string
+  conditionMain?: string
+  icon?: string | null
 }
 
 export type SectorWeather = {
   sector: string
+  locationId?: number | null
   lat: number
   lon: number
   temp: number | null
@@ -27,6 +116,7 @@ export type SectorWeather = {
   humidity: number | null
   windSpeed: number | null
   condition: string
+  conditionMain?: string
   days: SectorDay[]
   error?: boolean
 }
@@ -44,136 +134,209 @@ export function useSectorWeather() {
     queryKey: ["weather-sectors"],
     queryFn: async () => {
       const res = await api.get<SectorWeatherResponse>("/api/weather/sectors")
-      return (res as any)?.data ?? res
+      return { sectors: res.data ?? [], generatedAt: res.generatedAt }
     },
     staleTime: 30 * 60 * 1000,
     retry: 1,
   })
 }
 
-export type WeatherMetric = "temp" | "rainfall"
-
-/** Value for a sector on a given day index for the chosen metric. */
-export function metricValue(sw: SectorWeather, metric: WeatherMetric, dayIndex = 0): number | null {
-  if (dayIndex === 0) {
-    return metric === "temp" ? sw.temp : sw.rainfall
-  }
-  const d = sw.days?.[dayIndex]
-  if (!d) return null
-  return metric === "temp" ? (d.tempDay ?? null) : (d.rainfall ?? null)
-}
-
-// Sequential ramps (metric-appropriate). Temperature: blue→yellow→red.
-// Rainfall: light→deep blue.
-const TEMP_STOPS: [number, string][] = [
-  [0, "#2c7fb8"], [0.25, "#7fcdbb"], [0.5, "#ffffb2"], [0.75, "#fd8d3c"], [1, "#e31a1c"],
-]
-const RAIN_STOPS: [number, string][] = [
-  [0, "#f7fbff"], [0.3, "#c6dbef"], [0.6, "#6baed6"], [0.85, "#2171b5"], [1, "#08306b"],
-]
-
-function hex2rgb(h: string) {
-  return [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)]
-}
-function mix(a: number[], b: number[], t: number) {
-  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t]
-}
-function ramp(stops: [number, string][], t: number) {
-  t = Math.max(0, Math.min(1, t))
-  for (let i = 0; i < stops.length - 1; i++) {
-    const [p0, c0] = stops[i]
-    const [p1, c1] = stops[i + 1]
-    if (t <= p1) return mix(hex2rgb(c0), hex2rgb(c1), (t - p0) / (p1 - p0))
-  }
-  return hex2rgb(stops[stops.length - 1][1])
-}
-
-export function metricColor(metric: WeatherMetric, value: number | null, lo: number, hi: number): string {
-  if (value == null) return "#e2e8f0"
-  const t = hi > lo ? (value - lo) / (hi - lo) : 0.5
-  const c = ramp(metric === "temp" ? TEMP_STOPS : RAIN_STOPS, t)
-  return `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`
-}
-
-export function metricRange(values: (number | null)[], metric: WeatherMetric): [number, number] {
-  const nums = values.filter((v): v is number => v != null)
-  if (nums.length === 0) return metric === "temp" ? [10, 30] : [0, 20]
-  return [Math.floor(Math.min(...nums)), Math.ceil(Math.max(...nums))]
-}
-
-export const TEMP_LEGEND = TEMP_STOPS
-export const RAIN_LEGEND = RAIN_STOPS
-
-// ---------------------------------------------------------------------------
-// Historical aggregation (per-sector choropleth on the Historical page).
-// The backend exposes history per *location* (GET /api/weather/historical/
-// location/:id). Musanze's seeded locations ARE its sectors, so we map
-// sector name -> location id and aggregate that location's records over the
-// selected window into the two choropleth metrics + trend series.
-// ---------------------------------------------------------------------------
-
-export type HistoryRecord = {
-  date: string
-  weatherSummary: {
-    temperature: { current: number; min: number; max: number }
-    precipitation: { rainAmount: number }
-  }
-}
-
-export type PeriodRow = {
-  key: string
-  tempAvg: number
+/** One forecast day, normalised for display (°C, mm, %, km/h). */
+export type Day = {
+  index: number
+  date: Date
+  iso: string
+  condition: Condition
   tempMin: number
   tempMax: number
   rainfall: number
+  rainChance: number
+  humidity: number | null
+  windKmh: number
 }
 
-export type SectorHistory = {
+export const isoDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
+export function sectorDays(sw: SectorWeather | undefined): Day[] {
+  if (!sw || sw.error || !sw.days?.length) return []
+  return sw.days.map((d, index) => {
+    const date = new Date(d.dt * 1000)
+    const tDay = d.tempDay ?? sw.temp ?? 0
+    return {
+      index,
+      date,
+      iso: isoDay(date),
+      condition: conditionOf(d.conditionMain, d.condition),
+      tempMin: Math.round(d.tempMin ?? tDay),
+      tempMax: Math.round(d.tempMax ?? tDay),
+      rainfall: Math.round((d.rainfall ?? 0) * 10) / 10,
+      rainChance: Math.round(d.rainChance ?? 0),
+      humidity: d.humidity ?? null,
+      windKmh: msToKmh(d.windSpeed),
+    }
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Forecast: one sector (overview, farming advice, 3-hourly, alerts)
+// ---------------------------------------------------------------------------
+
+export function useLocationWeather(locationId: number | null | undefined) {
+  return useQuery({
+    queryKey: ["weather-location", locationId],
+    queryFn: async () => {
+      const res = await api.get<ApiResponse<WeatherData>>(`/api/weather/location/${locationId}`, {
+        params: { type: "daily", createAlert: false },
+      })
+      return res.data
+    },
+    enabled: locationId != null,
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  })
+}
+
+// ---------------------------------------------------------------------------
+// History: all sectors, one row per day
+// ---------------------------------------------------------------------------
+
+export type DailyRecord = { date: string; min: number; max: number; avg: number; rain: number; rainChance: number | null }
+
+export type SectorHistoryRows = {
   sector: string
-  avgTemp: number | null
-  totalRain: number | null
-  count: number
-  monthly: PeriodRow[]
+  locationId: number | null
+  firstDate: string | null
+  lastDate: string | null
+  records: DailyRecord[]
 }
 
-const MONTH_ORDER = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+type SectorHistoryResponse = {
+  status: string
+  data: { startDate: string; endDate: string; sectors: SectorHistoryRows[] }
+}
+
+export function useSectorHistory(startDate: string, endDate: string, enabled = true) {
+  return useQuery({
+    queryKey: ["weather-history-sectors", startDate, endDate],
+    queryFn: async () => {
+      const res = await api.get<SectorHistoryResponse>("/api/weather/historical/sectors", { params: { startDate, endDate } })
+      const bySector: Record<string, SectorHistoryRows> = {}
+      for (const s of res.data?.sectors ?? []) bySector[s.sector] = s
+      return bySector
+    },
+    enabled: enabled && !!startDate && !!endDate,
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
+  })
+}
+
+export type MonthStats = {
+  ym: string // YYYY-MM
+  rain: number
+  rainyDays: number
+  heavy: number
+  tmax: number
+  tmin: number
+  tavg: number
+  days: number
+}
+
+export type PeriodStats = {
+  count: number
+  total: number
+  rainyDays: number
+  heavyDays: number
+  hotDays: number
+  avgMax: number
+  avgMin: number
+  longestDry: { len: number; from?: string; to?: string }
+  hottest: DailyRecord
+  coldest: DailyRecord
+  months: MonthStats[]
+}
+
 const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0)
 
-/** Aggregate one location's records into monthly rows + window totals. */
-export function aggregateHistory(sector: string, records: HistoryRecord[]): SectorHistory {
-  if (!records?.length) return { sector, avgTemp: null, totalRain: null, count: 0, monthly: [] }
-  const buckets: Record<string, { tAvg: number[]; tMin: number[]; tMax: number[]; rain: number[] }> = {}
-  const allTemp: number[] = []
-  let allRain = 0
-  for (const r of records) {
-    const key = new Date(r.date).toLocaleString("en-US", { month: "short" })
-    buckets[key] ??= { tAvg: [], tMin: [], tMax: [], rain: [] }
-    const s = r.weatherSummary
-    buckets[key].tAvg.push(s.temperature.current)
-    buckets[key].tMin.push(s.temperature.min)
-    buckets[key].tMax.push(s.temperature.max)
-    buckets[key].rain.push(s.precipitation.rainAmount)
-    allTemp.push(s.temperature.current)
-    allRain += s.precipitation.rainAmount
+/** Totals, extremes and monthly rows for one sector's records inside [start, end]. */
+export function periodStats(records: DailyRecord[] | undefined, start: string, end: string): PeriodStats | null {
+  const recs = (records ?? []).filter((r) => r.date >= start && r.date <= end).sort((a, b) => a.date.localeCompare(b.date))
+  if (!recs.length) return null
+
+  const byMonth = new Map<string, DailyRecord[]>()
+  for (const r of recs) {
+    const k = r.date.slice(0, 7)
+    if (!byMonth.has(k)) byMonth.set(k, [])
+    byMonth.get(k)!.push(r)
   }
-  const monthly: PeriodRow[] = MONTH_ORDER.filter((k) => buckets[k]).map((k) => ({
-    key: k,
-    tempAvg: +mean(buckets[k].tAvg).toFixed(1),
-    tempMin: +mean(buckets[k].tMin).toFixed(1),
-    tempMax: +mean(buckets[k].tMax).toFixed(1),
-    rainfall: Math.round(buckets[k].rain.reduce((x, y) => x + y, 0)),
+  const months: MonthStats[] = Array.from(byMonth.entries()).map(([ym, rs]) => ({
+    ym,
+    rain: Math.round(rs.reduce((s, r) => s + r.rain, 0)),
+    rainyDays: rs.filter((r) => r.rain >= RAINY_DAY_MM).length,
+    heavy: rs.filter((r) => r.rain >= HEAVY_DAY_MM).length,
+    tmax: Math.round(mean(rs.map((r) => r.max))),
+    tmin: Math.round(mean(rs.map((r) => r.min))),
+    tavg: Math.round(mean(rs.map((r) => r.avg)) * 10) / 10,
+    days: rs.length,
   }))
+
+  // Longest run of consecutive calendar days under 1 mm (a missing day breaks the run).
+  let best: PeriodStats["longestDry"] = { len: 0 }
+  let cur = 0
+  let curStart = ""
+  let prev = ""
+  for (const r of recs) {
+    const consecutive = prev && dayDiff(prev, r.date) === 1
+    if (r.rain < RAINY_DAY_MM) {
+      if (!cur || !consecutive) { cur = 0; curStart = r.date }
+      cur++
+      if (cur > best.len) best = { len: cur, from: curStart, to: r.date }
+    } else cur = 0
+    prev = r.date
+  }
+
   return {
-    sector,
-    avgTemp: +mean(allTemp).toFixed(1),
-    totalRain: Math.round(allRain),
-    count: records.length,
-    monthly,
+    count: recs.length,
+    total: Math.round(recs.reduce((s, r) => s + r.rain, 0)),
+    rainyDays: recs.filter((r) => r.rain >= RAINY_DAY_MM).length,
+    heavyDays: recs.filter((r) => r.rain >= HEAVY_DAY_MM).length,
+    hotDays: recs.filter((r) => r.max >= HOT_DAY_C).length,
+    avgMax: Math.round(mean(recs.map((r) => r.max))),
+    avgMin: Math.round(mean(recs.map((r) => r.min))),
+    longestDry: best,
+    hottest: recs.reduce((a, b) => (b.max > a.max ? b : a)),
+    coldest: recs.reduce((a, b) => (b.min < a.min ? b : a)),
+    months,
   }
 }
 
-/** Choropleth value for a sector history under the selected metric. */
-export function historyMetricValue(h: SectorHistory | undefined, metric: WeatherMetric): number | null {
-  if (!h) return null
-  return metric === "temp" ? h.avgTemp : h.totalRain
+const parseDay = (iso: string) => new Date(`${iso}T00:00:00`)
+export function dayDiff(a: string, b: string) {
+  return Math.round((parseDay(b).getTime() - parseDay(a).getTime()) / 864e5)
+}
+export function addDays(iso: string, n: number) {
+  const d = parseDay(iso)
+  d.setDate(d.getDate() + n)
+  return isoDay(d)
+}
+export const minusYear = (iso: string) => `${+iso.slice(0, 4) - 1}${iso.slice(4)}`.replace(/-02-29$/, "-02-28")
+
+/** Rwanda's farming seasons: A Sep–Jan, B Feb–May, C Jun–Aug (month index 0–11). */
+export type Season = "A" | "B" | "C"
+export const seasonOf = (m: number): Season => (m >= 8 || m === 0 ? "A" : m <= 4 ? "B" : "C")
+
+/** Start/end of the season containing `iso`, plus the season before it. */
+export function seasonRange(iso: string): { season: Season; start: string; end: string } {
+  const y = +iso.slice(0, 4)
+  const m = +iso.slice(5, 7) - 1
+  const s = seasonOf(m)
+  if (s === "A") {
+    const startYear = m === 0 ? y - 1 : y
+    return { season: "A", start: `${startYear}-09-01`, end: `${startYear + 1}-01-31` }
+  }
+  if (s === "B") return { season: "B", start: `${y}-02-01`, end: `${y}-05-31` }
+  return { season: "C", start: `${y}-06-01`, end: `${y}-08-31` }
+}
+export function previousSeason(iso: string) {
+  return seasonRange(addDays(seasonRange(iso).start, -1))
 }

@@ -1,35 +1,31 @@
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import type { NextPage } from "next"
 import Head from "next/head"
 import dynamic from "next/dynamic"
-import { useQueries, useQuery } from "@tanstack/react-query"
+import { useRouter } from "next/router"
+import { useQuery } from "@tanstack/react-query"
 import {
-  Bar, BarChart, CartesianGrid, Line, LineChart, Tooltip, XAxis, YAxis, Legend, ResponsiveContainer,
+  Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts"
-import { Download, Layers, ChevronDown, X } from "lucide-react"
-import { AppLayout } from "@/components/layout/AppLayout"
-import { useLanguage } from "@/i18n"
-import { SegmentedControl } from "@/components/ui/segmented-control"
-import { Checkbox } from "@/components/ui/checkbox"
-import { DataTable, type SortableColumn } from "@/components/ui/table"
-import { Skeleton } from "@/components/ui/skeleton"
-import { DateRangePicker } from "@/components/ui/calendar"
-import api from "@/lib/api"
-import type { FeatureCollection } from "@/lib/soil"
-import { readSector } from "@/lib/soil"
 import {
-  aggregateHistory, historyMetricValue, metricColor, metricRange,
-  TEMP_LEGEND, RAIN_LEGEND, type WeatherMetric, type SectorHistory, type HistoryRecord,
+  CalendarX, ChevronDown, ChevronUp, CloudOff, CloudRain, Download, Droplets, Plus, Sun, Thermometer, X, type LucideIcon,
+} from "lucide-react"
+import { AppLayout } from "@/components/layout/AppLayout"
+import { SectorMenu } from "@/components/weather/SectorMenu"
+import { StateCard } from "@/components/weather/StateCard"
+import { DateRangePicker, type DateRange } from "@/components/ui/calendar"
+import { Skeleton } from "@/components/ui/skeleton"
+import type { FeatureCollection } from "@/lib/soil"
+import {
+  SECTORS, NO_DATA_FILL, addDays, minusYear, periodStats, previousSeason, rainRamp, seasonOf, seasonRange, tempRamp,
+  useSectorHistory, type PeriodStats, type Season,
 } from "@/lib/weather"
-import type { HistoricalWeatherRecord } from "@/types/weather"
-import type { Location } from "@/types/farmer"
+import { dayMonth, downloadCsv, escapeHtml, fmtInt, fromIso, monthName, useWx } from "@/lib/weatherFormat"
 
 const WeatherMap = dynamic(() => import("@/components/WeatherSectorMap"), {
   ssr: false,
-  loading: () => <div className="h-full w-full animate-pulse bg-muted" />,
+  loading: () => <div className="h-full w-full animate-pulse rounded-[10px] bg-muted" />,
 })
-
-const SERIES_COLORS = ["#147677", "#f59e0b", "#2563eb", "#db2777", "#16a34a", "#7c3aed"]
 
 function useGeo(file: string) {
   return useQuery({
@@ -43,386 +39,546 @@ function useGeo(file: string) {
   })
 }
 
+const DEFAULT_SECTOR = "Musanze"
+const MAX_SECTORS = 3
+const SERIES = ["#147677", "#b45309", "#6d28d9"]
+const RAIN_BAR = "#3b7dd8"
+const LY_BAR = "#c9d9ee"
+const TEMP_LINE = "#e0702f"
+const BAND: Record<Season, [string, string]> = { A: ["#e8f3f3", "#0f5f60"], B: ["#eef5e7", "#3d6b1f"], C: ["#f8f2e4", "#8a5a00"] }
+const PRESETS = ["thisSeason", "lastSeason", "last12", "year", "custom"] as const
+type Preset = (typeof PRESETS)[number]
+
+const kigaliToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Kigali" }).format(new Date())
+
+type ChartRow = { ym: string; rain: number | null; ly: number | null; temp: number | null }
+
 const Historical: NextPage = () => {
-  const { t, locale: lang } = useLanguage()
-  const locale = lang === "rw" ? "rw-RW" : "en-US"
+  const { w, lang } = useWx()
+  const router = useRouter()
 
-  const [metric, setMetric] = useState<WeatherMetric>("temp")
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [sectorMenuOpen, setSectorMenuOpen] = useState(false)
-  const [dateRange, setDateRange] = useState({
-    start: `${new Date().getFullYear()}-01-01`,
-    end: `${new Date().getFullYear()}-12-31`,
+  const [sectors, setSectorsState] = useState<string[]>([DEFAULT_SECTOR])
+  const [preset, setPreset] = useState<Preset>("last12")
+  const [custom, setCustom] = useState<DateRange>(() => {
+    const y = addDays(kigaliToday(), -1)
+    return { start: `${y.slice(0, 4)}-01-01`, end: y }
   })
-  const [popover, setPopover] = useState<{ x: number; y: number; sector: string } | null>(null)
-  const [dockTab, setDockTab] = useState(0)
-  const [dockOpen, setDockOpen] = useState(true)
+  const [cmpLastYear, setCmpLastYear] = useState(true)
+  const [metric, setMetric] = useState<"rain" | "temp">("rain")
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [tableOpen, setTableOpen] = useState(false)
 
-  const sectorsQ = useGeo("Sectors.geojson")
-  const districtQ = useGeo("Musanze_District_Boundary.geojson")
-
-  // All sector names, straight from the geojson (authoritative 15 sectors).
-  const allSectors = useMemo(
-    () => (sectorsQ.data?.features.map((f) => readSector(f.properties)).filter(Boolean).sort() ?? []) as string[],
-    [sectorsQ.data]
-  )
-
-  // Locations (= sectors) so we can resolve each sector's history endpoint id.
-  const locationsQ = useQuery({
-    queryKey: ["locations-all"],
-    queryFn: async () => {
-      const res = await api.get<any>("/api/users/locations/all", { params: { limit: 100 } })
-      const data = (res as any)?.data ?? res
-      return (data?.locations ?? data ?? []) as Location[]
-    },
-    staleTime: 30 * 60 * 1000,
-  })
-  const idBySector = useMemo(() => {
-    const m: Record<string, number> = {}
-    for (const l of locationsQ.data ?? []) if (l.name) m[l.name] = l.id
-    return m
-  }, [locationsQ.data])
-
-  // Fetch history for EVERY sector that has a location id (drives the choropleth).
-  const sectorsWithId = allSectors.filter((s) => idBySector[s] != null)
-  const historyQs = useQueries({
-    queries: sectorsWithId.map((sector) => ({
-      queryKey: ["historical", idBySector[sector], dateRange.start, dateRange.end],
-      queryFn: async () => {
-        const res = await api.get<any>(`/api/weather/historical/location/${idBySector[sector]}`, {
-          params: { startDate: dateRange.start, endDate: dateRange.end, limit: 1000, sortBy: "date", sortOrder: "ASC" },
-        })
-        const data = (res as any)?.data ?? res
-        const records = (data?.records ?? data ?? []) as HistoricalWeatherRecord[]
-        return aggregateHistory(sector, records as unknown as HistoryRecord[])
-      },
-      staleTime: 15 * 60 * 1000,
-      enabled: idBySector[sector] != null,
-    })),
-  })
-
-  const historyBySector = useMemo(() => {
-    const m: Record<string, SectorHistory> = {}
-    sectorsWithId.forEach((sector, i) => {
-      const h = historyQs[i]?.data
-      if (h) m[sector] = h
-    })
-    return m
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectorsWithId.join(","), historyQs.map((q) => q.dataUpdatedAt).join(",")])
-
-  // Default: select the first two sectors that have data once loaded.
+  // ?sectors=A,B keeps the comparison shareable
   useEffect(() => {
-    if (selected.size > 0) return
-    const withData = Object.keys(historyBySector)
-    if (withData.length > 0) setSelected(new Set(withData.slice(0, 2)))
+    if (!router.isReady) return
+    const q = router.query.sectors
+    if (typeof q === "string") {
+      const picked = q.split(",").filter((s) => (SECTORS as readonly string[]).includes(s)).slice(0, MAX_SECTORS)
+      if (picked.length) setSectorsState(picked)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [historyBySector])
+  }, [router.isReady])
+  const setSectors = (next: string[]) => {
+    const list = next.slice(0, MAX_SECTORS)
+    if (!list.length) return
+    setSectorsState(list)
+    router.replace({ pathname: router.pathname, query: { ...router.query, sectors: list.join(",") } }, undefined, { shallow: true })
+  }
+  const addSector = (s: string) => { if (!sectors.includes(s)) setSectors([...sectors, s]); setMenuOpen(false) }
+  const removeSector = (s: string) => setSectors(sectors.filter((x) => x !== s))
 
-  const valueBySector = useMemo(() => {
-    const m: Record<string, number | null> = {}
-    for (const s of allSectors) m[s] = historyMetricValue(historyBySector[s], metric)
+  // ---- period ----
+  const today = kigaliToday()
+  const yesterday = addDays(today, -1)
+  const [start, end] = useMemo((): [string, string] => {
+    const clampEnd = (s: string, e: string): [string, string] => [s, e < s ? s : e]
+    switch (preset) {
+      case "thisSeason": { const r = seasonRange(today); return clampEnd(r.start, r.end < yesterday ? r.end : yesterday) }
+      case "lastSeason": { const r = previousSeason(today); return clampEnd(r.start, r.end) }
+      case "year": return clampEnd(`${today.slice(0, 4)}-01-01`, yesterday)
+      case "custom": return clampEnd(custom.start, custom.end)
+      default: {
+        const y = +yesterday.slice(0, 4)
+        const m = +yesterday.slice(5, 7) - 1 - 11
+        const first = new Date(y, m, 1)
+        return clampEnd(`${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, "0")}-01`, yesterday)
+      }
+    }
+  }, [preset, custom, today, yesterday])
+
+  const primary = sectors[0]
+  const single = sectors.length === 1
+  const wantLY = single && cmpLastYear
+
+  const histQ = useSectorHistory(start, end)
+  const lyQ = useSectorHistory(minusYear(start), minusYear(end), wantLY)
+  const sectorsGeo = useGeo("Sectors.geojson")
+  const districtGeo = useGeo("Musanze_District_Boundary.geojson")
+
+  const allStats = useMemo(() => {
+    const m: Record<string, PeriodStats | null> = {}
+    SECTORS.forEach((s) => (m[s] = periodStats(histQ.data?.[s]?.records, start, end)))
     return m
-  }, [allSectors, historyBySector, metric])
+  }, [histQ.data, start, end])
+  const ly = wantLY ? periodStats(lyQ.data?.[primary]?.records, minusYear(start), minusYear(end)) : null
+  const main = allStats[primary]
 
-  const [lo, hi] = useMemo(() => metricRange(Object.values(valueBySector), metric), [valueBySector, metric])
+  const isLoading = histQ.isLoading
+  const isDown = histQ.isError
+  const isLive = !isLoading && !isDown && !!main
+  const noData = !isLoading && !isDown && !main
 
-  const isLoading = sectorsQ.isLoading || locationsQ.isLoading || historyQs.some((q) => q.isLoading)
-  const legendStops = metric === "temp" ? TEMP_LEGEND : RAIN_LEGEND
-  const unit = metric === "temp" ? "°C" : "mm"
+  // ---- text ----
+  const colorOf = (s: string) => SERIES[sectors.indexOf(s)] ?? SERIES[0]
+  const dt = (iso: string) => dayMonth(fromIso(iso), lang, { year: true })
+  const dts = (iso: string) => dayMonth(fromIso(iso), lang)
+  const ymName = (ym: string, long = true) => `${monthName(+ym.slice(5) - 1, lang, long)} ${ym.slice(0, 4)}`
+  const daysWord = (n: number) => (n === 1 ? w("day") : w("days"))
+  const pct = (a: number, b: number) => (b ? Math.round(((a - b) / b) * 100) : null)
 
-  // ---- selected sectors -> comparison series ----
-  const selectedList = Array.from(selected)
-  const series = selectedList.map((s, i) => ({
-    sector: s,
-    color: SERIES_COLORS[i % SERIES_COLORS.length],
-    history: historyBySector[s],
-  }))
+  const periodName = (() => {
+    if (preset === "thisSeason" || preset === "lastSeason") {
+      const r = preset === "thisSeason" ? seasonRange(today) : previousSeason(today)
+      const y = r.season === "A" ? `${r.start.slice(0, 4)}/${r.end.slice(2, 4)}` : r.start.slice(0, 4)
+      const months = `${monthName(+r.start.slice(5, 7) - 1, lang)}–${monthName(+r.end.slice(5, 7) - 1, lang)}`
+      const name = w("seasonName", { s: r.season, y, months })
+      return r.end > end ? `${name}, ${w("soFar")}` : name
+    }
+    return w(`preset.${preset}`)
+  })()
+  const periodText = `${w("periodText", { name: periodName, from: dt(start), to: dt(end) })}${main ? ` · ${w("daysOfRecords", { n: main.count })}` : ""}`
 
-  const chartData = useMemo(() => {
-    const keys: string[] = []
-    series.forEach((s) => s.history?.monthly.forEach((r) => { if (!keys.includes(r.key)) keys.push(r.key) }))
-    const order = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    keys.sort((a, b) => order.indexOf(a) - order.indexOf(b))
-    return keys.map((key) => {
-      const row: Record<string, any> = { key }
-      series.forEach((s) => {
-        const r = s.history?.monthly.find((x) => x.key === key)
-        row[`temp_${s.sector}`] = r ? r.tempAvg : null
-        row[`rain_${s.sector}`] = r ? r.rainfall : null
-      })
-      return row
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedList.join(","), historyBySector])
-
-  const toggleSector = (s: string) => setSelected((prev) => {
-    const n = new Set(prev); n.has(s) ? n.delete(s) : n.add(s); return n
-  })
-
-  const handleExport = () => {
-    if (!chartData.length) return
-    const header = ["Month", ...series.flatMap((s) => [`${s.sector} Temp`, `${s.sector} Rain`])]
-    const rows = chartData.map((d) => [d.key, ...series.flatMap((s) => [d[`temp_${s.sector}`] ?? "", d[`rain_${s.sector}`] ?? ""])])
-    const csv = [header.join(","), ...rows.map((r) => r.join(","))].join("\n")
-    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv" }))
-    const a = document.createElement("a")
-    a.href = url; a.download = `historical_${metric}_${selectedList.join("-") || "all"}.csv`; a.click()
-    URL.revokeObjectURL(url)
+  let answer = ""
+  if (main) {
+    if (single) {
+      let cmp = ""
+      if (ly) {
+        const p = pct(main.total, ly.total)
+        cmp = p == null ? "" : Math.abs(p) < 3 ? w("ansSame") : w(p > 0 ? "ansMore" : "ansLess", { p: Math.abs(p) })
+      }
+      answer = w("ansSingle", { s: primary, mm: fmtInt(main.total), from: dt(start), to: dt(end), cmp })
+      if (main.months.length > 1) {
+        const wet = main.months.reduce((a, b) => (b.rain > a.rain ? b : a))
+        const dry = main.months.reduce((a, b) => (b.rain < a.rain ? b : a))
+        answer += ` ${w("ansMonths", { wm: ymName(wet.ym), wmm: wet.rain, dm: ymName(dry.ym), dmm: dry.rain })}`
+      }
+      if (wantLY && !lyQ.isLoading && !ly) answer += ` ${w("noPrev")}`
+    } else {
+      const ranked = sectors.map((s) => [s, allStats[s]] as const).filter((x): x is readonly [string, PeriodStats] => !!x[1]).sort((a, b) => b[1].total - a[1].total)
+      answer = w("ansMulti", { s: ranked[0][0], mm: fmtInt(ranked[0][1].total), from: dt(start), to: dt(end) })
+      const rest = ranked.slice(1).map(([s, x]) => w("ansOther", { s, mm: fmtInt(x.total) }))
+      if (rest.length) answer += ` ${rest.join(", ")}.`
+    }
   }
 
-  const recordColumns = useMemo<SortableColumn<Record<string, any>>[]>(() => {
-    const cols: SortableColumn<Record<string, any>>[] = [
-      { id: "key", header: t("period") || "Month", value: (r) => r.key, cell: (r) => r.key, width: "120px" },
-    ]
-    series.forEach((s) => {
-      cols.push({ id: `temp_${s.sector}`, header: `${s.sector} °C`, numeric: true, width: "120px", value: (r) => r[`temp_${s.sector}`] ?? 0, cell: (r) => r[`temp_${s.sector}`] ?? "-" })
-      cols.push({ id: `rain_${s.sector}`, header: `${s.sector} mm`, numeric: true, width: "120px", value: (r) => r[`rain_${s.sector}`] ?? 0, cell: (r) => r[`rain_${s.sector}`] ?? "-" })
-    })
-    return cols
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedList.join(","), t])
+  // ---- stat cards ----
+  type Row = { name: string; color: string; value: string }
+  const rowsFor = (fn: (x: PeriodStats) => string, lyFn: (x: PeriodStats) => string): Row[] => {
+    if (!single) return sectors.slice(1).map((s) => ({ name: s, color: colorOf(s), value: allStats[s] ? fn(allStats[s]!) : "–" }))
+    if (wantLY) return [{ name: w("cLastYear"), color: LY_BAR, value: ly ? lyFn(ly) : "–" }]
+    return []
+  }
+  const stats: { icon: LucideIcon; iconColor: string; label: string; value: string; unit: string; meaning: string; bg: string; rows: Row[] }[] = main
+    ? (() => {
+        const heavyMonth = main.months.reduce((a, b) => (b.heavy > a.heavy ? b : a))
+        return [
+          {
+            icon: Droplets, iconColor: "#2f6cbc", label: w("totalRain"), value: fmtInt(main.total), unit: "mm", bg: "#fff",
+            meaning: w("rainyMeaning", { n: main.rainyDays, k: Math.round((main.rainyDays / main.count) * 10) }),
+            rows: rowsFor((x) => `${fmtInt(x.total)} mm`, (x) => {
+              const p = pct(main.total, x.total)
+              return `${fmtInt(x.total)} mm${p == null ? "" : ` (${p >= 0 ? "+" : ""}${p}%)`}`
+            }),
+          },
+          {
+            icon: Thermometer, iconColor: TEMP_LINE, label: w("avgTemp"), value: `${main.avgMax}° / ${main.avgMin}°`, unit: w("highLow"), bg: "#fff",
+            meaning: w("tempMeaning", { hot: Math.round(main.hottest.max), hd: dts(main.hottest.date), cold: Math.round(main.coldest.min), cd: dts(main.coldest.date), n: main.hotDays }),
+            rows: rowsFor((x) => `${x.avgMax}° / ${x.avgMin}°`, (x) => `${x.avgMax}° / ${x.avgMin}°`),
+          },
+          {
+            icon: CloudRain, iconColor: "#2f6cbc", label: w("heavyDays"), value: `${main.heavyDays}`, unit: daysWord(main.heavyDays), bg: main.heavyDays >= 5 ? "#f3f7fc" : "#fff",
+            meaning: `${w("heavyMeaning")} ${main.heavyDays ? w("heavyMost", { m: monthName(+heavyMonth.ym.slice(5) - 1, lang, true) }) : w("heavyNone")}`,
+            rows: rowsFor((x) => `${x.heavyDays}`, (x) => `${x.heavyDays}`),
+          },
+          {
+            icon: Sun, iconColor: "#e39a1c", label: w("drySpell"), value: `${main.longestDry.len}`, unit: daysWord(main.longestDry.len), bg: "#fff",
+            meaning: main.longestDry.len && main.longestDry.from && main.longestDry.to ? w("dryMeaning", { from: dts(main.longestDry.from), to: dts(main.longestDry.to) }) : "",
+            rows: rowsFor((x) => `${x.longestDry.len} ${daysWord(x.longestDry.len)}`, (x) => `${x.longestDry.len} ${daysWord(x.longestDry.len)}`),
+          },
+        ]
+      })()
+    : []
 
-  const dockTabs = [t("summary") || "Summary", t("trends") || "Trends", t("records") || "Records"]
-  const recordMinWidth = 120 + series.length * 240
+  // ---- charts (one per sector, same scales) ----
+  const months = useMemo(() => {
+    const set = new Set<string>()
+    sectors.forEach((s) => allStats[s]?.months.forEach((m) => set.add(m.ym)))
+    return Array.from(set).sort()
+  }, [sectors, allStats])
+  const lyByMonth = useMemo(() => {
+    const m: Record<string, number> = {}
+    ly?.months.forEach((x) => (m[x.ym.slice(5)] = x.rain))
+    return m
+  }, [ly])
+  const chartRows = (s: string): ChartRow[] => {
+    const byYm = new Map((allStats[s]?.months ?? []).map((m) => [m.ym, m]))
+    return months.map((ym) => {
+      const m = byYm.get(ym)
+      return { ym, rain: m ? m.rain : null, ly: wantLY && ly ? lyByMonth[ym.slice(5)] ?? null : null, temp: m ? m.tavg : null }
+    })
+  }
+  const allRain = sectors.flatMap((s) => allStats[s]?.months.map((m) => m.rain) ?? []).concat(ly?.months.map((m) => m.rain) ?? [])
+  const yMax = Math.max(50, Math.ceil(Math.max(0, ...allRain) / 50) * 50)
+  const allTemp = sectors.flatMap((s) => allStats[s]?.months.map((m) => m.tavg) ?? [])
+  const tDomain: [number, number] = allTemp.length ? [Math.floor(Math.min(...allTemp)) - 2, Math.ceil(Math.max(...allTemp)) + 2] : [5, 25]
+  const bands = (() => {
+    const out: { season: Season; from: string; to: string; n: number }[] = []
+    months.forEach((ym) => {
+      const se = seasonOf(+ym.slice(5) - 1)
+      const last = out[out.length - 1]
+      if (last && last.season === se) { last.to = ym; last.n++ } else out.push({ season: se, from: ym, to: ym, n: 1 })
+    })
+    return out
+  })()
+  const tickLabel = (ym: string) => {
+    const i = months.indexOf(ym)
+    const showYear = months.length <= 6 || ym.endsWith("-01") || i === 0
+    return `${monthName(+ym.slice(5) - 1, lang)}${showYear ? ` ${ym.slice(2, 4)}` : ""}`
+  }
+
+  // ---- map ----
+  const isRain = metric === "rain"
+  const mapVal = (x: PeriodStats) => (isRain ? x.total : (x.avgMax + x.avgMin) / 2)
+  const vals = SECTORS.map((s) => allStats[s]).filter((x): x is PeriodStats => !!x).map(mapVal)
+  const vlo = vals.length ? Math.min(...vals) : 0
+  const vhi = vals.length ? Math.max(...vals) : 1
+  const { mapFills, mapLabels } = useMemo(() => {
+    const fills: Record<string, string> = {}
+    const labels: Record<string, string> = {}
+    SECTORS.forEach((s) => {
+      const x = allStats[s]
+      if (!x) { fills[s] = NO_DATA_FILL; labels[s] = "–"; return }
+      const v = mapVal(x)
+      const t = (v - vlo) / Math.max(1, vhi - vlo)
+      fills[s] = isRain ? rainRamp(t) : tempRamp(t)
+      labels[s] = isRain ? `${fmtInt(x.total)} mm` : `${Math.round(v)}°`
+    })
+    return { mapFills: fills, mapLabels: labels }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allStats, isRain, vlo, vhi])
+
+  const popupHtml = useCallback(
+    (s: string) => {
+      const x = allStats[s]
+      const row = (k: string, v: string | number) =>
+        `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:3px 0;"><span style="color:#64748b;">${escapeHtml(k)}</span><b style="font-weight:600;color:#0f172a;font-variant-numeric:tabular-nums;">${escapeHtml(String(v))}</b></div>`
+      const inCmp = sectors.includes(s)
+      const btn = s === primary
+        ? ""
+        : inCmp
+          ? `<button data-action="remove" data-sector="${escapeHtml(s)}" style="font:inherit;margin-top:8px;width:100%;border:1px solid #e5e7eb;background:#fff;border-radius:8px;padding:8px;font-size:14px;font-weight:600;color:#475569;cursor:pointer;">${escapeHtml(w("remove"))}</button>`
+          : sectors.length < MAX_SECTORS
+            ? `<button data-action="add" data-sector="${escapeHtml(s)}" style="font:inherit;margin-top:8px;width:100%;border:0;background:#147677;border-radius:8px;padding:8px;font-size:14px;font-weight:600;color:#fff;cursor:pointer;">${escapeHtml(w("addToCompare"))}</button>`
+            : ""
+      if (!x) return `<div style="font-size:15px;font-weight:700;">${escapeHtml(s)}</div><div style="font-size:14px;color:#64748b;margin-top:4px;">${escapeHtml(w("histNoData", { s }))}</div>${btn}`
+      return `<div style="font-size:15px;font-weight:700;color:#0f172a;margin-bottom:4px;">${escapeHtml(s)}</div>`
+        + row(w("totalRain"), `${fmtInt(x.total)} mm`) + row(w("rainyD"), x.rainyDays) + row(w("heavyD"), x.heavyDays)
+        + row(w("avgTemp"), `${x.avgMax}° / ${x.avgMin}°`) + btn
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allStats, sectors.join(","), primary, lang]
+  )
+  const onMapAction = (action: string, s: string) => {
+    if (action === "add") addSector(s)
+    if (action === "remove") removeSector(s)
+  }
+
+  // ---- table + CSV ----
+  const tableRows = months.flatMap((ym) => sectors.map((s, j) => {
+    const m = allStats[s]?.months.find((x) => x.ym === ym)
+    return { ym, first: j === 0, sector: s, rain: m?.rain, ly: wantLY && ly ? lyByMonth[ym.slice(5)] : undefined, rainy: m?.rainyDays, heavy: m?.heavy, hi: m?.tmax, lo: m?.tmin }
+  }))
+  const showLyCol = wantLY && !!ly
+  const exportCsv = () => {
+    const header = ["Month", "Sector", "Rain_mm", ...(showLyCol ? ["Rain_last_year_mm"] : []), "RainyDays", "HeavyDays", "AvgHigh_C", "AvgLow_C"]
+    const rows = tableRows.map((r) => [r.ym, r.sector, r.rain ?? "", ...(showLyCol ? [r.ly ?? ""] : []), r.rainy ?? "", r.heavy ?? "", r.hi ?? "", r.lo ?? ""])
+    downloadCsv(`historical_${sectors.join("-")}_${start}_${end}.csv`, [header, ...rows])
+  }
+
+  const firstDate = histQ.data?.[primary]?.firstDate
+  const noDataText = firstDate && firstDate > end
+    ? w("histNoDataText", { s: primary, d: dt(firstDate) })
+    : !firstDate && histQ.data ? w("histNoDataNever", { s: primary }) : undefined
+
+  const segBtn = (on: boolean) => `rounded-md px-3 py-[7px] text-sm font-medium ${on ? "bg-[#147677] text-white" : "text-slate-600 hover:text-slate-900"}`
 
   return (
     <AppLayout>
-      <Head><title>{t("historical") || "Historical"} | {t("climateInformationSystem") || "Teganyamuhinzi"}</title></Head>
-      <div className="p-4 md:p-6 space-y-4">
-        {/* Header — dashboard white-card style */}
-        <div className="rounded-lg bg-white px-4 py-3 shadow-sm">
-          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{t("historicalWeatherData") || "Historical Weather · Musanze"}</h1>
-              <p className="text-sm text-slate-400">{t("historicalMapDesc") || "Sectors shaded by climate over the selected window — pick sectors to compare"}</p>
+      <Head><title>{`${w("histTitle")} | Teganyamuhinzi`}</title></Head>
+      <div className="max-w-[1280px] space-y-4 p-3 text-sm text-[#171717] md:p-6">
+        {/* Header + filters */}
+        <div className="flex flex-col gap-3.5 rounded-lg bg-white px-4 py-3.5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{w("histTitle")}</h1>
+              <p className="mt-0.5 text-sm text-slate-500">{w("histSub")}</p>
             </div>
-            <button onClick={handleExport} className="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb]">
-              <Download className="h-4 w-4 text-[#147677]" /> {t("exportData") || "Export CSV"}
+            <button onClick={exportCsv} disabled={!isLive} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb] disabled:opacity-50">
+              <Download className="h-4 w-4 text-[#147677]" />{w("exportCsv")}
             </button>
           </div>
-        </div>
-
-        {/* One framed unit: left panel + map */}
-        <div className="flex h-[740px] overflow-hidden rounded-2xl border border-border bg-card shadow-sm max-lg:h-auto max-lg:flex-col">
-          {/* LEFT PANEL */}
-          <aside className="w-[310px] shrink-0 overflow-y-auto border-r border-border p-4 max-lg:w-full max-lg:border-b max-lg:border-r-0">
-            <Group label={t("metric") || "Metric"}>
-              <SegmentedControl
-                label="Metric"
-                value={metric}
-                onValueChange={(v) => setMetric(v as WeatherMetric)}
-                className="w-full"
-                options={[
-                  { value: "temp", label: t("temperature") || "Temperature" },
-                  { value: "rainfall", label: t("rainfall") || "Rainfall" },
-                ]}
-              />
-            </Group>
-
-            <Group label={t("timeWindow") || "Time window"}>
-              <DateRangePicker
-                value={dateRange}
-                onChange={setDateRange}
-                locale={locale}
-                label={t("timeWindow") || "Time window"}
-                max={new Date()}
-              />
-            </Group>
-
-            <Group label={t("sector") || "Sectors"} action={selected.size > 0 ? { label: t("clear") || "Clear", onClick: () => setSelected(new Set()) } : undefined}>
-              <div className="relative">
-                <button onClick={() => setSectorMenuOpen((o) => !o)} className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left text-sm">
-                  <span className="flex flex-wrap gap-1">
-                    {selected.size === 0 ? <span className="text-muted-foreground">{t("selectSectors") || "Select sectors"}</span>
-                      : selectedList.slice(0, 2).map((s) => <span key={s} className="rounded bg-[#147677]/10 px-1.5 py-0.5 text-[11px] font-medium text-[#147677]">{s}</span>)}
-                    {selected.size > 2 && <span className="rounded bg-[#147677]/10 px-1.5 py-0.5 text-[11px] font-medium text-[#147677]">+{selected.size - 2}</span>}
+          <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-sm font-semibold text-slate-700">{w("sectorsLabel")}</span>
+              <div className="relative flex flex-wrap items-center gap-1.5">
+                {sectors.map((s) => (
+                  <span key={s} className="inline-flex items-center gap-2 rounded-lg border-[1.5px] bg-white py-[7px] pl-3 pr-2 text-[15px] font-semibold text-slate-900" style={{ borderColor: colorOf(s) }}>
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: colorOf(s) }} />{s}
+                    {sectors.length > 1 && (
+                      <button onClick={() => removeSector(s)} aria-label={`${w("remove")} ${s}`} className="flex p-0.5 text-slate-500 hover:text-slate-800"><X className="h-[15px] w-[15px]" /></button>
+                    )}
                   </span>
-                  <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                </button>
-                {sectorMenuOpen && (
-                  <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
-                    {allSectors.map((s) => {
-                      const hasData = historyBySector[s] != null
-                      return (
-                        <label key={s} className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted ${hasData ? "" : "opacity-50"}`}>
-                          <Checkbox checked={selected.has(s)} onCheckedChange={() => toggleSector(s)} />
-                          <span className="flex-1">{s}</span>
-                          {!hasData && <span className="text-[10px] text-muted-foreground">{t("noData") || "no data"}</span>}
-                        </label>
-                      )
-                    })}
+                ))}
+                {sectors.length < MAX_SECTORS && (
+                  <div className="relative">
+                    <button onClick={() => setMenuOpen((o) => !o)} aria-expanded={menuOpen} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-[#9fb3bb] bg-white px-3 py-2 text-sm font-semibold text-[#147677]">
+                      <Plus className="h-[15px] w-[15px]" />{w("addSector")}
+                    </button>
+                    <SectorMenu
+                      open={menuOpen}
+                      onClose={() => setMenuOpen(false)}
+                      onPick={addSector}
+                      width={280}
+                      searchPlaceholder={w("searchSectors")}
+                      noMatch={(q) => w("noMatch", { q })}
+                      items={SECTORS.filter((s) => !sectors.includes(s)).map((s) => ({
+                        name: s,
+                        right: <span className="text-[13px] tabular-nums text-slate-500">{allStats[s] ? `${fmtInt(allStats[s]!.total)} mm` : "–"}</span>,
+                      }))}
+                    />
                   </div>
                 )}
               </div>
-            </Group>
-
-            <Group label={t("comparing") || "Comparing"}>
-              {series.length === 0 ? (
-                <p className="text-xs text-muted-foreground">{t("selectSectorsHint") || "Pick one or more sectors from the map or the dropdown."}</p>
-              ) : (
-                <div className="space-y-1.5">
-                  {series.map((s) => (
-                    <div key={s.sector} className="flex items-center gap-2 rounded-md px-1.5 py-1 text-sm">
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ background: s.color }} />
-                      <span className="flex-1 font-medium">{s.sector}</span>
-                      <span className="tabular-nums text-xs text-muted-foreground">
-                        {s.history ? (metric === "temp" ? `${s.history.avgTemp}°` : `${s.history.totalRain}mm`) : "—"}
-                      </span>
-                      <button onClick={() => toggleSector(s.sector)} className="text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Group>
-
-            <Group label={t("howToRead") || "How to read"}>
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                {t("historicalReadHint") || "Each sector is shaded by the selected metric aggregated over the time window. Click sectors to compare their trends below."}
-              </p>
-            </Group>
-          </aside>
-
-          {/* MAP STAGE */}
-          <div className="relative isolate flex-1 max-lg:h-[62vh]">
-            {isLoading ? (
-              <div className="flex h-full items-center justify-center">
-                <div className="w-2/3 space-y-3">
-                  <Skeleton className="h-6 w-40" />
-                  <Skeleton className="h-64 w-full" />
-                </div>
+            </div>
+            <div className="flex min-w-0 flex-col gap-1.5">
+              <span className="text-sm font-semibold text-slate-700">{w("period")}</span>
+              <div role="radiogroup" className="flex flex-wrap gap-1 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
+                {PRESETS.map((p) => (
+                  <button key={p} role="radio" aria-checked={preset === p} onClick={() => setPreset(p)} className={segBtn(preset === p)}>{w(`preset.${p}`)}</button>
+                ))}
               </div>
-            ) : (
-              <WeatherMap
-                sectors={sectorsQ.data ?? null}
-                district={districtQ.data ?? null}
-                valueBySector={valueBySector}
-                metric={metric}
-                lo={lo}
-                hi={hi}
-                selectedSectors={selected}
-                onSectorClick={(sector, x, y) => {
-                  if (historyBySector[sector]) { toggleSector(sector); setPopover({ x, y, sector }); setDockOpen(true) }
-                }}
-              />
+            </div>
+            {preset === "custom" && (
+              <div className="w-[260px]">
+                <DateRangePicker value={custom} onChange={setCustom} locale={lang === "rw" ? "rw-RW" : "en-GB"} label={w("period")} max={fromIso(yesterday)} />
+              </div>
             )}
-
-            {/* badge */}
-            <div className="pointer-events-none absolute left-3 top-3 z-[500] rounded-lg border border-border bg-card/95 px-3 py-1.5 text-[11px] text-muted-foreground shadow-sm backdrop-blur">
-              {metric === "temp" ? (t("temperature") || "Temperature") : (t("rainfall") || "Rainfall")} · <b className="text-foreground">{selected.size === 0 ? (t("allSectors") || "all sectors") : `${selected.size} ${t("sector") || "sectors"}`}</b>
-            </div>
-
-            {/* legend */}
-            <div className="absolute right-3 top-3 z-[500] rounded-lg border border-border bg-card/95 px-3 py-2 shadow-sm backdrop-blur">
-              <div className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {(metric === "temp" ? (t("temperature") || "Temperature") : (t("rainfall") || "Rainfall"))} ({unit})
-              </div>
-              <div className="flex items-end gap-0">
-                {legendStops.map((s, i) => {
-                  const val = Math.round(lo + (hi - lo) * s[0])
-                  return (
-                    <div key={i} className="w-[44px] text-center text-[9px]">
-                      <div className="h-[7px]" style={{ backgroundColor: s[1], borderRadius: i === 0 ? "3px 0 0 3px" : i === legendStops.length - 1 ? "0 3px 3px 0" : 0 }} />
-                      <div className="mt-1 tabular-nums text-muted-foreground/80">{val}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* popover */}
-            {popover && historyBySector[popover.sector] && (
-              <div className="absolute z-[600] w-52 -translate-x-1/2 -translate-y-full rounded-xl border border-border bg-popover p-3 text-xs shadow-xl" style={{ left: popover.x, top: popover.y - 8 }}>
-                <button onClick={() => setPopover(null)} className="absolute right-2 top-2 text-muted-foreground hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
-                <h4 className="mb-1.5 text-sm font-semibold">{popover.sector}</h4>
-                <div className="space-y-0.5 text-muted-foreground">
-                  <div className="flex justify-between"><span>{t("avgTempLabel") || "Avg temp"}</span><b className="tabular-nums text-foreground">{historyBySector[popover.sector].avgTemp}°C</b></div>
-                  <div className="flex justify-between"><span>{t("totalRain") || "Total rain"}</span><b className="tabular-nums text-foreground">{historyBySector[popover.sector].totalRain} mm</b></div>
-                  <div className="flex justify-between"><span>{t("records") || "Records"}</span><b className="tabular-nums text-foreground">{historyBySector[popover.sector].count}</b></div>
+            {single && (
+              <div className="flex min-w-0 flex-col gap-1.5">
+                <span className="text-sm font-semibold text-slate-700">{w("compareWith")}</span>
+                <div role="radiogroup" className="flex flex-wrap gap-1 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
+                  <button role="radio" aria-checked={!cmpLastYear} onClick={() => setCmpLastYear(false)} className={segBtn(!cmpLastYear)}>{w("cNone")}</button>
+                  <button role="radio" aria-checked={cmpLastYear} onClick={() => setCmpLastYear(true)} className={segBtn(cmpLastYear)}>{w("cLastYear")}</button>
                 </div>
               </div>
             )}
+          </div>
+          <div className="text-sm text-slate-600">{periodText}</div>
+        </div>
 
-            {/* dock */}
-            {series.length > 0 && (
-              <div className="absolute inset-x-3 bottom-3 z-[500] flex flex-col overflow-hidden rounded-xl border border-border bg-card/97 shadow-[0_-2px_24px_rgba(20,40,60,0.16)] backdrop-blur" style={{ maxHeight: dockOpen ? "48%" : undefined }}>
-                <div className="flex items-center gap-1 border-b border-border bg-white px-3 rounded-t-xl">
-                  {dockTabs.map((label, i) => (
-                    <button key={i} onClick={() => setDockTab(i)} className={`border-b-2 px-3 py-2.5 text-xs font-semibold ${dockTab === i ? "border-[#147677] text-[#147677]" : "border-transparent text-muted-foreground"}`}>{label}</button>
-                  ))}
-                  <button onClick={() => setDockOpen((o) => !o)} className="ml-auto flex items-center gap-1 px-2 py-2 text-xs font-medium text-muted-foreground">
-                    <Layers className="h-3.5 w-3.5" /> {dockOpen ? (t("collapse") || "Collapse") : (t("expand") || "Expand")}
-                  </button>
-                </div>
-                {dockOpen && (
-                  <div className="overflow-auto p-3">
-                    {dockTab === 0 && (
-                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                        {series.map((s) => (
-                          <div key={s.sector} className="rounded-xl border border-border p-3">
-                            <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wide text-muted-foreground"><span className="h-2 w-2 rounded-full" style={{ background: s.color }} />{s.sector}</div>
-                            <div className="mt-1 text-xl font-bold tabular-nums">{s.history?.avgTemp ?? "—"}°C</div>
-                            <div className="text-[11px] text-muted-foreground">{(s.history?.totalRain ?? 0).toLocaleString()} mm {t("rainfall") || "rain"}</div>
+        {isDown && <StateCard icon={CloudOff} tone="error" title={w("downTitle")} text={w("downHistText")} retryLabel={w("retry")} onRetry={() => histQ.refetch()} />}
+
+        {isLoading && (
+          <div className="flex flex-col gap-4" aria-busy>
+            <div className="flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-[22px]">
+              <Skeleton className="h-[22px] w-[70%]" />
+              <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-3">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[130px] rounded-xl" />)}</div>
+            </div>
+            <div className="flex h-[340px] items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm text-slate-500">{w("loadingHist")}</div>
+          </div>
+        )}
+
+        {noData && <StateCard icon={CalendarX} title={w("histNoData", { s: primary })} text={noDataText} />}
+
+        {isLive && main && (
+          <>
+            {/* Answer + stat cards */}
+            <section className="flex flex-col gap-[18px] rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
+              <p className="max-w-[900px] text-[19px] font-semibold leading-[1.35] tracking-[-0.01em] text-slate-900 md:text-[22px]">{answer}</p>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
+                {stats.map((s) => (
+                  <div key={s.label} className="flex flex-col gap-1.5 rounded-xl border border-gray-200 p-4" style={{ background: s.bg }}>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-600"><s.icon className="h-[17px] w-[17px]" color={s.iconColor} />{s.label}</div>
+                    <div className="flex flex-wrap items-baseline gap-1.5">
+                      <span className="text-[34px] font-semibold leading-[1.05] tracking-[-0.02em] tabular-nums text-slate-900">{s.value}</span>
+                      <span className="text-[15px] text-slate-600">{s.unit}</span>
+                    </div>
+                    {s.meaning && <p className="text-sm leading-[1.45] text-slate-700">{s.meaning}</p>}
+                    {s.rows.length > 0 && (
+                      <div className="mt-1 flex flex-col gap-[3px]">
+                        {s.rows.map((r) => (
+                          <div key={r.name} className="flex justify-between gap-2 border-t border-[#eef1f3] pt-[5px] text-sm text-slate-600">
+                            <span className="flex min-w-0 items-center gap-1.5"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: r.color }} />{r.name}</span>
+                            <b className="whitespace-nowrap font-semibold tabular-nums text-slate-900">{r.value}</b>
                           </div>
                         ))}
                       </div>
                     )}
-                    {dockTab === 1 && (
-                      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                        <div className="rounded-xl border border-border bg-card p-3">
-                          <div className="mb-2 text-xs font-semibold">{t("temperature") || "Temperature"} · °C</div>
-                          <ResponsiveContainer width="100%" height={180}>
-                            <LineChart data={chartData} margin={{ top: 6, right: 8, bottom: 2, left: -18 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                              <XAxis dataKey="key" tick={{ fontSize: 10 }} />
-                              <YAxis tick={{ fontSize: 10 }} />
-                              <Tooltip />
-                              <Legend wrapperStyle={{ fontSize: 11 }} />
-                              {series.map((s) => <Line key={s.sector} type="monotone" dataKey={`temp_${s.sector}`} name={s.sector} stroke={s.color} strokeWidth={2.5} dot={false} connectNulls />)}
-                            </LineChart>
-                          </ResponsiveContainer>
-                        </div>
-                        <div className="rounded-xl border border-border bg-card p-3">
-                          <div className="mb-2 text-xs font-semibold">{t("rainfall") || "Rainfall"} · mm</div>
-                          <ResponsiveContainer width="100%" height={180}>
-                            <BarChart data={chartData} margin={{ top: 6, right: 8, bottom: 2, left: -18 }}>
-                              <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-                              <XAxis dataKey="key" tick={{ fontSize: 10 }} />
-                              <YAxis tick={{ fontSize: 10 }} />
-                              <Tooltip />
-                              <Legend wrapperStyle={{ fontSize: 11 }} />
-                              {series.map((s) => <Bar key={s.sector} dataKey={`rain_${s.sector}`} name={s.sector} fill={s.color} radius={[3, 3, 0, 0]} />)}
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    )}
-                    {dockTab === 2 && (
-                      <div className="overflow-x-auto">
-                        <div style={{ minWidth: recordMinWidth }}>
-                          <DataTable label="Records" data={chartData} columns={recordColumns} getRowId={(r) => r.key} loading={isLoading} skeletonRows={6} rowHeight={40} emptyState={t("noData") || "No data"} />
-                        </div>
-                      </div>
-                    )}
                   </div>
-                )}
+                ))}
+              </div>
+            </section>
+
+            {/* Monthly chart */}
+            <section className="rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1.5">
+                <h2 className="text-[17px] font-bold text-slate-900">{w("monthlyTitle")}</h2>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-slate-600">
+                  <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: RAIN_BAR }} />{w("bars")}</span>
+                  <span className="inline-flex items-center gap-1.5"><span className="h-[3px] w-4 rounded-sm" style={{ background: TEMP_LINE }} />{w("line")}</span>
+                  {showLyCol && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-sm" style={{ background: LY_BAR }} />{w("lastYearBars")}</span>}
+                </div>
+              </div>
+              <div className="mt-2.5 overflow-x-auto">
+                <div className="flex min-w-[600px] flex-col gap-3.5">
+                  {sectors.filter((s) => allStats[s]).map((s) => (
+                    <div key={s}>
+                      {!single && (
+                        <div className="mb-1 mt-0.5 flex items-center gap-2 text-[15px] font-semibold text-slate-900"><span className="h-2.5 w-2.5 rounded-full" style={{ background: colorOf(s) }} />{s}</div>
+                      )}
+                      <ResponsiveContainer width="100%" height={single ? 300 : 210}>
+                        <ComposedChart data={chartRows(s)} margin={{ top: 26, right: 4, bottom: 0, left: -8 }} barGap={2}>
+                          {bands.map((b) => (
+                            <ReferenceArea
+                              key={b.from}
+                              yAxisId="rain"
+                              x1={b.from}
+                              x2={b.to}
+                              y1={0}
+                              y2={yMax}
+                              fill={BAND[b.season][0]}
+                              fillOpacity={1}
+                              ifOverflow="extendDomain"
+                              label={{ value: b.n >= 2 ? w("seasonShort", { s: b.season }) : b.season, position: "insideTopLeft", fill: BAND[b.season][1], fontSize: 13, fontWeight: 600 }}
+                            />
+                          ))}
+                          <CartesianGrid vertical={false} stroke="#e5e9ec" />
+                          <XAxis dataKey="ym" tickFormatter={tickLabel} tick={{ fontSize: 13, fill: "#334155" }} tickLine={false} axisLine={{ stroke: "#e5e9ec" }} interval={0} />
+                          <YAxis yAxisId="rain" domain={[0, yMax]} ticks={[0, 0.25, 0.5, 0.75, 1].map((t) => Math.round(yMax * t))} tick={{ fontSize: 12, fill: "#64748b" }} tickLine={false} axisLine={false} width={44} />
+                          <YAxis yAxisId="temp" orientation="right" domain={tDomain} ticks={[0, 0.5, 1].map((t) => Math.round(tDomain[0] + (tDomain[1] - tDomain[0]) * t))} tick={{ fontSize: 12, fill: "#c25a1f" }} tickFormatter={(v) => `${v}°`} tickLine={false} axisLine={false} width={36} />
+                          <Tooltip content={<ChartTooltip w={w} ymName={ymName} showLy={showLyCol} />} cursor={{ fill: "rgba(15,23,42,0.04)" }} />
+                          {showLyCol && <Bar yAxisId="rain" dataKey="ly" fill={LY_BAR} radius={[2, 2, 0, 0]} maxBarSize={30} isAnimationActive={false} />}
+                          <Bar yAxisId="rain" dataKey="rain" fill={RAIN_BAR} radius={[2, 2, 0, 0]} maxBarSize={30} isAnimationActive={false}>
+                            {months.length <= 13 && <LabelList dataKey="rain" position="top" fontSize={12} fontWeight={600} fill="#1d4f8a" />}
+                          </Bar>
+                          <Line yAxisId="temp" dataKey="temp" stroke={TEMP_LINE} strokeWidth={2.5} dot={{ r: 4, fill: "#fff", stroke: TEMP_LINE, strokeWidth: 2 }} connectNulls isAnimationActive={false} />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* Sector map */}
+        {!isLoading && !isDown && (
+          <section className="min-w-0 rounded-2xl border border-gray-200 bg-white px-5 py-[18px]">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-[17px] font-bold text-slate-900">{w("mapHist", { m: isRain ? w("totalRainM") : w("avgTempM") })}</h2>
+              <div role="radiogroup" className="inline-grid grid-cols-2 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
+                {(["rain", "temp"] as const).map((m) => (
+                  <button key={m} role="radio" aria-checked={metric === m} onClick={() => setMetric(m)} className={`rounded-md px-3 py-1.5 text-sm font-medium ${metric === m ? "bg-[#147677] text-white" : "text-slate-600"}`}>{w(m)}</button>
+                ))}
+              </div>
+            </div>
+            <div className="relative isolate mt-3 h-[300px] overflow-hidden rounded-[10px] md:h-[460px]">
+              {sectorsGeo.isError ? (
+                <div className="flex h-full items-center justify-center bg-[#e9eef2] p-4 text-center text-sm text-slate-500">{w("mapUnavailable")}</div>
+              ) : (
+                <WeatherMap
+                  sectors={sectorsGeo.data ?? null}
+                  district={districtGeo.data ?? null}
+                  fills={mapFills}
+                  labels={mapLabels}
+                  selected={primary}
+                  compare={sectors.slice(1)}
+                  popupHtml={popupHtml}
+                  onAction={onMapAction}
+                />
+              )}
+            </div>
+            {vals.length > 0 && (
+              <div className="mt-2.5 flex items-center gap-2 text-[13px] text-slate-600">
+                <span>{isRain ? `${w("drier")} ${fmtInt(vlo)}` : `${w("cooler")} ${Math.round(vlo)}°`}</span>
+                <span
+                  className="h-2.5 flex-1 rounded-[5px] border border-black/[0.08]"
+                  style={{ background: `linear-gradient(90deg,${(isRain ? rainRamp : tempRamp)(0)},${(isRain ? rainRamp : tempRamp)(0.5)},${(isRain ? rainRamp : tempRamp)(1)})` }}
+                />
+                <span>{isRain ? `${fmtInt(vhi)} mm ${w("wetter")}` : `${Math.round(vhi)}° ${w("warmer")}`}</span>
               </div>
             )}
-          </div>
-        </div>
+            <p className="mt-1.5 text-[13px] text-slate-500">{w("mapHintHist")}</p>
+          </section>
+        )}
+
+        {/* Monthly figures */}
+        {isLive && (
+          <section className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+            <button onClick={() => setTableOpen((o) => !o)} aria-expanded={tableOpen} className="flex items-center gap-1.5 text-[15px] font-semibold text-[#147677]">
+              {tableOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}{tableOpen ? w("hideMonthly") : w("showMonthly")}
+            </button>
+            {tableOpen && (
+              <div className="mt-3 overflow-x-auto">
+                <table className="w-full min-w-[640px] text-sm tabular-nums">
+                  <thead>
+                    <tr className="border-b border-gray-200 text-left font-semibold text-slate-600">
+                      <th className="p-2 font-semibold">{w("month")}</th>
+                      <th className="p-2 font-semibold">{w("sector")}</th>
+                      <th className="p-2 text-right font-semibold">{w("rainMm")}</th>
+                      {showLyCol && <th className="p-2 text-right font-semibold">{w("lastYear")}</th>}
+                      <th className="p-2 text-right font-semibold">{w("rainyD")}</th>
+                      <th className="p-2 text-right font-semibold">{w("heavyD")}</th>
+                      <th className="p-2 text-right font-semibold">{w("avgHigh")}</th>
+                      <th className="p-2 text-right font-semibold">{w("avgLow")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableRows.map((r) => (
+                      <tr key={`${r.ym}-${r.sector}`} className={`border-t ${r.first ? "border-gray-200" : "border-[#f3f5f6]"}`}>
+                        <td className="px-2 py-[7px] font-semibold text-slate-900">{r.first ? ymName(r.ym, false) : ""}</td>
+                        <td className="px-2 py-[7px] text-slate-700">{r.sector}</td>
+                        <td className="px-2 py-[7px] text-right font-semibold">{r.rain ?? "–"}</td>
+                        {showLyCol && <td className="px-2 py-[7px] text-right text-slate-500">{r.ly ?? "–"}</td>}
+                        <td className="px-2 py-[7px] text-right">{r.rainy ?? "–"}</td>
+                        <td className="px-2 py-[7px] text-right">{r.heavy ?? "–"}</td>
+                        <td className="px-2 py-[7px] text-right">{r.hi != null ? `${r.hi}°` : "–"}</td>
+                        <td className="px-2 py-[7px] text-right">{r.lo != null ? `${r.lo}°` : "–"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
       </div>
     </AppLayout>
   )
 }
 
-function Group({ label, action, children }: { label: string; action?: { label: string; onClick: () => void }; children: React.ReactNode }) {
+type W = (key: string, params?: Record<string, string | number>) => string
+
+function ChartTooltip({ active, payload, w, ymName, showLy }: { active?: boolean; payload?: { payload: ChartRow }[]; w: W; ymName: (ym: string) => string; showLy: boolean }) {
+  if (!active || !payload?.length) return null
+  const r = payload[0].payload
   return (
-    <div className="mb-5">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{label}</span>
-        {action && <button onClick={action.onClick} className="text-[10.5px] font-semibold text-[#147677] hover:underline">{action.label}</button>}
-      </div>
-      {children}
+    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-md">
+      <div className="mb-1 font-semibold text-slate-900">{ymName(r.ym)}</div>
+      <div className="flex justify-between gap-4 text-slate-600"><span>{w("rain")}</span><b className="tabular-nums text-slate-900">{r.rain ?? "–"} mm</b></div>
+      {showLy && <div className="flex justify-between gap-4 text-slate-600"><span>{w("lastYear")}</span><b className="tabular-nums text-slate-900">{r.ly ?? "–"} mm</b></div>}
+      <div className="flex justify-between gap-4 text-slate-600"><span>{w("avgTemp")}</span><b className="tabular-nums text-slate-900">{r.temp != null ? `${r.temp}°C` : "–"}</b></div>
     </div>
   )
 }
