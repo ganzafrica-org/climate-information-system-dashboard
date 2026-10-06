@@ -9,17 +9,16 @@ import {
   MessageSquareText, Sprout, TriangleAlert, Umbrella, Wind, X, type LucideIcon,
 } from "lucide-react"
 import { AppLayout } from "@/components/layout/AppLayout"
-import { ConditionIcon, conditionIcon } from "@/components/weather/ConditionIcon"
+import { ConditionIcon } from "@/components/weather/ConditionIcon"
 import { SectorMenu } from "@/components/weather/SectorMenu"
 import { StateCard } from "@/components/weather/StateCard"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { FeatureCollection } from "@/lib/soil"
 import type { DailyWeather, HourlyForecast, WeatherAlert } from "@/types/weather"
 import {
-  SECTORS, HEAVY_DAY_MM, NO_DATA_FILL, RAIN_FILL, STRONG_WIND_KMH, amountCat, chanceCat, conditionOf, fieldCat,
-  sectorDays, tempRamp, useLocationWeather, useSectorWeather, warmRamp, type Day, type FieldCat,
+  SECTORS, NO_DATA_FILL, conditionOf, rainRamp, sectorDays, tempRamp, useLocationWeather, useSectorWeather, warmRamp, type Day,
 } from "@/lib/weather"
-import { dayMonth, downloadCsv, escapeHtml, joinList, useWx, weekday } from "@/lib/weatherFormat"
+import { dayMonth, downloadCsv, escapeHtml, useWx, weekday } from "@/lib/weatherFormat"
 
 const WeatherMap = dynamic(() => import("@/components/WeatherSectorMap"), {
   ssr: false,
@@ -40,19 +39,12 @@ function useGeo(file: string) {
 
 const DEFAULT_SECTOR = "Musanze"
 const LIST_DAYS = 8
-const FIELD_STYLE: Record<FieldCat, { bg: string; border: string; color: string; cond: "clear" | "clouds" | "rain" }> = {
-  good: { bg: "#e7f3ea", border: "#c6e3cd", color: "#0c5b2f", cond: "clear" },
-  maybe: { bg: "#f5f7f8", border: "#e3e8ec", color: "#334155", cond: "clouds" },
-  avoid: { bg: "#e6eef8", border: "#c9daf0", color: "#1d4f8a", cond: "rain" },
-}
 const ALERT_CATEGORIES = ["rainfall", "flooding", "temperature"]
 
 const kigaliHour = (dt: number) =>
   +new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hour12: false, timeZone: "Africa/Kigali" }).format(new Date(dt * 1000)) % 24
 const kigaliTime = (d: Date) =>
   new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Africa/Kigali" }).format(d)
-const kigaliDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Kigali" }).format(d)
-const partOfDay = (h: number) => (h >= 5 && h < 11 ? "morning" : h >= 11 && h < 17 ? "afternoon" : h >= 17 && h < 21 ? "evening" : "night")
 
 type Banner = { key: string; title: string; text: string; cta?: { label: string; onClick: () => void } }
 
@@ -114,72 +106,16 @@ const Forecasts: NextPage = () => {
   const noData = !isLoading && !isDown && nDays === 0
 
   // ---- text helpers ----
-  const catWord = (k: string) => w(k)
   const dayName = (x: Day) => (x.index === 0 ? w("today") : x.index === 1 ? w("tomorrow") : weekday(x.date, lang))
-  const dayNameLower = (x: Day) => (x.index <= 1 ? dayName(x).toLowerCase() : `${weekday(x.date, lang, true)} ${x.date.getDate()}`)
   const longDate = (x: Day) => `${weekday(x.date, lang, true)}, ${dayMonth(x.date, lang, { long: true })}`
-  const rainText = (x: Day) => {
-    const a = amountCat(x.rainfall)
-    if (a === "dry") return x.rainfall > 0 ? `${w("dry")} · <1 mm` : w("dry")
-    return `${w(a)} · ${Math.round(x.rainfall)} mm`
-  }
-  // Day list: the category word is dropped on phones so the row stays on one line
-  const rainCell = (x: Day) => {
-    const a = amountCat(x.rainfall)
-    if (a === "dry") return x.rainfall > 0 ? <><span className="hidden sm:inline">{w("dry")} · </span>{"<1 mm"}</> : w("dry")
-    return <><span className="hidden sm:inline">{w(a)} · </span>{Math.round(x.rainfall)} mm</>
-  }
+  const rainText = (x: Day) => `${x.rainfall} mm`
   const condLabel = (x: Day) => w(`cond.${x.condition}`)
-
-  // Part of the day with the highest chance of rain today (from the 3-hourly slots)
-  const todayTiming = useMemo(() => {
-    const today = kigaliDate(new Date())
-    const slots = hourly.filter((h) => kigaliDate(new Date(h.dt * 1000)) === today && (h.pop ?? 0) >= 0.3)
-    if (!slots.length) return ""
-    const top = slots.reduce((a, b) => ((b.pop ?? 0) > (a.pop ?? 0) ? b : a))
-    return partOfDay(kigaliHour(top.dt))
-  }, [hourly])
-
-  const rainSentence = (x: Day) => {
-    let c = chanceCat(x.rainChance)
-    const a = amountCat(x.rainfall)
-    if (c === "unlikely" && a !== "dry") c = "possible"
-    const when = x.index === 0 && todayTiming ? w(`when.${todayTiming}`) : ""
-    const at = when ? "At" : ""
-    const mm = x.rainfall >= 1 ? w("mmAbout", { mm: Math.round(x.rainfall) }) : w("mmUnder1")
-    if (c === "likely") {
-      const key = x.condition === "thunderstorm" ? (a === "heavy" ? "thunderHeavy" : "thunder") : "rain"
-      return w(`sentence.${key}${at}`, { when, mm })
-    }
-    if (c === "possible") return w(`sentence.possible${at}`, { when, mm })
-    return w(x.condition === "clear" ? "sentence.dryClear" : "sentence.dryCloud")
-  }
-  const fallbackAdvice = (x: Day) => {
-    const a = amountCat(x.rainfall)
-    const c = chanceCat(x.rainChance)
-    const k = a === "heavy" ? "heavy" : c === "likely" || a === "moderate" ? "wet" : c === "possible" || a === "light" ? "light" : "dry"
-    return w(`advice.${k}`)
-  }
-  const humWord = (h: number) => w(`humWord.${h < 40 ? "dry" : h < 70 ? "ok" : h < 85 ? "humid" : "veryHumid"}`)
-  const windWord = (k: number) => w(`windWord.${k < 12 ? "light" : k < 20 ? "moderate" : k < STRONG_WIND_KMH ? "fresh" : "strong"}`)
 
   // ---- coming days ----
   const tMin = days.length ? Math.min(...days.map((x) => x.tempMin)) : 0
   const tMax = days.length ? Math.max(...days.map((x) => x.tempMax)) : 1
   const span = Math.max(1, tMax - tMin)
   const shownDays = allDays ? days : days.slice(0, LIST_DAYS)
-
-  // ---- field work ----
-  const fieldDays = days.slice(0, 7).map((x) => ({ x, k: fieldCat(x.rainChance, x.rainfall) }))
-  const goods = fieldDays.filter((f) => f.k === "good")
-  const fieldSentence = goods.length
-    ? w("bestDays", { s: sector, days: joinList(goods.map((f) => dayNameLower(f.x)), lang) })
-    : fieldDays.length
-      ? (() => {
-          const least = fieldDays.reduce((a, b) => (b.x.rainChance < a.x.rainChance ? b : a))
-          return w("noDry", { s: sector, day: dayNameLower(least.x), pct: least.x.rainChance })
-        })()
-      : ""
 
   // ---- sector map ----
   const isRain = metric === "rain"
@@ -190,33 +126,35 @@ const Forecasts: NextPage = () => {
   const withData = sectorRows.filter((r): r is { s: (typeof SECTORS)[number]; x: Day } => !!r.x)
   const sMin = withData.length ? Math.min(...withData.map((r) => r.x.tempMax)) : 0
   const sMax = withData.length ? Math.max(...withData.map((r) => r.x.tempMax)) : 1
+  const rMin = withData.length ? Math.min(...withData.map((r) => r.x.rainfall)) : 0
+  const rMax = withData.length ? Math.max(...withData.map((r) => r.x.rainfall)) : 1
   const tT = (x: Day) => (x.tempMax - sMin) / Math.max(1, sMax - sMin)
-  const mmLabel = (mm: number) => `${mm < 1 ? "<1" : Math.round(mm)} mm`
+  const rT = (x: Day) => (x.rainfall - rMin) / Math.max(0.1, rMax - rMin)
   const { mapFills, mapLabels } = useMemo(() => {
     const fills: Record<string, string> = {}
     const labels: Record<string, string> = {}
     sectorRows.forEach(({ s, x }) => {
       if (!x) { fills[s] = NO_DATA_FILL; labels[s] = "–"; return }
-      fills[s] = isRain ? RAIN_FILL[amountCat(x.rainfall)] : tempRamp(tT(x))
-      labels[s] = isRain ? mmLabel(x.rainfall) : `${x.tempMax}°`
+      fills[s] = isRain ? rainRamp(rT(x)) : tempRamp(tT(x))
+      labels[s] = isRain ? `${x.rainfall} mm` : `${x.tempMax}°`
     })
     return { mapFills: fills, mapLabels: labels }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectorRows, isRain, sMin, sMax])
+  }, [sectorRows, isRain, sMin, sMax, rMin, rMax])
   const ranked = [...withData].sort((a, b) => (isRain ? b.x.rainfall - a.x.rainfall : b.x.tempMax - a.x.tempMax))
   const whenWord = d ? (dayIdx <= 1 ? dayName(d).toLowerCase() : weekday(d.date, lang, true)) : ""
   const rankSentence = ranked.length
     ? (() => {
-        const top3 = ranked.slice(0, 3).map(({ s, x }) => (isRain ? `${s} ${Math.round(x.rainfall)} mm` : `${s} ${x.tempMax}°`)).join(", ")
+        const top3 = ranked.slice(0, 3).map(({ s, x }) => (isRain ? `${s} ${x.rainfall} mm` : `${s} ${x.tempMax}°`)).join(", ")
         const last = ranked[ranked.length - 1]
         return isRain
-          ? w("wettest", { when: whenWord, list: top3, last: `${last.s} ${mmLabel(last.x.rainfall)}` })
+          ? w("wettest", { when: whenWord, list: top3, last: `${last.s} ${last.x.rainfall} mm` })
           : w("warmest", { when: whenWord, list: top3, last: `${last.s} ${last.x.tempMax}°` })
       })()
     : ""
   const legend = isRain
-    ? ([["dry", "<1 mm"], ["light", "1–10"], ["moderate", "10–30"], ["heavy", "30+ mm"]] as const).map(([k, r]) => ({ color: RAIN_FILL[k], label: `${w(k)} ${r}` }))
-    : ([[0, w("cooler")], [0.5, ""], [1, w("warmer")]] as const).map(([t, word]) => ({ color: tempRamp(t), label: `${word} ${Math.round(sMin + (sMax - sMin) * t)}°`.trim() }))
+    ? [{ color: rainRamp(0), label: `${w("drier")} ${rMin} mm` }, { color: rainRamp(1), label: `${w("wetter")} ${rMax} mm` }]
+    : [{ color: tempRamp(0), label: `${w("cooler")} ${sMin}°` }, { color: tempRamp(1), label: `${w("warmer")} ${sMax}°` }]
 
   const popupHtml = useCallback(
     (s: string) => {
@@ -226,50 +164,33 @@ const Forecasts: NextPage = () => {
         `<div style="display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:3px 0;"><span style="color:#64748b;">${escapeHtml(k)}</span><b style="font-weight:600;color:#0f172a;font-variant-numeric:tabular-nums;">${escapeHtml(v)}</b></div>`
       return `<div style="margin-bottom:6px;"><div style="font-size:15px;font-weight:700;color:#0f172a;">${escapeHtml(s)}</div><div style="font-size:13px;color:#64748b;">${escapeHtml(`${dayName(x)} · ${condLabel(x)}`)}</div></div>`
         + row(w("rain"), rainText(x))
-        + row(w("popupChance"), `${x.rainChance}% · ${catWord(chanceCat(x.rainChance))}`)
+        + row(w("popupChance"), `${x.rainChance}%`)
         + row(w("popupTemp"), `${x.tempMax}° / ${x.tempMin}°`)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [daysBySector, dayIdx, lang]
   )
 
-  // ---- alerts ----
-  const heavy = useMemo(() => {
-    for (const i of [0, 1]) {
-      const hit = SECTORS.filter((s) => (daysBySector[s]?.[i]?.rainfall ?? 0) >= HEAVY_DAY_MM)
-      if (hit.length) {
-        const mms = hit.map((s) => daysBySector[s][i].rainfall)
-        return { dayIndex: i, sectors: hit as string[], lo: Math.floor(Math.min(...mms)), hi: Math.ceil(Math.max(...mms)) }
-      }
-    }
-    return null
-  }, [daysBySector])
+  // ---- alerts (backend text only) ----
   const serverAlerts: WeatherAlert[] = (loc?.intelligentAlerts ?? loc?.weather?.intelligentAlerts ?? []).filter(
     (a) => ["high", "critical"].includes(String(a.level || a.priority)) && ALERT_CATEGORIES.includes(String(a.category))
   )
   const banners: Banner[] = []
   serverAlerts.forEach((a) => {
-    const key = `srv-${sector}-${a.category}`
-    if (!dismissed.includes(key)) banners.push({ key, title: w(`alertCat.${a.category}.title`), text: w(`alertCat.${a.category}.text`) })
+    const title = a.title?.trim()
+    const text = (a.message || a.description || "").trim()
+    if (!title && !text) return
+    const key = `srv-${sector}-${a.id ?? a.category}`
+    if (!dismissed.includes(key)) banners.push({ key, title: title || text, text })
   })
-  const heavyDayWord = heavy ? (heavy.dayIndex === 0 ? w("today") : w("tomorrow")).toLowerCase() : ""
-  const heavyKey = heavy ? `heavy-${heavy.dayIndex}-${heavy.sectors.join(",")}` : ""
-  const heavyAffected = !!heavy && heavy.sectors.includes(sector)
-  const coveredByServer = heavy?.dayIndex === 0 && serverAlerts.some((a) => a.category === "rainfall" || a.category === "flooding")
-  if (heavy && heavyAffected && !coveredByServer && !dismissed.includes(heavyKey)) {
-    banners.push({
-      key: heavyKey,
-      title: w("heavyAlertTitle", { day: heavyDayWord }),
-      text: w("heavyAlertText", { lo: heavy.lo, hi: heavy.hi, list: joinList(heavy.sectors, lang) }),
-      cta: dayIdx !== heavy.dayIndex ? { label: w("seeDay", { day: heavyDayWord }), onClick: () => setDayIdx(heavy.dayIndex) } : undefined,
-    })
-  }
-  const strip = heavy && !heavyAffected && !dismissed.includes(heavyKey) ? heavy : null
 
-  // ---- SMS ----
-  const advice = locDay?.farmingRecommendation || (d ? fallbackAdvice(d) : "")
+  // ---- SMS (backend values only) ----
+  const advice = locDay?.farmingRecommendation || ""
   const smsText = d
-    ? `${sector}, ${dayName(d).toLowerCase()}: ${rainSentence(d)} ${d.tempMin}–${d.tempMax}°C. ${advice.split(/(?<=[.:;])\s/)[0]}`
+    ? [sector, `${dayName(d).toLowerCase()}: ${d.tempMin}–${d.tempMax}°C`, `${d.rainfall} mm`, locDay?.overview, advice]
+        .filter(Boolean)
+        .join(". ")
+        .replace(/\.\s*\./g, ".")
     : ""
   const copySms = () => {
     navigator.clipboard?.writeText(smsText).catch(() => {})
@@ -307,14 +228,6 @@ const Forecasts: NextPage = () => {
             </div>
           </div>
         ))}
-        {strip && (
-          <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[#f3d3a8] bg-white px-3 py-2 text-sm text-[#7c2d12]">
-            <TriangleAlert className="h-4 w-4 text-[#b45309]" />
-            <span className="flex-[1_1_240px]">{w("heavyAlertStrip", { day: heavyDayWord, list: joinList(strip.sectors, lang) })}</span>
-            <button onClick={() => { setSector(strip.sectors[0]); setDayIdx(strip.dayIndex) }} className="font-semibold text-[#b45309] hover:underline">{strip.sectors[0]} →</button>
-          </div>
-        )}
-
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm">
           <div className="min-w-0">
@@ -371,8 +284,7 @@ const Forecasts: NextPage = () => {
                     <button onClick={() => setShareOpen(false)} aria-label={w("dismiss")} className="text-slate-400 hover:text-slate-600"><X className="h-4 w-4" /></button>
                   </div>
                   <div className="rounded-[10px] bg-[#f1f5f4] p-3 text-sm leading-normal text-slate-900">{smsText}</div>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-slate-500">{w("chars", { n: smsText.length, k: Math.ceil(smsText.length / 160) })}</span>
+                  <div className="flex items-center justify-end gap-2">
                     <button onClick={copySms} className="flex items-center gap-1.5 rounded-lg bg-[#147677] px-3 py-2 text-sm font-semibold text-white">
                       {copied ? <Check className="h-[15px] w-[15px]" /> : <Copy className="h-[15px] w-[15px]" />}{copied ? w("copied") : w("copy")}
                     </button>
@@ -392,11 +304,11 @@ const Forecasts: NextPage = () => {
         {noData && <StateCard icon={CloudAlert} title={w("noFcTitle", { s: sector })} text={w("noFcText")} />}
 
         {!isLoading && !isDown && (
-          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
             {d && (
               <>
                 {/* Hero */}
-                <section className="flex min-w-0 flex-col gap-[18px] rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
+                <section className="order-2 flex min-w-0 flex-col gap-[18px] rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div className="text-base font-semibold text-slate-900">
                       {sector} <span className="font-medium text-slate-500">· {isToday ? `${w("today")}, ${dayMonth(d.date, lang, { long: true })}` : longDate(d)}</span>
@@ -415,9 +327,8 @@ const Forecasts: NextPage = () => {
                       </div>
                     </div>
                     <div className="min-w-0 flex-[1_1_240px]">
-                      <p className="text-[22px] font-semibold leading-[1.3] tracking-[-0.01em] text-slate-900">{rainSentence(d)}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <HeroChips d={d} w={w} />
+                      <div className="flex flex-wrap gap-2">
+                        <HeroChips d={d} />
                       </div>
                     </div>
                   </div>
@@ -428,26 +339,28 @@ const Forecasts: NextPage = () => {
                     <p className="text-[15px] leading-relaxed text-slate-700">{locDay.overview}</p>
                   ) : null}
 
+                  {(locQ.isLoading || locQ.isError || advice || locDay?.soilCondition || locDay?.rainPrediction?.confidence) && (
                   <div className="flex gap-3.5 rounded-xl border border-[#d5e8e8] bg-[#eef6f6] px-[18px] py-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#147677] text-white"><Sprout className="h-[19px] w-[19px]" /></div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[15px] font-bold text-[#0f5f60]">{w("farming")}</div>
                       {locQ.isLoading ? (
                         <div className="mt-2 space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-2/3" /></div>
-                      ) : (
+                      ) : advice ? (
                         <p className="mt-1 text-[15px] leading-[1.55] text-[#12393a]">{advice}</p>
-                      )}
+                      ) : null}
                       {locDay && (
                         <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1.5 text-sm text-[#3f6667]">
                           {locDay.soilCondition && <span>{w("soil")}: <b className="font-semibold text-[#12393a]">{locDay.soilCondition}</b></span>}
                           {locDay.rainPrediction?.confidence && (
-                            <span>{w("confidence")}: <b className="font-semibold text-[#12393a]">{w(`conf.${String(locDay.rainPrediction.confidence).toLowerCase()}`)}</b></span>
+                            <span>{w("confidence")}: <b className="font-semibold text-[#12393a]">{locDay.rainPrediction.confidence}</b></span>
                           )}
                         </div>
                       )}
                       {locQ.isError && <p className="mt-2 text-[13px] text-[#3f6667]">{w("detailUnavailable")}</p>}
                     </div>
                   </div>
+                  )}
 
                   <div>
                     <button onClick={() => setDetailsOpen((o) => !o)} aria-expanded={detailsOpen} className="flex items-center gap-1.5 text-left text-sm font-semibold text-[#147677]">
@@ -455,15 +368,15 @@ const Forecasts: NextPage = () => {
                     </button>
                     {detailsOpen && (
                       <div className="mt-3 grid grid-cols-[repeat(auto-fit,minmax(160px,1fr))] gap-2.5">
-                        {d.humidity != null && <DetailTile icon={Droplet} label={w("humidity")} value={`${Math.round(d.humidity)}%`} word={humWord(d.humidity)} />}
-                        <DetailTile icon={Wind} label={w("wind")} value={`${d.windKmh} km/h`} word={windWord(d.windKmh)} />
+                        {d.humidity != null && <DetailTile icon={Droplet} label={w("humidity")} value={`${Math.round(d.humidity)}%`} />}
+                        <DetailTile icon={Wind} label={w("wind")} value={`${d.windKmh} km/h`} />
                       </div>
                     )}
                   </div>
                 </section>
 
                 {/* Coming days */}
-                <section className="min-w-0 rounded-2xl border border-gray-200 bg-white px-2 pb-2.5 pt-[18px] md:px-3.5">
+                <section className="order-1 min-w-0 rounded-2xl border border-gray-200 bg-white px-2 pb-2.5 pt-[18px] md:px-3.5">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 px-1">
                     <h2 className="text-[17px] font-bold text-slate-900">{w("nextDays", { n: nDays })}</h2>
                     <span className="text-sm text-slate-500">{w("clickDay")}</span>
@@ -484,9 +397,9 @@ const Forecasts: NextPage = () => {
                           </span>
                           <span className="flex flex-col items-center gap-px">
                             <ConditionIcon cond={x.condition} size={24} />
-                            <span className="min-h-[14px] text-xs font-bold text-[#2563a8]">{x.rainChance >= 30 ? `${x.rainChance}%` : ""}</span>
+                            <span className="min-h-[14px] text-xs font-bold text-[#2563a8]">{x.rainChance}%</span>
                           </span>
-                          <span className={`min-w-0 whitespace-nowrap text-sm font-medium ${amountCat(x.rainfall) === "dry" ? "text-slate-500" : "text-[#1d4f8a]"}`}>{rainCell(x)}</span>
+                          <span className="min-w-0 whitespace-nowrap text-sm font-medium text-[#1d4f8a]">{rainText(x)}</span>
                           <span className="text-right text-[15px] tabular-nums text-slate-500">{x.tempMin}°</span>
                           <span className="relative h-1.5 rounded-[3px] bg-[#eef1f3]">
                             <span
@@ -511,9 +424,9 @@ const Forecasts: NextPage = () => {
                 </section>
 
                 {/* Next 24 hours */}
-                <section className="min-w-0 rounded-2xl border border-gray-200 bg-white px-5 py-[18px]">
+                <section className="order-3 min-w-0 rounded-2xl border border-gray-200 bg-white px-5 py-[18px] xl:col-span-2">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1">
-                    <h2 className="text-[17px] font-bold text-slate-900">{w("next24", { s: sector })}, {w("every3")}</h2>
+                    <h2 className="text-[17px] font-bold text-slate-900">{w("next24", { s: sector })}</h2>
                     <span className="text-sm text-slate-500">{w("bluePct")}</span>
                   </div>
                   {locQ.isLoading ? (
@@ -527,40 +440,11 @@ const Forecasts: NextPage = () => {
                   )}
                 </section>
 
-                {/* Field work */}
-                <section className="min-w-0 rounded-2xl border border-gray-200 bg-white px-5 py-[18px]">
-                  <h2 className="text-[17px] font-bold text-slate-900">{w("fieldTitle")}</h2>
-                  <p className="mt-1.5 text-[15px] leading-normal text-slate-700">{fieldSentence}</p>
-                  <div className={`mt-3.5 grid gap-1.5 ${lang === "rw" ? "grid-cols-[repeat(auto-fill,minmax(96px,1fr))]" : "grid-cols-[repeat(auto-fill,minmax(64px,1fr))]"}`}>
-                    {fieldDays.map(({ x, k }) => {
-                      const st = FIELD_STYLE[k]
-                      const { Icon } = conditionIcon(st.cond)
-                      return (
-                        <button
-                          key={x.iso}
-                          onClick={() => setDayIdx(x.index)}
-                          title={`${x.rainChance}% · ${x.rainfall} mm`}
-                          className="flex min-w-0 flex-col items-center gap-1 rounded-[10px] border-[1.5px] px-1 py-2.5 text-center"
-                          style={{ background: st.bg, borderColor: x.index === dayIdx ? "#147677" : st.border, color: st.color }}
-                        >
-                          <span className="text-sm font-semibold leading-tight">{x.index === 0 ? w("today") : weekday(x.date, lang)}</span>
-                          <Icon className="h-[18px] w-[18px]" />
-                          <span className="text-[13px] font-bold">{w(k)}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[13px] leading-snug text-slate-600">
-                    <span><b className="text-[#0c5b2f]">{w("good")}</b> {w("goodDef")}</span>
-                    <span><b className="text-slate-700">{w("maybe")}</b> {w("maybeDef")}</span>
-                    <span><b className="text-[#1d4f8a]">{w("avoid")}</b> {w("avoidDef")}</span>
-                  </div>
-                </section>
               </>
             )}
 
             {/* Sector map */}
-            <section className="min-w-0 rounded-2xl border border-gray-200 bg-white px-5 py-[18px] xl:col-span-2">
+            <section className="order-4 min-w-0 rounded-2xl border border-gray-200 bg-white px-5 py-[18px] xl:col-span-2">
               <div className="flex flex-wrap items-center justify-between gap-2.5">
                 <h2 className="text-[17px] font-bold text-slate-900">{w("allSectors", { d: d ? (isToday ? w("today") : longDate(d)) : "" })}</h2>
                 <div role="radiogroup" className="inline-grid grid-cols-2 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
@@ -594,7 +478,7 @@ const Forecasts: NextPage = () => {
                   </span>
                 ))}
               </div>
-              <p className="mt-1.5 text-[13px] text-slate-500">{w("clickMap")} {w("thresholdsNote")}</p>
+              <p className="mt-1.5 text-[13px] text-slate-500">{w("clickMap")}</p>
             </section>
           </div>
         )}
@@ -605,23 +489,15 @@ const Forecasts: NextPage = () => {
 
 type W = (key: string, params?: Record<string, string | number>) => string
 
-function HeroChips({ d, w }: { d: Day; w: W }) {
-  const cc = chanceCat(d.rainChance)
-  const ac = amountCat(d.rainfall)
-  const chips: { icon: LucideIcon; text: string; bg: string; color: string }[] = [
-    { icon: Umbrella, text: w("chanceChip", { p: d.rainChance, w: w(cc) }), bg: cc === "likely" ? "#dde9f7" : "#eef3f8", color: "#1d4f8a" },
-    {
-      icon: Droplets,
-      text: ac === "dry" ? w("dryChip") : w("mmChip", { mm: Math.round(d.rainfall), w: w(ac).toLowerCase() }),
-      bg: ac === "heavy" ? "#2f6cbc" : "#eef3f8",
-      color: ac === "heavy" ? "#fff" : "#1d4f8a",
-    },
+function HeroChips({ d }: { d: Day }) {
+  const chips: { icon: LucideIcon; text: string }[] = [
+    { icon: Umbrella, text: `${d.rainChance}%` },
+    { icon: Droplets, text: `${d.rainfall} mm` },
   ]
-  if (d.windKmh >= STRONG_WIND_KMH) chips.push({ icon: Wind, text: w("windChip", { k: d.windKmh }), bg: "#fff1dc", color: "#8a4b00" })
   return (
     <>
       {chips.map((c) => (
-        <span key={c.text} className="inline-flex items-center gap-1.5 rounded-full px-[11px] py-1.5 text-sm font-semibold" style={{ background: c.bg, color: c.color }}>
+        <span key={c.text} className="inline-flex items-center gap-1.5 rounded-full bg-[#eef3f8] px-[11px] py-1.5 text-sm font-semibold text-[#1d4f8a]">
           <c.icon className="h-[15px] w-[15px]" />{c.text}
         </span>
       ))}
@@ -629,12 +505,11 @@ function HeroChips({ d, w }: { d: Day; w: W }) {
   )
 }
 
-function DetailTile({ icon: Icon, label, value, word }: { icon: LucideIcon; label: string; value: string; word: string }) {
+function DetailTile({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
     <div className="rounded-[10px] border border-gray-200 p-3">
       <div className="flex items-center gap-1.5 text-sm text-slate-500"><Icon className="h-[15px] w-[15px]" />{label}</div>
       <div className="mt-1 text-2xl font-semibold tabular-nums text-slate-900">{value}</div>
-      <div className="text-sm text-slate-600">{word}</div>
     </div>
   )
 }
@@ -645,11 +520,11 @@ function HourSlot({ h, w }: { h: HourlyForecast; w: W }) {
   const sub = hour === 6 ? w("morning") : hour === 12 ? w("midday") : hour === 18 ? w("evening") : hour === 0 ? w("night") : ""
   const night = hour >= 18 || hour < 6
   return (
-    <div className={`flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-2.5 text-center ${pop > 60 ? "bg-[#f0f5fb]" : ""}`}>
+    <div className="flex flex-col items-center gap-1.5 rounded-[10px] px-1 py-2.5 text-center">
       <span className="text-sm font-semibold text-slate-600">{`${String(hour).padStart(2, "0")}:00`}</span>
       <span className="min-h-[15px] text-xs text-slate-500">{sub}</span>
       <ConditionIcon cond={conditionOf(h.weather?.[0]?.main, h.weather?.[0]?.description)} night={night} size={26} />
-      <span className={`text-sm font-semibold tabular-nums ${pop >= 30 ? "text-[#2563a8]" : "text-slate-400"}`}>{pop}%</span>
+      <span className="text-sm font-semibold tabular-nums text-[#2563a8]">{pop}%</span>
       <span className="text-[19px] font-semibold tabular-nums text-slate-900">{Math.round(h.temp)}°</span>
     </div>
   )
@@ -657,19 +532,18 @@ function HourSlot({ h, w }: { h: HourlyForecast; w: W }) {
 
 function LoadingGrid({ label }: { label: string }) {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]" aria-busy>
-      <div className="flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-6">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" aria-busy>
+      <div className="order-1 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5">
+        <Skeleton className="h-4 w-1/3" />
+        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+      </div>
+      <div className="order-2 flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-6">
         <Skeleton className="h-4 w-2/5" />
         <div className="flex items-center gap-4"><Skeleton className="h-[76px] w-[76px] rounded-full" /><Skeleton className="h-[52px] w-36" /></div>
         <Skeleton className="h-[22px] w-[85%]" />
         <Skeleton className="h-24 w-full" />
       </div>
-      <div className="flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5">
-        <Skeleton className="h-4 w-1/3" />
-        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
-      </div>
-      <Skeleton className="h-[170px] rounded-2xl" />
-      <Skeleton className="h-[170px] rounded-2xl" />
+      <Skeleton className="h-[170px] rounded-2xl xl:col-span-2" />
       <div className="flex h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm text-slate-500 xl:col-span-2">{label}</div>
     </div>
   )

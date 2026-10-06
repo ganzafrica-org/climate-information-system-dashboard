@@ -8,12 +8,13 @@ import {
   Bar, CartesianGrid, Cell, ComposedChart, LabelList, Line, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts"
 import {
-  CalendarX, ChevronDown, ChevronUp, CloudOff, CloudRain, Download, Droplets, Info, Plus, Sun, Thermometer, TriangleAlert, X, type LucideIcon,
+  CalendarX, ChevronDown, ChevronUp, CloudOff, CloudRain, Download, Droplets, Plus, Sun, Thermometer, X, type LucideIcon,
 } from "lucide-react"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { SectorMenu } from "@/components/weather/SectorMenu"
 import { StateCard } from "@/components/weather/StateCard"
 import { DateRangePicker, type DateRange } from "@/components/ui/calendar"
+import { Pagination } from "@/components/ui/pagination"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { FeatureCollection } from "@/lib/soil"
 import {
@@ -47,6 +48,7 @@ const LY_BAR = "#c9d9ee"
 const TEMP_LINE = "#e0702f"
 const BAND: Record<Season, [string, string]> = { A: ["#e8f3f3", "#0f5f60"], B: ["#eef5e7", "#3d6b1f"], C: ["#f8f2e4", "#8a5a00"] }
 const LOW_COVERAGE = 0.8
+const TABLE_PAGE_SIZE = 10
 const PRESETS = ["thisSeason", "lastSeason", "last12", "year", "custom"] as const
 type Preset = (typeof PRESETS)[number]
 
@@ -55,7 +57,7 @@ const kigaliToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/K
 type ChartRow = { ym: string; rain: number | null; ly: number | null; temp: number | null; days: number; expectedDays: number }
 
 const Historical: NextPage = () => {
-  const { w, lang } = useWx()
+  const { w, t, lang } = useWx()
   const router = useRouter()
 
   const [sectors, setSectorsState] = useState<string[]>([DEFAULT_SECTOR])
@@ -68,6 +70,7 @@ const Historical: NextPage = () => {
   const [metric, setMetric] = useState<"rain" | "temp">("rain")
   const [menuOpen, setMenuOpen] = useState(false)
   const [tableOpen, setTableOpen] = useState(false)
+  const [tablePage, setTablePage] = useState(1)
 
   // ?sectors=A,B keeps the comparison shareable
   useEffect(() => {
@@ -132,7 +135,6 @@ const Historical: NextPage = () => {
   // ---- text ----
   const colorOf = (s: string) => SERIES[sectors.indexOf(s)] ?? SERIES[0]
   const dt = (iso: string) => dayMonth(fromIso(iso), lang, { year: true })
-  const dts = (iso: string) => dayMonth(fromIso(iso), lang)
   const ymName = (ym: string, long = true) => `${monthName(+ym.slice(5) - 1, lang, long)} ${ym.slice(0, 4)}`
   const daysWord = (n: number) => (n === 1 ? w("day") : w("days"))
   const pct = (a: number, b: number) => (b ? Math.round(((a - b) / b) * 100) : null)
@@ -147,13 +149,11 @@ const Historical: NextPage = () => {
     }
     return w(`preset.${preset}`)
   })()
-  const periodText = `${w("periodText", { name: periodName, from: dt(start), to: dt(end) })}${main ? ` · ${w("daysRecorded", { n: main.count, m: main.expectedDays })}` : ""}`
-  const missingDays = main ? main.expectedDays - main.count : 0
+  const periodText = w("periodText", { name: periodName, from: dt(start), to: dt(end) })
 
   // Sectors compared side by side: fall back to rain per recorded day when their coverage differs
   const compared = sectors.map((s) => allStats[s]).filter((x): x is PeriodStats => !!x)
   const comparePerDay = !single && compared.some((a) => compared.some((b) => coverageDiffers(a, b)))
-  const lyPerDay = !!(main && ly && coverageDiffers(main, ly))
 
   let answer = ""
   if (main) {
@@ -169,10 +169,8 @@ const Historical: NextPage = () => {
       answer = w("ansSingle", { s: primary, mm: fmtInt(main.total), from: dt(start), to: dt(end), cmp })
       if (main.months.length > 1) {
         const wet = main.months.reduce((a, b) => (b.rain > a.rain ? b : a))
-        const dry = main.months.reduce((a, b) => (b.rain < a.rain ? b : a))
-        answer += ` ${w("ansMonths", { wm: ymName(wet.ym), wmm: wet.rain, dm: ymName(dry.ym), dmm: dry.rain })}`
+        if (wet.rain > 0) answer += ` ${w("ansMonthsWet", { wm: ymName(wet.ym), wmm: wet.rain })}`
       }
-      if (wantLY && !lyQ.isLoading && !ly) answer += ` ${w("noPrev")}`
     } else {
       const withStats = sectors.map((s) => [s, allStats[s]] as const).filter((x): x is readonly [string, PeriodStats] => !!x[1])
       if (comparePerDay) {
@@ -191,43 +189,27 @@ const Historical: NextPage = () => {
 
   // ---- stat cards ----
   type Row = { name: string; color: string; value: string }
-  const rowsFor = (fn: (x: PeriodStats) => string, lyFn: (x: PeriodStats) => string): Row[] => {
-    if (!single) return sectors.slice(1).map((s) => ({ name: s, color: colorOf(s), value: allStats[s] ? fn(allStats[s]!) : "–" }))
-    if (wantLY) return [{ name: w("cLastYear"), color: LY_BAR, value: ly ? lyFn(ly) : "–" }]
-    return []
-  }
-  const stats: { icon: LucideIcon; iconColor: string; label: string; value: string; unit: string; meaning: string; bg: string; rows: Row[] }[] = main
-    ? (() => {
-        const heavyMonth = main.months.reduce((a, b) => (b.heavy > a.heavy ? b : a))
-        return [
-          {
-            icon: Droplets, iconColor: "#2f6cbc", label: w("totalRain"), value: fmtInt(main.total), unit: "mm", bg: "#fff",
-            meaning: `${w("rainyMeaning", { n: main.rainyDays, k: Math.round((main.rainyDays / main.count) * 10) })} ${w("daysRecorded", { n: main.count, m: main.expectedDays })}.`,
-            rows: rowsFor(
-              (x) => `${fmtInt(x.total)} mm${comparePerDay ? ` · ${w("daysShort", { n: x.count })}` : ""}`,
-              (x) => {
-                const p = lyPerDay ? pct(main.perDay, x.perDay) : pct(main.total, x.total)
-                return `${fmtInt(x.total)} mm${lyPerDay ? ` · ${w("daysShort", { n: x.count })}` : ""}${p == null ? "" : ` (${p >= 0 ? "+" : ""}${p}%)`}`
-              }
-            ),
-          },
-          {
-            icon: Thermometer, iconColor: TEMP_LINE, label: w("avgTemp"), value: `${main.avgMax}° / ${main.avgMin}°`, unit: w("highLow"), bg: "#fff",
-            meaning: w("tempMeaning", { hot: Math.round(main.hottest.max), hd: dts(main.hottest.date), cold: Math.round(main.coldest.min), cd: dts(main.coldest.date), n: main.hotDays }),
-            rows: rowsFor((x) => `${x.avgMax}° / ${x.avgMin}°`, (x) => `${x.avgMax}° / ${x.avgMin}°`),
-          },
-          {
-            icon: CloudRain, iconColor: "#2f6cbc", label: w("heavyDays"), value: `${main.heavyDays}`, unit: daysWord(main.heavyDays), bg: main.heavyDays >= 5 ? "#f3f7fc" : "#fff",
-            meaning: `${w("heavyMeaning")} ${main.heavyDays ? w("heavyMost", { m: monthName(+heavyMonth.ym.slice(5) - 1, lang, true) }) : w("heavyNone")}`,
-            rows: rowsFor((x) => `${x.heavyDays}`, (x) => `${x.heavyDays}`),
-          },
-          {
-            icon: Sun, iconColor: "#e39a1c", label: w("drySpell"), value: `${main.longestDry.len}`, unit: daysWord(main.longestDry.len), bg: "#fff",
-            meaning: main.longestDry.len && main.longestDry.from && main.longestDry.to ? w("dryMeaning", { from: dts(main.longestDry.from), to: dts(main.longestDry.to) }) : "",
-            rows: rowsFor((x) => `${x.longestDry.len} ${daysWord(x.longestDry.len)}`, (x) => `${x.longestDry.len} ${daysWord(x.longestDry.len)}`),
-          },
-        ]
-      })()
+  const extraRows = (fn: (x: PeriodStats) => string): Row[] =>
+    single ? [] : sectors.slice(1).map((s) => ({ name: s, color: colorOf(s), value: allStats[s] ? fn(allStats[s]!) : "–" }))
+  const stats: { icon: LucideIcon; iconColor: string; label: string; value: string; unit: string; bg: string; rows: Row[] }[] = main
+    ? [
+        {
+          icon: Droplets, iconColor: "#2f6cbc", label: w("totalRain"), value: fmtInt(main.total), unit: "mm", bg: "#fff",
+          rows: extraRows((x) => `${fmtInt(x.total)} mm${comparePerDay ? ` · ${w("daysShort", { n: x.count })}` : ""}`),
+        },
+        {
+          icon: Thermometer, iconColor: TEMP_LINE, label: w("avgTemp"), value: `${main.avgMax}° / ${main.avgMin}°`, unit: w("highLow"), bg: "#fff",
+          rows: extraRows((x) => `${x.avgMax}° / ${x.avgMin}°`),
+        },
+        {
+          icon: CloudRain, iconColor: "#2f6cbc", label: w("heavyDays"), value: `${main.heavyDays}`, unit: daysWord(main.heavyDays), bg: main.heavyDays >= 5 ? "#f3f7fc" : "#fff",
+          rows: extraRows((x) => `${x.heavyDays}`),
+        },
+        {
+          icon: Sun, iconColor: "#e39a1c", label: w("drySpell"), value: `${main.longestDry.len}`, unit: daysWord(main.longestDry.len), bg: "#fff",
+          rows: extraRows((x) => `${x.longestDry.len} ${daysWord(x.longestDry.len)}`),
+        },
+      ]
     : []
 
   // ---- charts (one per sector, same scales) ----
@@ -330,6 +312,12 @@ const Historical: NextPage = () => {
     return { ym, first: j === 0, sector: s, rain: m?.rain, days: m ? `${m.days}/${m.expectedDays}` : undefined, ly: wantLY && ly ? lyByMonth[ym.slice(5)] : undefined, rainy: m?.rainyDays, heavy: m?.heavy, hi: m?.tmax, lo: m?.tmin }
   }))
   const showLyCol = wantLY && !!ly
+  const tablePageCount = Math.max(1, Math.ceil(tableRows.length / TABLE_PAGE_SIZE))
+  const tablePageSafe = Math.min(tablePage, tablePageCount)
+  const pagedRows = tableRows.length > TABLE_PAGE_SIZE
+    ? tableRows.slice((tablePageSafe - 1) * TABLE_PAGE_SIZE, tablePageSafe * TABLE_PAGE_SIZE)
+    : tableRows
+  useEffect(() => { setTablePage(1) }, [start, end, sectors.join(",")])
   const exportCsv = () => {
     const header = ["Month", "Sector", "DaysRecorded", "Rain_mm", ...(showLyCol ? ["Rain_last_year_mm"] : []), "RainyDays", "HeavyDays", "AvgHigh_C", "AvgLow_C"]
     const rows = tableRows.map((r) => [r.ym, r.sector, r.days ?? "", r.rain ?? "", ...(showLyCol ? [r.ly ?? ""] : []), r.rainy ?? "", r.heavy ?? "", r.hi ?? "", r.lo ?? ""])
@@ -352,7 +340,7 @@ const Historical: NextPage = () => {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{w("histTitle")}</h1>
-              <p className="mt-0.5 text-sm text-slate-500">{w("histSub")}</p>
+              <p className="mt-0.5 text-sm text-slate-500">{w("district")}</p>
             </div>
             <button onClick={exportCsv} disabled={!isLive} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb] disabled:opacity-50">
               <Download className="h-4 w-4 text-[#147677]" />{w("exportCsv")}
@@ -414,15 +402,7 @@ const Historical: NextPage = () => {
               </div>
             )}
           </div>
-          <div className="flex flex-col gap-1.5">
-            <div className="text-sm text-slate-600">{periodText}</div>
-            <div className="flex items-start gap-1.5 text-[13px] leading-snug text-slate-500"><Info className="mt-px h-3.5 w-3.5 shrink-0" />{w("dataNote")}</div>
-            {isLive && missingDays > 0 && main && main.coverage < 0.9 && (
-              <div className="flex items-start gap-1.5 rounded-lg border border-[#f3d3a8] bg-[#fff7ed] px-2.5 py-1.5 text-[13px] leading-snug text-[#7c2d12]">
-                <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0 text-[#b45309]" />{w("gapWarning", { k: missingDays })}
-              </div>
-            )}
-          </div>
+          <p className="text-sm text-slate-600">{periodText}</p>
         </div>
 
         {isDown && <StateCard icon={CloudOff} tone="error" title={w("downTitle")} text={w("downHistText")} retryLabel={w("retry")} onRetry={() => histQ.refetch()} />}
@@ -443,10 +423,7 @@ const Historical: NextPage = () => {
           <>
             {/* Answer + stat cards */}
             <section className="flex flex-col gap-[18px] rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
-              <div className="flex flex-col gap-1.5">
-                <p className="max-w-[900px] text-[19px] font-semibold leading-[1.35] tracking-[-0.01em] text-slate-900 md:text-[22px]">{answer}</p>
-                {(comparePerDay || lyPerDay) && <p className="text-sm text-slate-500">{w(comparePerDay ? "perDayNote" : "lyPerDayNote")}</p>}
-              </div>
+              <p className="max-w-[900px] text-[19px] font-semibold leading-[1.35] tracking-[-0.01em] text-slate-900 md:text-[22px]">{answer}</p>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
                 {stats.map((s) => (
                   <div key={s.label} className="flex flex-col gap-1.5 rounded-xl border border-gray-200 p-4" style={{ background: s.bg }}>
@@ -455,7 +432,6 @@ const Historical: NextPage = () => {
                       <span className="text-[34px] font-semibold leading-[1.05] tracking-[-0.02em] tabular-nums text-slate-900">{s.value}</span>
                       <span className="text-[15px] text-slate-600">{s.unit}</span>
                     </div>
-                    {s.meaning && <p className="text-sm leading-[1.45] text-slate-700">{s.meaning}</p>}
                     {s.rows.length > 0 && (
                       <div className="mt-1 flex flex-col gap-[3px]">
                         {s.rows.map((r) => (
@@ -575,7 +551,6 @@ const Historical: NextPage = () => {
                 <span>{isRain ? `${mapPerDay ? w("mmPerDay", { v: vhi.toFixed(1) }) : `${fmtInt(vhi)} mm`} ${w("wetter")}` : `${Math.round(vhi)}° ${w("warmer")}`}</span>
               </div>
             )}
-            <p className="mt-1.5 text-[13px] text-slate-500">{w("mapHintHist")}{mapPerDay ? ` ${w("perDayNote")}` : ""}</p>
           </section>
         )}
 
@@ -586,37 +561,54 @@ const Historical: NextPage = () => {
               {tableOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}{tableOpen ? w("hideMonthly") : w("showMonthly")}
             </button>
             {tableOpen && (
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[720px] text-sm tabular-nums">
-                  <thead>
-                    <tr className="border-b border-gray-200 text-left font-semibold text-slate-600">
-                      <th className="p-2 font-semibold">{w("month")}</th>
-                      <th className="p-2 font-semibold">{w("sector")}</th>
-                      <th className="p-2 text-right font-semibold">{w("daysRecCol")}</th>
-                      <th className="p-2 text-right font-semibold">{w("rainMm")}</th>
-                      {showLyCol && <th className="p-2 text-right font-semibold">{w("lastYear")}</th>}
-                      <th className="p-2 text-right font-semibold">{w("rainyD")}</th>
-                      <th className="p-2 text-right font-semibold">{w("heavyD")}</th>
-                      <th className="p-2 text-right font-semibold">{w("avgHigh")}</th>
-                      <th className="p-2 text-right font-semibold">{w("avgLow")}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {tableRows.map((r) => (
-                      <tr key={`${r.ym}-${r.sector}`} className={`border-t ${r.first ? "border-gray-200" : "border-[#f3f5f6]"}`}>
-                        <td className="px-2 py-[7px] font-semibold text-slate-900">{r.first ? ymName(r.ym, false) : ""}</td>
-                        <td className="px-2 py-[7px] text-slate-700">{r.sector}</td>
-                        <td className="px-2 py-[7px] text-right text-slate-500">{r.days ?? "–"}</td>
-                        <td className="px-2 py-[7px] text-right font-semibold">{r.rain ?? "–"}</td>
-                        {showLyCol && <td className="px-2 py-[7px] text-right text-slate-500">{r.ly ?? "–"}</td>}
-                        <td className="px-2 py-[7px] text-right">{r.rainy ?? "–"}</td>
-                        <td className="px-2 py-[7px] text-right">{r.heavy ?? "–"}</td>
-                        <td className="px-2 py-[7px] text-right">{r.hi != null ? `${r.hi}°` : "–"}</td>
-                        <td className="px-2 py-[7px] text-right">{r.lo != null ? `${r.lo}°` : "–"}</td>
+              <div className="mt-3 space-y-3">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-sm tabular-nums">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left font-semibold text-slate-600">
+                        <th className="p-2 font-semibold">{w("month")}</th>
+                        <th className="p-2 font-semibold">{w("sector")}</th>
+                        <th className="p-2 text-right font-semibold">{w("daysRecCol")}</th>
+                        <th className="p-2 text-right font-semibold">{w("rainMm")}</th>
+                        {showLyCol && <th className="p-2 text-right font-semibold">{w("lastYear")}</th>}
+                        <th className="p-2 text-right font-semibold">{w("rainyD")}</th>
+                        <th className="p-2 text-right font-semibold">{w("heavyD")}</th>
+                        <th className="p-2 text-right font-semibold">{w("avgHigh")}</th>
+                        <th className="p-2 text-right font-semibold">{w("avgLow")}</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {pagedRows.map((r, i) => (
+                        <tr key={`${r.ym}-${r.sector}`} className={`border-t ${i === 0 || r.ym !== pagedRows[i - 1].ym ? "border-gray-200" : "border-[#f3f5f6]"}`}>
+                          <td className="px-2 py-[7px] font-semibold text-slate-900">{i === 0 || r.ym !== pagedRows[i - 1].ym ? ymName(r.ym, false) : ""}</td>
+                          <td className="px-2 py-[7px] text-slate-700">{r.sector}</td>
+                          <td className="px-2 py-[7px] text-right text-slate-500">{r.days ?? "–"}</td>
+                          <td className="px-2 py-[7px] text-right font-semibold">{r.rain ?? "–"}</td>
+                          {showLyCol && <td className="px-2 py-[7px] text-right text-slate-500">{r.ly ?? "–"}</td>}
+                          <td className="px-2 py-[7px] text-right">{r.rainy ?? "–"}</td>
+                          <td className="px-2 py-[7px] text-right">{r.heavy ?? "–"}</td>
+                          <td className="px-2 py-[7px] text-right">{r.hi != null ? `${r.hi}°` : "–"}</td>
+                          <td className="px-2 py-[7px] text-right">{r.lo != null ? `${r.lo}°` : "–"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {tableRows.length > TABLE_PAGE_SIZE && (
+                  <div className="flex flex-col items-center justify-between gap-3 sm:flex-row">
+                    <p className="text-sm text-slate-500">
+                      {(tablePageSafe - 1) * TABLE_PAGE_SIZE + 1}–{Math.min(tablePageSafe * TABLE_PAGE_SIZE, tableRows.length)} {t("of")} {tableRows.length}
+                    </p>
+                    <Pagination
+                      label={w("showMonthly")}
+                      variant="boxed"
+                      showEdges
+                      count={tablePageCount}
+                      page={tablePageSafe}
+                      onPageChange={setTablePage}
+                    />
+                  </div>
+                )}
               </div>
             )}
           </section>
