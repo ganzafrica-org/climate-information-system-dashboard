@@ -216,7 +216,7 @@ const Forecasts: NextPage = () => {
   const exportCsv = () => {
     const rows: (string | number)[][] = [["Sector", "Date", "Condition", "High_C", "Low_C", "RainChance_pct", "Rain_mm", "Humidity_pct", "Wind_kmh"]]
     SECTORS.forEach((s) => (daysBySector[s] ?? []).forEach((x) =>
-      rows.push([s, x.iso, x.condition, x.tempMax, x.tempMin, x.rainChance, x.rainfall, x.humidity ?? "", x.windKmh])
+      rows.push([s, x.iso, x.condition, x.tempMax, x.tempMin, x.rainChance, x.rainfall ?? "", x.humidity ?? "", x.windKmh])
     ))
     downloadCsv(`musanze_forecast_${days[0]?.iso ?? "export"}.csv`, rows)
   }

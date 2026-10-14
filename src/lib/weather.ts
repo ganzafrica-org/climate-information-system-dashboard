@@ -246,7 +246,7 @@ export function asRainCat(value?: string | null): RainCat | undefined {
 }
 
 /** Millimetres as sent on this API day. Null if that day has no rain field. */
-export function rainMmFromApi(d: { rainfall?: number | null; rainAmount?: number | null; rain?: number | null } | undefined) {
+export function rainMmFromApi(d: { rainfall?: number | string | null; rainAmount?: number | string | null; rain?: number | string | null } | undefined) {
   if (!d) return null
   const hasOwn =
     Object.prototype.hasOwnProperty.call(d, "rainfall") ||
