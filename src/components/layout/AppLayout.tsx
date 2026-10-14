@@ -22,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Tooltip, TooltipGroup } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { AgronomistChat } from '@/components/AgronomistChat';
 
 interface AppLayoutProps {
     children: React.ReactNode;
@@ -54,6 +55,9 @@ export function AppLayout({ children }: AppLayoutProps) {
         window.addEventListener('resize', checkIsMobile);
         return () => window.removeEventListener('resize', checkIsMobile);
     }, []);
+
+    const isNavActive = (href: string) =>
+        href === '/training' ? router.pathname.startsWith('/training') : router.pathname === href
 
     const navItems = [
         { href: '/dashboard', icon: <LayoutDashboard size={20} />, label: t('dashboard') },
@@ -96,7 +100,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                 <nav className="flex-1 px-2 space-y-1">
                     <TooltipGroup openDelay={300}>
                         {navItems.map((item) => {
-                            const isActive = router.pathname === item.href;
+                            const isActive = isNavActive(item.href);
                             return (
                                 <Tooltip
                                     key={item.href}
@@ -195,7 +199,7 @@ export function AppLayout({ children }: AppLayoutProps) {
                     <div className="flex flex-col h-[calc(100%-4rem)] overflow-y-auto py-4">
                         <nav className="flex-1 px-2 space-y-1">
                             {navItems.map((item) => {
-                                const isActive = router.pathname === item.href;
+                                const isActive = isNavActive(item.href);
                                 return (
                                     <Link key={item.href} href={item.href}>
                                         <Button
@@ -339,11 +343,12 @@ export function AppLayout({ children }: AppLayoutProps) {
             
             <div className="flex flex-col flex-1 overflow-hidden pt-16">
                 <main className="flex-1 overflow-auto bg-[#f9fafb]">
-                    <div className="container mx-auto p-3 md:p-6">
+                    <div className="w-full p-3 md:p-4">
                         {children}
                     </div>
                 </main>
             </div>
+            <AgronomistChat />
         </div>
     );
 }

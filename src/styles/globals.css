@@ -189,3 +189,12 @@ body {
 .animation-delay-700 {
   animation-delay: 700ms;
 }
+
+.leaflet-container {
+  z-index: 0;
+  height: 100%;
+  width: 100%;
+}
+.leaflet-container img {
+  max-width: none !important;
+}

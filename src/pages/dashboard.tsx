@@ -46,6 +46,7 @@ import {
     YAxis,
 } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
+import { rainfallCategory } from '@/lib/weather';
 
 const SoftCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={cn('bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,40,80,0.06)]', className)}>
@@ -413,7 +414,6 @@ const Dashboard: NextPage = () => {
     const weeklyChartConfig = {
         tempMax: { label: t('maxTempShort'), color: '#147677' },
         tempMin: { label: t('minTempShort'), color: '#F5A623' },
-        rain: { label: t('rainAmountMm'), color: '#F5A623' },
         rainChance: { label: t('rainChancePercent'), color: '#147677' },
     };
 
@@ -492,6 +492,9 @@ const Dashboard: NextPage = () => {
     const currentWeather = weatherData?.weather?.current;
     const displayTemp = currentWeather?.temp ?? todayWeather?.tempMax;
     const displayCondition = currentWeather?.condition || todayWeather?.condition || '';
+    const todayRainLabel = todayWeather
+        ? t(`wx.rainCat.${rainfallCategory(Number(todayWeather.rainAmount) || 0)}`)
+        : '';
 
     const rainyDonut = weeklySummary ? [
         { name: t('rainy'), value: weeklySummary.daysWithRain, fill: '#F5A623' },
@@ -659,6 +662,9 @@ const Dashboard: NextPage = () => {
                                             <span className="text-[11px] text-slate-400">{day.day}</span>
                                             {getWeatherIcon(day.condition, 'h-5 w-5')}
                                             <span className="text-sm font-semibold text-slate-700">{day.tempMax}°</span>
+                                            <span className="text-[10px] leading-tight text-center text-slate-500">
+                                                {t(`wx.rainCat.${rainfallCategory(day.rain)}`)}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
@@ -693,8 +699,8 @@ const Dashboard: NextPage = () => {
                                             <p className="text-sm font-semibold text-slate-700">{weeklySummary.avgHumidity}%</p>
                                         </div>
                                         <div className="rounded-xl bg-[#F3F8F8] px-2 py-1 text-center">
-                                            <p className="text-[10px] text-slate-400">{t('totalRainfall')}</p>
-                                            <p className="text-sm font-semibold text-slate-700">{weeklySummary.totalRain} mm</p>
+                                            <p className="text-[10px] text-slate-400">{t('wx.rain')}</p>
+                                            <p className="text-sm font-semibold text-slate-700">{todayRainLabel || '—'}</p>
                                         </div>
                                         <div className="rounded-xl bg-[#F3F8F8] px-2 py-1 text-center">
                                             <p className="text-[10px] text-slate-400">{t('averageWindSpeed')}</p>
@@ -730,15 +736,18 @@ const Dashboard: NextPage = () => {
                                 </p>
                                 <p className="text-5xl font-bold tracking-tight leading-none mt-1">{Math.round(displayTemp)}°</p>
                                 <p className="text-white/90 capitalize text-sm mt-1">{translateCondition(displayCondition) || t('todayForecast')}</p>
-                                <div className="flex items-center gap-3 text-xs text-white/85 mt-3">
-                                    <span className="flex items-center gap-1.5">
-                                        <Wind className="h-3.5 w-3.5" />
-                                        {todayWeather ? `${Math.round(todayWeather.windSpeed * 3.6)} km/h` : '--'}
-                                    </span>
-                                    <span className="text-white/40">|</span>
+                                <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-white/85 mt-3">
                                     <span className="flex items-center gap-1.5">
                                         <Droplets className="h-3.5 w-3.5" />
-                                        {t('humidity')} {todayWeather ? `${todayWeather.humidity}%` : '--'}
+                                        {todayRainLabel}
+                                        {todayWeather.rainChance != null ? ` · ${todayWeather.rainChance}%` : ''}
+                                    </span>
+                                    <span className="text-white/40">|</span>
+                                    <span>{t('humidity')} {todayWeather.humidity}%</span>
+                                    <span className="text-white/40">|</span>
+                                    <span className="flex items-center gap-1.5">
+                                        <Wind className="h-3.5 w-3.5" />
+                                        {Math.round(todayWeather.windSpeed * 3.6)} km/h
                                     </span>
                                 </div>
                             </div>
@@ -751,9 +760,8 @@ const Dashboard: NextPage = () => {
 
                     <SoftCard className="p-3 xl:col-span-4">
                         <div className="flex items-center justify-between mb-1">
-                            <h2 className="text-sm font-semibold text-slate-800">{t('totalRainfall')}</h2>
+                            <h2 className="text-sm font-semibold text-slate-800">{t('wx.rain')}</h2>
                             <div className="flex items-center gap-2 text-[10px] text-slate-500">
-                                <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#F5A623]" />mm</span>
                                 <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-[#147677]" />%</span>
                             </div>
                         </div>
@@ -763,7 +771,6 @@ const Dashboard: NextPage = () => {
                                     <XAxis dataKey="day" tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} />
                                     <YAxis tick={{ fill: '#94A3B8', fontSize: 10 }} axisLine={false} tickLine={false} />
                                     <Tooltip content={<ChartTooltipContent />} />
-                                    <Bar dataKey="rain" fill="#F5A623" radius={[6, 6, 6, 6]} barSize={8} name={t('rainAmountMm')} />
                                     <Bar dataKey="rainChance" fill="#147677" radius={[6, 6, 6, 6]} barSize={8} name={t('rainChancePercent')} />
                                 </BarChart>
                             </ChartContainer>

@@ -114,7 +114,7 @@
   "joinedDate": "Joined Date",
 
   "heavyRainAlert": "Heavy Rainfall Alert",
-  "heavyRainWarning": "Heavy rainfall expected (>25mm). Protect seedlings, delay fertilizer application, ensure proper drainage in fields.",
+  "heavyRainWarning": "Heavy rainfall expected (20 mm or more). Protect seedlings, delay fertilizer application, ensure proper drainage in fields.",
   "heavyRainAction1": "Cover young seedlings to protect from heavy rain",
   "heavyRainAction2": "Clean drainage ditches to prevent field flooding",
   "heavyRainAvoid1": "Avoid applying fertilizers during heavy rain periods",
@@ -1277,6 +1277,19 @@
       "thunderstorm": "Thunderstorms",
       "fog": "Mist"
     },
+    "rainCat": {
+      "no_rain": "No rain",
+      "trace": "Trace",
+      "light_rain": "Light rain",
+      "moderate_rain": "Moderate rain",
+      "heavy_rain": "Heavy rain",
+      "very_heavy": "Very heavy rain"
+    },
+    "cloudCat": {
+      "few_clouds": "Few clouds",
+      "partly_cloudy": "Partly cloudy",
+      "mostly_cloudy": "Mostly cloudy"
+    },
     "fcTitle": "Weather Forecast",
     "shareSms": "Share as SMS",
     "smsFor": "SMS for farmers in {{s}}",
@@ -1320,6 +1333,7 @@
     "nextDays": "Next {{n}} days",
     "clickDay": "Click a day to see it above",
     "showAll": "Show all {{n}} days",
+    "viewMoreDays": "View more days",
     "showFewer": "Show fewer days",
     "fieldTitle": "Good days for field work",
     "good": "Good",
@@ -1358,6 +1372,7 @@
     "downFcText": "We could not reach the forecast service. Try again in a few minutes.",
     "detailUnavailable": "The written overview and farming advice are not available right now.",
     "chanceChip": "{{p}}% chance · {{w}}",
+    "rainChanceLine": "{{rain}} · {{p}}% chance",
     "mmChip": "{{mm}} mm · {{w}} rain",
     "dryChip": "Under 1 mm · Dry",
     "windChip": "Strong wind · {{k}} km/h",
@@ -1424,7 +1439,7 @@
     "avgTemp": "Average temperature",
     "tempMeaning": "Hottest day {{hot}}° on {{hd}}. Coldest night {{cold}}° on {{cd}}. Hot days (25° or more): {{n}}.",
     "heavyDays": "Heavy-rain days",
-    "heavyMeaning": "Days with 30 mm or more.",
+    "heavyMeaning": "Days with 20 mm or more.",
     "heavyMost": "Most were in {{m}}.",
     "heavyNone": "None in this period.",
     "drySpell": "Longest dry spell",
@@ -1469,5 +1484,46 @@
     "daysRecCol": "Days recorded",
     "perDayM": "average rain per recorded day",
     "mmPerDay": "{{v}} mm/day"
+  },
+
+  "msgGuide": {
+    "title": "How Weather Data Are Translate",
+    "cardDesc": "See how raw weather numbers become the rain and cloud wording farmers receive, so agronomists can explain it clearly.",
+    "intro": "The weather feed gives numbers (millimetres of rain, percent of cloud). Users should see a short category in English or Kinyarwanda. So, we do not showshow values such as “30 mm rain”.",
+    "source": "OpenWeatherMap supplies the millimetres of rain and the percent of cloud. Teganyamuhinzi turns those numbers into short category words using Meteo Rwanda bands.",
+    "sourceNumbersLabel": "Weather numbers from",
+    "sourceWordsLabel": "Category words from",
+    "sourceWordsDetail": "Rwanda Meteorology Agency",
+    "back": "Back to training",
+    "colWhen": "When the number is",
+    "rainTitle": "Rainfall in 24 hours",
+    "rainNote": "When rain is above 0 mm we do not show the millimetres. We show trace, light, moderate, heavy, or very heavy rain.",
+    "rainExample": "30 mm in 24 hours is heavy rain (Imvura nyinshi), because it falls between 20 mm and 50 mm.",
+    "cloudTitle": "Cloud cover",
+    "cloudNote": "Use the percent of the sky covered by cloud. 30% is partly cloudy. 60% is mostly cloudy.",
+    "scaleTitle": "Forecast time scales",
+    "scaleIntro": "Rwanda Meteorology Agency issues forecasts on these time scales.",
+    "rulesTitle": "Rules for generating the paragraph",
+    "rulesIntro": "Use these words when writing the day’s weather paragraph. Do not print degrees, millimetres, percents, or kilometres.",
+    "colData": "Weather data",
+    "colHow": "How to describe it"
+  },
+
+  "chat": {
+    "title": "Agronomist helper",
+    "welcome": "Hi. Ask me about rain, spraying or the season in {{s}} — in your own words.",
+    "placeholder": "Type a question…",
+    "fallback": "I didn’t quite catch that. Try “rain today”, “can we spray”, or “what season is this”.",
+    "thinking": "One moment…",
+    "todayAsk": "What is today's rain?",
+    "open": "Open agronomist helper",
+    "close": "Close chat",
+    "send": "Send",
+    "reset": "Start over",
+    "useLocation": "Weather here",
+    "locating": "Finding sector…",
+    "noGps": "This device cannot share a location.",
+    "gpsDenied": "Location was not shared. Pick a sector on Forecasts, or type a sector name.",
+    "nearSector": "Nearest sector in the data is {{s}}."
   }
 }

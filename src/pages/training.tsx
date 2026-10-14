@@ -1,5 +1,6 @@
-import { JSX, SVGProps, useState} from 'react';
+import { JSX, useState} from 'react';
 import Head from 'next/head';
+import { useRouter } from 'next/router';
 import {AppLayout} from '@/components/layout/AppLayout';
 import {useLanguage} from '@/i18n';
 import {Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter} from '@/components/ui/card';
@@ -39,7 +40,8 @@ import {
     ArrowLeft,
     Share,
     Clock,
-    Eye
+    Eye,
+    MessageSquareText,
 } from 'lucide-react';
 import {Label} from "@/components/ui/label";
 import {Accordion, AccordionContent, AccordionItem, AccordionTrigger} from "@/components/ui/accordion";
@@ -61,6 +63,21 @@ const trainingModules = [
         pdfPath: '/GanzAfrica Booklet_English.pdf',
         pdfPathKinyarwanda: '/GanzAfrica Booklet_Kinyarwanda.pdf',
         image: '/Screensho.png'
+    },
+    {
+        id: 'weather-message-guide',
+        title: 'msgGuide.title',
+        titleEn: 'How Weather Data Are Translate',
+        titleRw: "Uko duhindura iteganyagihe mu magambo",
+        description: 'msgGuide.cardDesc',
+        icon: <MessageSquareText className="h-6 w-6" />,
+        level: 'allLevels',
+        duration: 10,
+        format: 'document',
+        popular: false,
+        new: true,
+        href: '/training/messages',
+        image: '/images/how_we_translate_weather_illustration.png',
     }
 ];
 
@@ -86,10 +103,12 @@ interface Module {
     pdfPath?: string;
     pdfPathKinyarwanda?: string;
     image?: string;
+    href?: string;
 }
 
 const Training = () => {
     const { t, locale } = useLanguage();
+    const router = useRouter();
     const [view, setView] = useState('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [levelFilter, setLevelFilter] = useState('all');
@@ -122,6 +141,10 @@ const Training = () => {
     };
 
     const handleView = (module: Module) => {
+        if (module.href) {
+            router.push(module.href);
+            return;
+        }
         const pdfPath = locale === 'rw' && module.pdfPathKinyarwanda ? module.pdfPathKinyarwanda : module.pdfPath;
         if (pdfPath) {
             setCurrentPdfUrl(pdfPath);
@@ -301,24 +324,27 @@ const Training = () => {
                                                         <img 
                                                             src={module.image} 
                                                             alt={getTitle(module)}
-                                                            className="w-full h-56 object-contain rounded-lg shadow-sm"
+                                                            className="w-full h-56 object-contain rounded-lg"
                                                         />
                                                     </div>
                                                 )}
                                                 <CardDescription className="text-gray-600 leading-relaxed">{t(module.description)}</CardDescription>
                                             </CardHeader>
                                             <CardContent className="pb-5 pt-2">
-                                                {module.pdfPath && (
+                                                {(module.pdfPath || module.href) && (
                                                     <div className="flex gap-3 mt-4">
                                                         <Button 
-                                                            variant="outline" 
+                                                            variant={module.href ? "primary" : "outline"}
                                                             size="sm" 
-                                                            className="flex-1 border-[#147677]/30 text-[#147677] hover:bg-[#147677]/10 hover:border-[#147677]/50"
+                                                            className={module.href
+                                                                ? "flex-1 bg-[#147677] hover:bg-[#147677]/90 text-white shadow-sm"
+                                                                : "flex-1 border-[#147677]/30 text-[#147677] hover:bg-[#147677]/10 hover:border-[#147677]/50"}
                                                             onClick={() => handleView(module)}
                                                         >
                                                             <Eye className="h-4 w-4 mr-2" />
                                                             {t('view')}
                                                         </Button>
+                                                        {module.pdfPath && (
                                                         <Button 
                                                             variant="primary"
                                                             size="sm" 
@@ -328,6 +354,7 @@ const Training = () => {
                                                             <Download className="h-4 w-4 mr-2" />
                                                             {t('download')}
                                                         </Button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </CardContent>
@@ -356,7 +383,7 @@ const Training = () => {
                                                             <img 
                                                                 src={module.image} 
                                                                 alt={getTitle(module)}
-                                                                className="w-full max-w-2xl h-40 object-contain rounded-lg shadow-sm"
+                                                                className="w-full max-w-2xl h-40 object-contain rounded-lg"
                                                             />
                                                         </div>
                                                     )}
@@ -364,17 +391,20 @@ const Training = () => {
                                                     <p className="text-gray-600 mb-4 leading-relaxed">{t(module.description)}</p>
                                                 </div>
 
-                                                {module.pdfPath && (
+                                                {(module.pdfPath || module.href) && (
                                                     <div className="flex gap-3">
                                                         <Button 
-                                                            variant="outline" 
+                                                            variant={module.href ? "primary" : "outline"}
                                                             size="sm"
-                                                            className="border-[#147677]/30 text-[#147677] hover:bg-[#147677]/10 hover:border-[#147677]/50"
+                                                            className={module.href
+                                                                ? "bg-[#147677] hover:bg-[#147677]/90 text-white shadow-sm"
+                                                                : "border-[#147677]/30 text-[#147677] hover:bg-[#147677]/10 hover:border-[#147677]/50"}
                                                             onClick={() => handleView(module)}
                                                         >
                                                             <Eye className="h-4 w-4 mr-2" />
                                                             {t('view')}
                                                         </Button>
+                                                        {module.pdfPath && (
                                                         <Button 
                                                             variant="primary"
                                                             size="sm"
@@ -384,6 +414,7 @@ const Training = () => {
                                                             <Download className="h-4 w-4 mr-2" />
                                                             {t('download')}
                                                         </Button>
+                                                        )}
                                                     </div>
                                                 )}
                                             </div>

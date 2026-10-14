@@ -142,7 +142,7 @@
   "locationSelector": "Guhitamo Ahantu",
 
   "heavyRainAlert": "Imyiteguro y'imvura nyinshi",
-  "heavyRainWarning": "Imvura nyinshi iteganyijwe (>25mm). Rinda imbuto, tegereza gushyiramo ifumbire, kuramo amazi mu mirima.",
+  "heavyRainWarning": "Imvura nyinshi iteganyijwe (mm 20 cyangwa zirenga). Rinda imbuto, tegereza gushyiramo ifumbire, kuramo amazi mu mirima.",
   "heavyRainAction1": "Pfuka imbuto nto kugira ngo urinde imvura nyinshi",
   "heavyRainAction2": "Sukura imiyoboro y'amazi kugira ngo wirinde umwuzure mu mirima",
   "heavyRainAvoid1": "Irinde gushyira ifumbire mu gihe cy'imvura nyinshi",
@@ -1387,6 +1387,19 @@
       "thunderstorm": "Imvura n'inkuba",
       "fog": "Igihu"
     },
+    "rainCat": {
+      "no_rain": "Ntamvura",
+      "trace": "Akayira",
+      "light_rain": "Imvura nke",
+      "moderate_rain": "Imvura iringaniye",
+      "heavy_rain": "Imvura nyinshi",
+      "very_heavy": "Imvura nyinshi cyane"
+    },
+    "cloudCat": {
+      "few_clouds": "Ibicu bike",
+      "partly_cloudy": "Ibicu biringaniye",
+      "mostly_cloudy": "Ibicu byinshi"
+    },
     "fcTitle": "Iteganyagihe ry'Ibihe",
     "shareSms": "Ohereza nka SMS",
     "smsFor": "SMS y'abahinzi b'i {{s}}",
@@ -1430,6 +1443,7 @@
     "nextDays": "Iminsi {{n}} iri imbere",
     "clickDay": "Kanda ku munsi uwurebe hejuru",
     "showAll": "Erekana iminsi yose uko ari {{n}}",
+    "viewMoreDays": "Reba iminsi myinshi",
     "showFewer": "Erekana iminsi mike",
     "fieldTitle": "Iminsi myiza yo gukora mu murima",
     "good": "Byiza",
@@ -1468,6 +1482,7 @@
     "downFcText": "Ntitwashoboye kugera kuri serivisi y'iteganyagihe. Ongera ugerageze mu minota mike.",
     "detailUnavailable": "Incamake n'inama z'ubuhinzi ntiziboneka ubu.",
     "chanceChip": "Amahirwe {{p}}% · {{w}}",
+    "rainChanceLine": "{{rain}} · amahirwe {{p}}%",
     "mmChip": "mm {{mm}} · imvura {{w}}",
     "dryChip": "Munsi ya mm 1 · Nta mvura",
     "windChip": "Umuyaga mwinshi · km/h {{k}}",
@@ -1534,7 +1549,7 @@
     "avgTemp": "Ubushyuhe bw'impuzandengo",
     "tempMeaning": "Umunsi washyushye cyane: {{hot}}° ({{hd}}). Ijoro ryakonje cyane: {{cold}}° ({{cd}}). Iminsi ishyushye (25°+): {{n}}.",
     "heavyDays": "Iminsi y'imvura nyinshi",
-    "heavyMeaning": "Iminsi yaguyemo mm 30 cyangwa zirenga.",
+    "heavyMeaning": "Iminsi yaguyemo mm 20 cyangwa zirenga.",
     "heavyMost": "Myinshi yari muri {{m}}.",
     "heavyNone": "Nta n'umwe muri iki gihe.",
     "drySpell": "Igihe kirekire cy'izuba",
@@ -1579,5 +1594,46 @@
     "daysRecCol": "Iminsi ifite amakuru",
     "perDayM": "impuzandengo y'imvura ku munsi ufite amakuru",
     "mmPerDay": "mm {{v}}/umunsi"
+  },
+
+  "msgGuide": {
+    "title": "Uko duhindura iteganyagihe mu magambo",
+    "cardDesc": "Reba uko imibare y'ikirere ihinduka amagambo y'imvura n'ibicu abahinzi bakira, kugira ngo abahanga mu buhinzi babisobanure neza.",
+    "intro": "Serivisi y'iteganyagihe itanga imibare (milimetero z'imvura, ijana ry'ibicu). Abakoresha bagomba kubona icyiciro gito mu Cyongereza cyangwa mu Kinyarwanda. Ntitwagomba kwerekana “mm 30 z'imvura”.",
+    "source": "OpenWeatherMap itanga milimetero z'imvura n'ijana ry'ibicu. Teganyamuhinzi ihindura iyo mibare mu magambo magufi akurikiza ibyiciro bya Meteo Rwanda.",
+    "sourceNumbersLabel": "Imibare y'ikirere iva kuri",
+    "sourceWordsLabel": "Amagambo y'ibyiciro ava kuri",
+    "sourceWordsDetail": "Ikigo cy'Igihe cya Rwanda",
+    "back": "Garuka ku mahugurwa",
+    "colWhen": "Iyo umubare uri",
+    "rainTitle": "Imvura mu masaha 24",
+    "rainNote": "Iyo imvura irengeje mm 0 ntitwereka milimetero. Twerekana akayira, imvura nke, iringaniye, nyinshi, cyangwa nyinshi cyane.",
+    "rainExample": "Mm 30 mu masaha 24 ni imvura nyinshi (Heavy rain), kuko iri hagati ya mm 20 na mm 50.",
+    "cloudTitle": "Ibicu",
+    "cloudNote": "Koresha ijana ry'ikirere gipfukamye n'ibicu. 30% ni ibicu biringaniye. 60% ni ibicu byinshi.",
+    "scaleTitle": "Igihe cy'iteganyagihe",
+    "scaleIntro": "Ikigo cy'Igihe cya Rwanda giteganya ikirere muri aya mashuri.",
+    "rulesTitle": "Amategeko yo gukora interuro",
+    "rulesIntro": "Koresha aya magambo mu interuro y'ikirere cy'umunsi. Ntukandike milimetero, igice cya kijana, cyangwa kilometero ku isaha.",
+    "colData": "Amakuru y'ikirere",
+    "colHow": "Uko ubisobanura"
+  },
+
+  "chat": {
+    "title": "Ubufasha bw'umuhinzi",
+    "welcome": "Muraho. Mbaza ku mvura, gufuka, cyangwa igihembwe i {{s}} — mu magambo yawe.",
+    "placeholder": "Andika ikibazo…",
+    "fallback": "Sinabyumvise neza. Gerageza «imvura y'uyu munsi», «gufuka», cyangwa «iki gihembwe».",
+    "thinking": "Rindira gato…",
+    "todayAsk": "Imvura y'uyu munsi ni iyihe?",
+    "open": "Fungura ubufasha bw'umuhinzi",
+    "close": "Funga ikiganiro",
+    "send": "Ohereza",
+    "reset": "Tangira bundi",
+    "useLocation": "Ikirere aha",
+    "locating": "Nshaka umurenge…",
+    "noGps": "Iki gikoresho ntigishobora gutanga ahantu.",
+    "gpsDenied": "Ahantu ntihabojetse. Hitamo umurenge kuri Iteganyagihe, cyangwa andika izina ry'umurenge.",
+    "nearSector": "Umurenge uri hafi mu makuru ni {{s}}."
   }
 }
