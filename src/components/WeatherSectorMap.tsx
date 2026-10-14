@@ -44,7 +44,6 @@ export default function WeatherSectorMap(props: Props) {
       zoomControl={false}
       scrollWheelZoom={false}
       zoomSnap={0.25}
-      whenReady={(e) => { setTimeout(() => e.target.invalidateSize(), 50) }}
       style={{ height: "100%", width: "100%", background: "#e9eef2" }}
     >
       <TileLayer
