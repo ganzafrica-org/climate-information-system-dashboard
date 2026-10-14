@@ -13,19 +13,52 @@ export const SECTORS = [
 ] as const
 
 // ---------------------------------------------------------------------------
-// Thresholds (placeholders, to confirm with the agronomy team)
+// Meteo Rwanda wording (numbers from OpenWeatherMap)
 // ---------------------------------------------------------------------------
 
 export type ChanceCat = "unlikely" | "possible" | "likely"
 export type AmountCat = "dry" | "light" | "moderate" | "heavy"
-
-export const chanceCat = (pct: number): ChanceCat => (pct < 30 ? "unlikely" : pct <= 60 ? "possible" : "likely")
-export const amountCat = (mm: number): AmountCat => (mm < 1 ? "dry" : mm < 10 ? "light" : mm < 30 ? "moderate" : "heavy")
+export type RainCat = "no_rain" | "trace" | "light_rain" | "moderate_rain" | "heavy_rain" | "very_heavy"
+export type CloudCat = "few_clouds" | "partly_cloudy" | "mostly_cloudy"
 
 export const RAINY_DAY_MM = 1
-export const HEAVY_DAY_MM = 30
+export const LIGHT_RAIN_MM = 5
+export const HEAVY_DAY_MM = 20
+export const VERY_HEAVY_RAIN_MM = 50
 export const HOT_DAY_C = 25
 export const STRONG_WIND_KMH = 30
+export const CHANCE_UNLIKELY_PCT = 30
+export const CHANCE_LIKELY_PCT = 60
+
+export const chanceCat = (pct: number): ChanceCat =>
+  (pct < CHANCE_UNLIKELY_PCT ? "unlikely" : pct <= CHANCE_LIKELY_PCT ? "possible" : "likely")
+
+/** 24-hour rainfall (mm) → Meteo Rwanda category. Each amount has one label. */
+export function rainfallCategory(mm: number): RainCat {
+  const amount = Number(mm) || 0
+  if (amount <= 0) return "no_rain"
+  if (amount < 1) return "trace"
+  if (amount < 5) return "light_rain"
+  if (amount < 20) return "moderate_rain"
+  if (amount <= 50) return "heavy_rain"
+  return "very_heavy"
+}
+
+/** Sky covered by cloud (0–100). 30% is partly cloudy; 60% is mostly cloudy. */
+export function cloudCategory(percent: number): CloudCat {
+  const clouds = Number(percent) || 0
+  if (clouds < 30) return "few_clouds"
+  if (clouds < 60) return "partly_cloudy"
+  return "mostly_cloudy"
+}
+
+export const amountCat = (mm: number): AmountCat => {
+  const r = rainfallCategory(mm)
+  if (r === "no_rain" || r === "trace") return "dry"
+  if (r === "light_rain") return "light"
+  if (r === "moderate_rain") return "moderate"
+  return "heavy"
+}
 
 /** OpenWeatherMap (metric) reports wind in m/s. */
 export const msToKmh = (ms: number | null | undefined) => Math.round((ms ?? 0) * 3.6)
@@ -63,6 +96,14 @@ export function conditionOf(main?: string | null, description?: string | null): 
 export const RAIN_FILL: Record<AmountCat, string> = {
   dry: "#eef1f3", light: "#c9def3", moderate: "#7fb0e2", heavy: "#2f6cbc",
 }
+export const RAIN_CAT_FILL: Record<RainCat, string> = {
+  no_rain: "#eef1f3",
+  trace: "#e4eef6",
+  light_rain: "#c9def3",
+  moderate_rain: "#7fb0e2",
+  heavy_rain: "#2f6cbc",
+  very_heavy: "#163a6e",
+}
 export const NO_DATA_FILL = "#d9dee2"
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t
@@ -95,12 +136,20 @@ export type SectorDay = {
   tempMin?: number
   tempMax?: number
   rainfall: number
+  rainAmount?: number
+  rain?: number
+  rainCategory?: string | null
   rainChance: number
   humidity?: number
   windSpeed?: number
   condition?: string
   conditionMain?: string
   icon?: string | null
+  overview?: string | null
+  farmingRecommendation?: string | null
+  farmingAdvice?: string | null
+  soilCondition?: string | null
+  rainPrediction?: { willRain?: boolean; timing?: string; confidence?: string } | null
 }
 
 export type SectorWeather = {
@@ -117,6 +166,11 @@ export type SectorWeather = {
   windSpeed: number | null
   condition: string
   conditionMain?: string
+  overview?: string | null
+  farmingRecommendation?: string | null
+  farmingAdvice?: string | null
+  soilCondition?: string | null
+  rainPrediction?: { willRain?: boolean; timing?: string; confidence?: string } | null
   days: SectorDay[]
   error?: boolean
 }
@@ -129,12 +183,37 @@ type SectorWeatherResponse = {
   data: SectorWeather[]
 }
 
+function asSectorList(res: unknown): SectorWeather[] {
+  const body = res as Record<string, unknown> | unknown[] | null
+  const nested = body && !Array.isArray(body) ? (body as Record<string, unknown>).data : undefined
+  const raw = Array.isArray(body)
+    ? body
+    : Array.isArray(nested)
+      ? nested
+      : Array.isArray((nested as { sectors?: unknown } | undefined)?.sectors)
+        ? (nested as { sectors: SectorWeather[] }).sectors
+        : Array.isArray((body as { sectors?: unknown } | null)?.sectors)
+          ? (body as { sectors: SectorWeather[] }).sectors
+          : []
+  return raw.map((row) => {
+    const s = row as SectorWeather & { name?: string; locationName?: string }
+    const name = String(s.sector || s.name || s.locationName || "").trim()
+    const match = SECTORS.find((x) => x.toLowerCase() === name.toLowerCase())
+    return { ...s, sector: match || name }
+  })
+}
+
 export function useSectorWeather() {
   return useQuery({
     queryKey: ["weather-sectors"],
     queryFn: async () => {
       const res = await api.get<SectorWeatherResponse>("/api/weather/sectors")
-      return { sectors: res.data ?? [], generatedAt: res.generatedAt }
+      const body = res as SectorWeatherResponse & { generatedAt?: string }
+      const inner = (body as unknown as { data?: { generatedAt?: string } }).data
+      return {
+        sectors: asSectorList(res),
+        generatedAt: body.generatedAt || inner?.generatedAt,
+      }
     },
     staleTime: 30 * 60 * 1000,
     retry: 1,
@@ -149,7 +228,8 @@ export type Day = {
   condition: Condition
   tempMin: number
   tempMax: number
-  rainfall: number
+  rainfall: number | null
+  rainCategory?: RainCat | null
   rainChance: number
   humidity: number | null
   windKmh: number
@@ -158,24 +238,79 @@ export type Day = {
 export const isoDay = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
 
+const RAIN_CATS: RainCat[] = ["no_rain", "trace", "light_rain", "moderate_rain", "heavy_rain", "very_heavy"]
+
+export function asRainCat(value?: string | null): RainCat | undefined {
+  const k = String(value || "").trim().toLowerCase().replace(/[\s-]+/g, "_")
+  return (RAIN_CATS as string[]).includes(k) ? (k as RainCat) : undefined
+}
+
+/** Millimetres as sent on this API day. Null if that day has no rain field. */
+export function rainMmFromApi(d: { rainfall?: number | null; rainAmount?: number | null; rain?: number | null } | undefined) {
+  if (!d) return null
+  const hasOwn =
+    Object.prototype.hasOwnProperty.call(d, "rainfall") ||
+    Object.prototype.hasOwnProperty.call(d, "rainAmount") ||
+    Object.prototype.hasOwnProperty.call(d, "rain")
+  if (!hasOwn) return null
+  const v = d.rainfall ?? d.rainAmount ?? d.rain
+  if (v == null || v === "") return null
+  const n = Number(v)
+  return Number.isFinite(n) ? n : null
+}
+
+export function rainCatFromApi(
+  d: { rainCategory?: string | null; rainfall?: number | null; rainAmount?: number | null; rain?: number | null } | undefined,
+) {
+  return asRainCat(d?.rainCategory) ?? rainfallCategory(rainMmFromApi(d) ?? 0)
+}
+
+function dayDate(d: { dt?: number | string; date?: string }, fallback = new Date()) {
+  if (d?.date) {
+    const parsed = new Date(d.date)
+    if (!Number.isNaN(parsed.getTime())) return parsed
+  }
+  const n = Number(d?.dt)
+  if (Number.isFinite(n) && n > 0) return new Date(n > 1e12 ? n : n * 1000)
+  return fallback
+}
+
+function toDay(index: number, d: SectorDay, sw: SectorWeather): Day {
+  const date = dayDate(d)
+  const tDay = d.tempDay ?? sw.temp ?? 0
+  return {
+    index,
+    date,
+    iso: isoDay(date),
+    condition: conditionOf(d.conditionMain || sw.conditionMain, d.condition || sw.condition),
+    tempMin: Math.round(d.tempMin ?? sw.tempMin ?? tDay ?? 0),
+    tempMax: Math.round(d.tempMax ?? sw.tempMax ?? tDay ?? 0),
+    rainfall: rainMmFromApi(d),
+    rainCategory: asRainCat(d.rainCategory),
+    rainChance: Math.round(d.rainChance ?? sw.rainChance ?? 0),
+    humidity: d.humidity ?? sw.humidity ?? null,
+    windKmh: msToKmh(d.windSpeed ?? sw.windSpeed),
+  }
+}
+
 export function sectorDays(sw: SectorWeather | undefined): Day[] {
-  if (!sw || sw.error || !sw.days?.length) return []
-  return sw.days.map((d, index) => {
-    const date = new Date(d.dt * 1000)
-    const tDay = d.tempDay ?? sw.temp ?? 0
-    return {
-      index,
-      date,
-      iso: isoDay(date),
-      condition: conditionOf(d.conditionMain, d.condition),
-      tempMin: Math.round(d.tempMin ?? tDay),
-      tempMax: Math.round(d.tempMax ?? tDay),
-      rainfall: Math.round((d.rainfall ?? 0) * 10) / 10,
-      rainChance: Math.round(d.rainChance ?? 0),
-      humidity: d.humidity ?? null,
-      windKmh: msToKmh(d.windSpeed),
-    }
-  })
+  if (!sw || sw.error) return []
+  if (sw.days?.length) return sw.days.map((d, index) => toDay(index, d, sw))
+  // Some `/sectors` payloads only send today's totals on the sector (no `days[]`).
+  if (sw.rainfall != null || sw.temp != null || sw.tempMax != null || sw.tempMin != null) {
+    return [toDay(0, {
+      dt: Math.floor(Date.now() / 1000),
+      tempMin: sw.tempMin ?? undefined,
+      tempMax: sw.tempMax ?? undefined,
+      rainfall: sw.rainfall as number,
+      rainChance: sw.rainChance ?? 0,
+      humidity: sw.humidity ?? undefined,
+      windSpeed: sw.windSpeed ?? undefined,
+      condition: sw.condition,
+      conditionMain: sw.conditionMain,
+    }, sw)]
+  }
+  return []
 }
 
 // ---------------------------------------------------------------------------

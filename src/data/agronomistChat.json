@@ -1,0 +1,104 @@
+{
+  "topics": [
+    {
+      "id": "today",
+      "kind": "today",
+      "chip": true,
+      "label": { "en": "How's today's rain?", "rw": "Imvura y'uyu munsi iri gute?" },
+      "keywords": {
+        "en": ["today", "today's rain", "rain today", "current weather", "now", "this morning", "this afternoon"],
+        "rw": ["uyu munsi", "uyu mukino", "imvura yuyu", "ikirere kiriho", "ubu", "mu gitondo"]
+      }
+    },
+    {
+      "id": "week",
+      "kind": "week",
+      "chip": true,
+      "label": { "en": "How is rain this week?", "rw": "Imvura y'iki cyumweru iri gute?" },
+      "keywords": {
+        "en": ["this week", "coming days", "forecast", "next days", "weekly", "will it rain"],
+        "rw": ["iki cyumweru", "iminsi iri imbere", "iteganyagihe", "izagwa", "imvura izagwa"]
+      }
+    },
+    {
+      "id": "spray",
+      "kind": "spray",
+      "chip": true,
+      "label": { "en": "What field work is recommended today?", "rw": "Ni ibihe bikorwa by'umurima byemewe uyu munsi?" },
+      "keywords": {
+        "en": ["spray", "spraying", "pesticide", "herbicide", "field work", "weeding", "top dress", "top-dress", "fertiliser", "fertilizer"],
+        "rw": ["gufuka", "imiti", "umurima", "kurandura", "ifumbire", "gukora mu murima"]
+      }
+    },
+    {
+      "id": "heavy",
+      "kind": "heavy",
+      "label": { "en": "Heavy rain risk", "rw": "Imvura nyinshi" },
+      "keywords": {
+        "en": ["heavy", "flood", "flooding", "downpour", "very heavy", "wash", "erosion", "landslide"],
+        "rw": ["nyinshi", "imvura nyinshi", "umwuzure", "isuri", "inkangu", "gukurura"]
+      }
+    },
+    {
+      "id": "rain-words",
+      "kind": "static",
+      "label": { "en": "Rain labels", "rw": "Amagambo y'imvura" },
+      "keywords": {
+        "en": ["rain words", "light rain", "moderate rain", "trace", "no rain", "category", "millimetre", "mm", "bands", "wording"],
+        "rw": ["amagambo", "imvura nke", "iringaniye", "akayira", "ntamvura", "milimetero", "ibyiciro"]
+      },
+      "answer": {
+        "en": "Millimetres come from OpenWeatherMap.\n\nWe then label 24-hour rain like this:\n• 0 mm — No rain (Ntamvura)\n• above 0 and under 1 mm — Trace (Akayira)\n• 1 to under 5 mm — Light rain (Imvura nke)\n• 5 to under 20 mm — Moderate rain (Imvura iringaniye)\n• 20 to 50 mm — Heavy rain (Imvura nyinshi)\n• above 50 mm — Very heavy rain (Imvura nyinshi cyane)\n\nWe do not pull a live Meteo Rwanda data feed.",
+        "rw": "Milimetero zikoma ku OpenWeatherMap.\n\nHanyuma dushyiraho amagambo y'imvura y'amasaha 24:\n• mm 0 — Ntamvura\n• hejuru ya 0 munsi ya 1 — Akayira\n• mm 1 kugeza munsi ya 5 — Imvura nke\n• mm 5 kugeza munsi ya 20 — Imvura iringaniye\n• mm 20 kugeza 50 — Imvura nyinshi\n• hejuru ya mm 50 — Imvura nyinshi cyane\n\nNtiturafata amakuru y'ikirere aturuka kuri Meteo Rwanda."
+      }
+    },
+    {
+      "id": "seasons",
+      "kind": "seasons",
+      "label": { "en": "Planting seasons", "rw": "Ibihembwe byo gutera" },
+      "keywords": {
+        "en": ["season", "this season", "what season", "which season", "season a", "season b", "season c", "planting", "plant", "calendar", "sow", "maize", "beans", "potato"],
+        "rw": ["igihembwe", "iki gihembwe", "igihe", "gutera", "ibigori", "ibishyimbo", "ibirayi", "kalendari", "umuhindo", "itumba"]
+      }
+    },
+    {
+      "id": "scales",
+      "kind": "static",
+      "label": { "en": "Forecast time scales", "rw": "Igihe cy'iteganyagihe" },
+      "keywords": {
+        "en": ["nowcast", "short range", "medium range", "monthly", "seasonal forecast", "time scale", "outlook", "10 days", "30 days"],
+        "rw": ["ako kanya", "igufi", "iringaniye", "ukwezi", "igihembwe", "iteganyagihe rirerire"]
+      },
+      "answer": {
+        "en": "The days list on Forecasts is the OpenWeatherMap short-range forecast (about 3–8 days, more if the subscription allows).\n\nTypical forecast ranges:\n• Nowcasting — minutes to about 2 hours\n• Short-range — 3 hours to 3 days\n• Medium-range — 3 days to under 10 days\n• Longer outlooks — 10–30 days, monthly, or seasonal\n\nThat list is not a seasonal bulletin.",
+        "rw": "Urutonde rw'iminsi kuri Iteganyagihe ni iteganyagihe rigufi rya OpenWeatherMap (iminsi 3–8, cyangwa irenzeho niba subscription yemera).\n\nIgihe gisanzwe:\n• Ako kanya — iminota kugeza hafi amasaha 2\n• Rigufi — amasaha 3 kugeza iminsi 3\n• Riringaniye — iminsi 3 kugeza munsi y'iminsi 10\n• Iriendeire — iminsi 10–30, ukwezi, cyangwa igihembwe\n\nUrwo rutonde si iteganyagihe ry'igihembwe."
+      }
+    },
+    {
+      "id": "sources",
+      "kind": "static",
+      "label": { "en": "Where data come from", "rw": "Aho amakuru akomoka" },
+      "keywords": {
+        "en": ["source", "openweather", "meteo", "who", "data from", "come from", "this data", "where did", "from where", "numbers", "bulletin"],
+        "rw": ["inkomoko", "amakuru", "ahejeje", "akomoka", "meteo", "openweather", "imibare"]
+      },
+      "answer": {
+        "en": "Live weather (rain millimetres, chance of rain, temperature, humidity, wind, clouds) comes from OpenWeatherMap, through our backend.\n\nThis app does not fetch a Meteo Rwanda API. Short rain labels (light, moderate, heavy) are only names we put on those OpenWeather millimetres.",
+        "rw": "Ikirere kiriho (milimetero z'imvura, amahirwe y'imvura, ubushyuhe, ubuhehere, umuyaga, ibicu) gikoma ku OpenWeatherMap, binyuze ku backend yacu.\n\nIyi porogaramu ntiifata API ya Meteo Rwanda. Amagambo magufi (imvura nke, iringaniye, nyinshi) ni amazina dushyira kuri izo milimetero za OpenWeather."
+      }
+    },
+    {
+      "id": "soil",
+      "kind": "static",
+      "label": { "en": "Soil moisture", "rw": "Ubuhehere bw'ubutaka" },
+      "keywords": {
+        "en": ["soil", "moisture", "wet soil", "dry soil", "mud", "suitability"],
+        "rw": ["ubutaka", "ubuhehere", "ubutaka bworoshye", "ubutaka bwumye", "isesengura"]
+      },
+      "answer": {
+        "en": "Say soil moisture only when you have a field check or a validated estimate — not from the sky forecast alone. Use the Soil suitability page for crop suitability maps in Musanze. After heavy rain, wait for the surface to firm before spraying or walking wet fields.",
+        "rw": "Vuga ubuhehere bw'ubutaka gusa iyo wagenzuye umurima cyangwa ufite ikigereranyo cyemewe — ntukivane ku kirere gusa. Koresha Isesengura ry'Ubutaka ku ikarita y'ibihingwa i Musanze. Nyuma y'imvura nyinshi, tegereza ubutaka gukomera mbere yo gufuka cyangwa kugenda mu mirima."
+      }
+    }
+  ]
+}

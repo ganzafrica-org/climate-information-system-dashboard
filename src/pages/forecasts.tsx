@@ -16,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton"
 import type { FeatureCollection } from "@/lib/soil"
 import type { DailyWeather, HourlyForecast, WeatherAlert } from "@/types/weather"
 import {
-  SECTORS, NO_DATA_FILL, conditionOf, rainRamp, sectorDays, tempRamp, useLocationWeather, useSectorWeather, warmRamp, type Day,
+  SECTORS, NO_DATA_FILL, RAIN_CAT_FILL, asRainCat, conditionOf, rainCatFromApi, rainfallCategory, sectorDays, tempRamp, useLocationWeather, useSectorWeather, warmRamp, type Day, type RainCat,
 } from "@/lib/weather"
 import { dayMonth, downloadCsv, escapeHtml, useWx, weekday } from "@/lib/weatherFormat"
 
@@ -29,7 +29,7 @@ function useGeo(file: string) {
   return useQuery({
     queryKey: ["soil-geo", file],
     queryFn: async () => {
-      const res = await fetch(`/suitability-vs-susceptability/${file}`)
+      const res = await fetch(`/suitability-vs-susceptability/${encodeURIComponent(file)}`)
       if (!res.ok) throw new Error(`Failed to load ${file}`)
       return (await res.json()) as FeatureCollection
     },
@@ -38,7 +38,7 @@ function useGeo(file: string) {
 }
 
 const DEFAULT_SECTOR = "Musanze"
-const LIST_DAYS = 8
+const LIST_PREVIEW = 6
 const ALERT_CATEGORIES = ["rainfall", "flooding", "temperature"]
 
 const kigaliHour = (dt: number) =>
@@ -55,8 +55,8 @@ const Forecasts: NextPage = () => {
   const [sector, setSectorState] = useState(DEFAULT_SECTOR)
   const [dayState, setDayIdx] = useState(0)
   const [metric, setMetric] = useState<"rain" | "temp">("rain")
-  const [allDays, setAllDays] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [allDays, setAllDays] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [shareOpen, setShareOpen] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -97,9 +97,12 @@ const Forecasts: NextPage = () => {
   const loc = locQ.data
   const utcIso = (dt: Date) => dt.toISOString().slice(0, 10)
   const locDay: DailyWeather | undefined = d
-    ? loc?.weather?.daily?.find((x) => x.date === utcIso(d.date)) ?? (isToday ? loc?.weather?.daily?.[0] : undefined)
+    ? loc?.weather?.daily?.find((x) => x.date === utcIso(d.date) || x.date === d.iso) ?? (isToday ? loc?.weather?.daily?.[0] : undefined)
     : undefined
-  const hourly = useMemo<HourlyForecast[]>(() => loc?.weather?.daily?.find((x) => x.hourly?.length)?.hourly ?? [], [loc])
+  const sectorDay = sw?.days?.[dayIdx]
+  const overview = locDay?.overview || (isToday ? sw?.overview : sectorDay?.overview) || ""
+  const advice = locDay?.farmingRecommendation || (isToday ? sw?.farmingAdvice || sw?.farmingRecommendation : sectorDay?.farmingAdvice || sectorDay?.farmingRecommendation) || ""
+  const hourly = useMemo<HourlyForecast[]>(() => loc?.weather?.daily?.find((x) => x.hourly?.length)?.hourly ?? (sw as { hourly?: HourlyForecast[] } | undefined)?.hourly ?? [], [loc, sw])
 
   const isLoading = weatherQ.isLoading
   const isDown = weatherQ.isError
@@ -108,14 +111,29 @@ const Forecasts: NextPage = () => {
   // ---- text helpers ----
   const dayName = (x: Day) => (x.index === 0 ? w("today") : x.index === 1 ? w("tomorrow") : weekday(x.date, lang))
   const longDate = (x: Day) => `${weekday(x.date, lang, true)}, ${dayMonth(x.date, lang, { long: true })}`
-  const rainText = (x: Day) => `${x.rainfall} mm`
+  const formatBackendMm = (mm: number) => {
+    if (Number.isInteger(mm)) return String(mm)
+    return String(parseFloat(mm.toPrecision(12)))
+  }
+  const rainCatOf = (x: Day) =>
+    asRainCat(x.rainCategory) ?? (x.rainfall != null ? rainfallCategory(x.rainfall) : undefined)
+  const rainText = (x: Day) => {
+    const cat = rainCatOf(x)
+    return cat ? w(`rainCat.${cat}`) : ""
+  }
+  const rainWithMm = (x: Day) => {
+    const mm = x.rainfall
+    const word = rainText(x)
+    if (mm == null) return word || "–"
+    return word ? `${formatBackendMm(mm)} mm (${word})` : `${formatBackendMm(mm)} mm`
+  }
   const condLabel = (x: Day) => w(`cond.${x.condition}`)
 
   // ---- coming days ----
   const tMin = days.length ? Math.min(...days.map((x) => x.tempMin)) : 0
   const tMax = days.length ? Math.max(...days.map((x) => x.tempMax)) : 1
   const span = Math.max(1, tMax - tMin)
-  const shownDays = allDays ? days : days.slice(0, LIST_DAYS)
+  const shownDays = allDays ? days : days.slice(0, LIST_PREVIEW)
 
   // ---- sector map ----
   const isRain = metric === "rain"
@@ -126,34 +144,32 @@ const Forecasts: NextPage = () => {
   const withData = sectorRows.filter((r): r is { s: (typeof SECTORS)[number]; x: Day } => !!r.x)
   const sMin = withData.length ? Math.min(...withData.map((r) => r.x.tempMax)) : 0
   const sMax = withData.length ? Math.max(...withData.map((r) => r.x.tempMax)) : 1
-  const rMin = withData.length ? Math.min(...withData.map((r) => r.x.rainfall)) : 0
-  const rMax = withData.length ? Math.max(...withData.map((r) => r.x.rainfall)) : 1
   const tT = (x: Day) => (x.tempMax - sMin) / Math.max(1, sMax - sMin)
-  const rT = (x: Day) => (x.rainfall - rMin) / Math.max(0.1, rMax - rMin)
   const { mapFills, mapLabels } = useMemo(() => {
     const fills: Record<string, string> = {}
     const labels: Record<string, string> = {}
     sectorRows.forEach(({ s, x }) => {
       if (!x) { fills[s] = NO_DATA_FILL; labels[s] = "–"; return }
-      fills[s] = isRain ? rainRamp(rT(x)) : tempRamp(tT(x))
-      labels[s] = isRain ? `${x.rainfall} mm` : `${x.tempMax}°`
+      fills[s] = isRain ? RAIN_CAT_FILL[rainCatFromApi(x)] : tempRamp(tT(x))
+      labels[s] = isRain ? w(`rainCat.${rainCatFromApi(x)}`) : `${x.tempMax}°`
     })
     return { mapFills: fills, mapLabels: labels }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sectorRows, isRain, sMin, sMax, rMin, rMax])
-  const ranked = [...withData].sort((a, b) => (isRain ? b.x.rainfall - a.x.rainfall : b.x.tempMax - a.x.tempMax))
+  }, [sectorRows, isRain, sMin, sMax, lang])
+  const ranked = [...withData].sort((a, b) => (isRain ? (b.x.rainfall ?? 0) - (a.x.rainfall ?? 0) : b.x.tempMax - a.x.tempMax))
   const whenWord = d ? (dayIdx <= 1 ? dayName(d).toLowerCase() : weekday(d.date, lang, true)) : ""
   const rankSentence = ranked.length
     ? (() => {
-        const top3 = ranked.slice(0, 3).map(({ s, x }) => (isRain ? `${s} ${x.rainfall} mm` : `${s} ${x.tempMax}°`)).join(", ")
+        const top3 = ranked.slice(0, 3).map(({ s, x }) => (isRain ? `${s} ${w(`rainCat.${rainCatFromApi(x)}`)}` : `${s} ${x.tempMax}°`)).join(", ")
         const last = ranked[ranked.length - 1]
         return isRain
-          ? w("wettest", { when: whenWord, list: top3, last: `${last.s} ${last.x.rainfall} mm` })
+          ? w("wettest", { when: whenWord, list: top3, last: `${last.s} ${w(`rainCat.${rainCatFromApi(last.x)}`)}` })
           : w("warmest", { when: whenWord, list: top3, last: `${last.s} ${last.x.tempMax}°` })
       })()
     : ""
+  const rainCats: RainCat[] = ["no_rain", "trace", "light_rain", "moderate_rain", "heavy_rain", "very_heavy"]
   const legend = isRain
-    ? [{ color: rainRamp(0), label: `${w("drier")} ${rMin} mm` }, { color: rainRamp(1), label: `${w("wetter")} ${rMax} mm` }]
+    ? rainCats.map((k) => ({ color: RAIN_CAT_FILL[k], label: w(`rainCat.${k}`) }))
     : [{ color: tempRamp(0), label: `${w("cooler")} ${sMin}°` }, { color: tempRamp(1), label: `${w("warmer")} ${sMax}°` }]
 
   const popupHtml = useCallback(
@@ -185,9 +201,8 @@ const Forecasts: NextPage = () => {
   })
 
   // ---- SMS (backend values only) ----
-  const advice = locDay?.farmingRecommendation || ""
   const smsText = d
-    ? [sector, `${dayName(d).toLowerCase()}: ${d.tempMin}–${d.tempMax}°C`, `${d.rainfall} mm`, locDay?.overview, advice]
+    ? [sector, `${dayName(d).toLowerCase()}: ${d.tempMin}–${d.tempMax}°C`, w("rainChanceLine", { rain: rainText(d), p: d.rainChance }), overview, advice]
         .filter(Boolean)
         .join(". ")
         .replace(/\.\s*\./g, ".")
@@ -212,7 +227,7 @@ const Forecasts: NextPage = () => {
   return (
     <AppLayout>
       <Head><title>{`${w("fcTitle")} | Teganyamuhinzi`}</title></Head>
-      <div className="max-w-[1280px] space-y-4 p-3 text-sm text-[#171717] md:p-6">
+      <div className="w-full max-w-[1600px] space-y-4 p-3 text-sm text-[#171717] md:p-6">
         {banners.map((b) => (
           <div key={b.key} role="alert" className="flex flex-wrap items-start gap-x-3.5 gap-y-3 rounded-xl border border-[#fbc98e] bg-[#fff7ed] px-4 py-3.5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fde3c3] text-[#b45309]"><TriangleAlert className="h-5 w-5" /></div>
@@ -304,11 +319,11 @@ const Forecasts: NextPage = () => {
         {noData && <StateCard icon={CloudAlert} title={w("noFcTitle", { s: sector })} text={w("noFcText")} />}
 
         {!isLoading && !isDown && (
-          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(640px,7.5fr)_minmax(0,6fr)] xl:items-stretch">
             {d && (
               <>
                 {/* Hero */}
-                <section className="order-2 flex min-w-0 flex-col gap-[18px] rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
+                <section className="order-2 flex h-full min-w-0 flex-col gap-[18px] rounded-2xl border border-gray-200 bg-white px-4 py-[18px] md:px-6 md:py-[22px]">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <div className="text-base font-semibold text-slate-900">
                       {sector} <span className="font-medium text-slate-500">· {isToday ? `${w("today")}, ${dayMonth(d.date, lang, { long: true })}` : longDate(d)}</span>
@@ -328,18 +343,18 @@ const Forecasts: NextPage = () => {
                     </div>
                     <div className="min-w-0 flex-[1_1_240px]">
                       <div className="flex flex-wrap gap-2">
-                        <HeroChips d={d} />
+                        <HeroChips d={d} rainLabel={rainWithMm(d)} />
                       </div>
                     </div>
                   </div>
 
                   {locQ.isLoading ? (
                     <div className="space-y-2"><Skeleton className="h-4 w-full" /><Skeleton className="h-4 w-4/5" /></div>
-                  ) : locDay?.overview ? (
-                    <p className="text-[15px] leading-relaxed text-slate-700">{locDay.overview}</p>
+                  ) : overview ? (
+                    <p className="text-[15px] leading-relaxed text-slate-700">{overview}</p>
                   ) : null}
 
-                  {(locQ.isLoading || locQ.isError || advice || locDay?.soilCondition || locDay?.rainPrediction?.confidence) && (
+                  {(locQ.isLoading || locQ.isError || advice) && (
                   <div className="flex gap-3.5 rounded-xl border border-[#d5e8e8] bg-[#eef6f6] px-[18px] py-4">
                     <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#147677] text-white"><Sprout className="h-[19px] w-[19px]" /></div>
                     <div className="min-w-0 flex-1">
@@ -349,15 +364,7 @@ const Forecasts: NextPage = () => {
                       ) : advice ? (
                         <p className="mt-1 text-[15px] leading-[1.55] text-[#12393a]">{advice}</p>
                       ) : null}
-                      {locDay && (
-                        <div className="mt-2.5 flex flex-wrap gap-x-[18px] gap-y-1.5 text-sm text-[#3f6667]">
-                          {locDay.soilCondition && <span>{w("soil")}: <b className="font-semibold text-[#12393a]">{locDay.soilCondition}</b></span>}
-                          {locDay.rainPrediction?.confidence && (
-                            <span>{w("confidence")}: <b className="font-semibold text-[#12393a]">{locDay.rainPrediction.confidence}</b></span>
-                          )}
-                        </div>
-                      )}
-                      {locQ.isError && <p className="mt-2 text-[13px] text-[#3f6667]">{w("detailUnavailable")}</p>}
+                      {locQ.isError && !overview && !advice && <p className="mt-2 text-[13px] text-[#3f6667]">{w("detailUnavailable")}</p>}
                     </div>
                   </div>
                   )}
@@ -376,12 +383,12 @@ const Forecasts: NextPage = () => {
                 </section>
 
                 {/* Coming days */}
-                <section className="order-1 min-w-0 rounded-2xl border border-gray-200 bg-white px-2 pb-2.5 pt-[18px] md:px-3.5">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 px-1">
+                <section className="order-1 flex h-full min-h-0 min-w-0 flex-col rounded-2xl border border-gray-200 bg-white px-2 pb-2.5 pt-[18px] md:px-4">
+                  <div className="flex shrink-0 flex-wrap items-baseline justify-between gap-x-2 gap-y-1 px-1">
                     <h2 className="text-[17px] font-bold text-slate-900">{w("nextDays", { n: nDays })}</h2>
                     <span className="text-sm text-slate-500">{w("clickDay")}</span>
                   </div>
-                  <div className="mt-2 flex flex-col">
+                  <div className={`mt-2 flex min-h-0 flex-1 flex-col overflow-x-auto pr-0.5 ${allDays ? "overflow-y-auto" : ""}`}>
                     {shownDays.map((x) => {
                       const sel = x.index === dayIdx
                       return (
@@ -389,7 +396,7 @@ const Forecasts: NextPage = () => {
                           key={x.iso}
                           onClick={() => setDayIdx(x.index)}
                           aria-pressed={sel}
-                          className={`grid items-center gap-2.5 rounded-[10px] border-t px-2.5 py-2 text-left text-slate-900 ${sel ? "bg-[#eef6f6] shadow-[inset_0_0_0_1.5px_#147677]" : "hover:bg-slate-50"} ${x.index === 0 || sel || x.index === dayIdx + 1 ? "border-transparent" : "border-slate-100"} ${lang === "rw" ? "grid-cols-[96px_40px_minmax(0,1fr)_26px_minmax(36px,0.8fr)_28px] md:grid-cols-[116px_44px_minmax(84px,1fr)_30px_minmax(60px,1.1fr)_30px]" : "grid-cols-[84px_40px_minmax(0,1fr)_26px_minmax(36px,0.8fr)_28px] md:grid-cols-[84px_44px_minmax(84px,1fr)_30px_minmax(60px,1.1fr)_30px]"}`}
+                          className={`grid min-w-[560px] items-center gap-3 rounded-[10px] border-t px-2.5 py-2 text-left text-slate-900 ${allDays ? "" : "flex-1"} ${sel ? "bg-[#eef6f6] shadow-[inset_0_0_0_1.5px_#147677]" : "hover:bg-slate-50"} ${x.index === 0 || sel || x.index === dayIdx + 1 ? "border-transparent" : "border-slate-100"} ${lang === "rw" ? "grid-cols-[108px_40px_minmax(220px,1.9fr)_24px_minmax(48px,0.7fr)_32px] md:grid-cols-[124px_44px_minmax(240px,2fr)_28px_minmax(56px,0.75fr)_36px]" : "grid-cols-[80px_40px_minmax(220px,1.9fr)_24px_minmax(48px,0.7fr)_32px] md:grid-cols-[88px_44px_minmax(240px,2fr)_28px_minmax(56px,0.75fr)_36px]"}`}
                         >
                           <span className="flex min-w-0 flex-col leading-tight">
                             <span className="text-[15px] font-semibold">{dayName(x)}</span>
@@ -399,7 +406,7 @@ const Forecasts: NextPage = () => {
                             <ConditionIcon cond={x.condition} size={24} />
                             <span className="min-h-[14px] text-xs font-bold text-[#2563a8]">{x.rainChance}%</span>
                           </span>
-                          <span className="min-w-0 whitespace-nowrap text-sm font-medium text-[#1d4f8a]">{rainText(x)}</span>
+                          <span className="whitespace-nowrap text-sm font-medium text-[#1d4f8a]">{rainWithMm(x)}</span>
                           <span className="text-right text-[15px] tabular-nums text-slate-500">{x.tempMin}°</span>
                           <span className="relative h-1.5 rounded-[3px] bg-[#eef1f3]">
                             <span
@@ -416,11 +423,18 @@ const Forecasts: NextPage = () => {
                       )
                     })}
                   </div>
-                  {nDays > LIST_DAYS && (
-                    <button onClick={() => setAllDays((a) => !a)} className="mt-1 w-full border-t border-slate-100 p-2.5 text-sm font-semibold text-[#147677]">
-                      {allDays ? w("showFewer") : w("showAll", { n: nDays })}
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (allDays && dayIdx >= LIST_PREVIEW) setDayIdx(0)
+                      setAllDays((open) => !open)
+                    }}
+                    aria-expanded={allDays}
+                    className="mt-auto flex w-full shrink-0 items-center justify-center gap-1.5 border-t border-slate-100 px-2.5 py-2.5 text-sm font-semibold text-[#147677] hover:underline"
+                  >
+                    {allDays ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                    {allDays ? w("showFewer") : w("viewMoreDays")}
+                  </button>
                 </section>
 
                 {/* Next 24 hours */}
@@ -456,12 +470,14 @@ const Forecasts: NextPage = () => {
                 </div>
               </div>
               {rankSentence && <p className="mb-3 mt-1.5 text-[15px] leading-normal text-slate-700">{rankSentence}</p>}
-              <div className="relative isolate h-[300px] overflow-hidden rounded-[10px] md:h-[380px]">
+              <div className="relative z-0 h-[300px] overflow-hidden rounded-[10px] md:h-[380px]">
                 {sectorsGeo.isError ? (
                   <div className="flex h-full items-center justify-center bg-[#e9eef2] p-4 text-center text-sm text-slate-500">{w("mapUnavailable")}</div>
+                ) : !sectorsGeo.data?.features?.length ? (
+                  <div className="h-full w-full animate-pulse bg-[#e9eef2]" />
                 ) : (
                   <WeatherMap
-                    sectors={sectorsGeo.data ?? null}
+                    sectors={sectorsGeo.data}
                     district={districtGeo.data ?? null}
                     fills={mapFills}
                     labels={mapLabels}
@@ -489,10 +505,10 @@ const Forecasts: NextPage = () => {
 
 type W = (key: string, params?: Record<string, string | number>) => string
 
-function HeroChips({ d }: { d: Day }) {
+function HeroChips({ d, rainLabel }: { d: Day; rainLabel: string }) {
   const chips: { icon: LucideIcon; text: string }[] = [
     { icon: Umbrella, text: `${d.rainChance}%` },
-    { icon: Droplets, text: `${d.rainfall} mm` },
+    { icon: Droplets, text: rainLabel },
   ]
   return (
     <>
@@ -532,12 +548,12 @@ function HourSlot({ h, w }: { h: HourlyForecast; w: W }) {
 
 function LoadingGrid({ label }: { label: string }) {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]" aria-busy>
-      <div className="order-1 flex flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(640px,7.5fr)_minmax(0,6fr)] xl:items-stretch" aria-busy>
+      <div className="order-1 flex h-full flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5">
         <Skeleton className="h-4 w-1/3" />
-        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+        {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
       </div>
-      <div className="order-2 flex flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="order-2 flex h-full flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-6">
         <Skeleton className="h-4 w-2/5" />
         <div className="flex items-center gap-4"><Skeleton className="h-[76px] w-[76px] rounded-full" /><Skeleton className="h-[52px] w-36" /></div>
         <Skeleton className="h-[22px] w-[85%]" />

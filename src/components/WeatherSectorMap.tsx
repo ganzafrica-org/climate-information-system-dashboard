@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { MapContainer, TileLayer, useMap } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
@@ -30,6 +30,11 @@ type Props = {
 }
 
 export default function WeatherSectorMap(props: Props) {
+  const [ready, setReady] = useState(false)
+  useEffect(() => { setReady(true) }, [])
+  if (!ready || !props.sectors?.features?.length) {
+    return <div className="h-full w-full bg-[#e9eef2]" />
+  }
   return (
     <MapContainer
       center={MUSANZE_CENTER}
@@ -39,6 +44,7 @@ export default function WeatherSectorMap(props: Props) {
       zoomControl={false}
       scrollWheelZoom={false}
       zoomSnap={0.25}
+      whenReady={(e) => { setTimeout(() => e.target.invalidateSize(), 50) }}
       style={{ height: "100%", width: "100%", background: "#e9eef2" }}
     >
       <TileLayer

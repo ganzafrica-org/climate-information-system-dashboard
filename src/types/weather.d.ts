@@ -56,6 +56,9 @@ export interface DailyWeather {
     uvIndex: number;
     rainChance: number;
     rainAmount: number;
+    rainCategory?: string;
+    cloudCategory?: string;
+    clouds?: number;
     windSpeed: number;
     windDirection: string;
     windStrength: string;
