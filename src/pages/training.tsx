@@ -289,7 +289,7 @@ const Training = () => {
                                                 }}>
                                                     {t('reset')}
                                                 </Button>
-                                                <Button type="submit">
+                                                <Button type="submit" variant="primary">
                                                     {t('apply')}
                                                 </Button>
                                             </DialogFooter>

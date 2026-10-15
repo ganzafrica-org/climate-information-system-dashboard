@@ -55,6 +55,8 @@ type LogSummary = {
     sent: number;
     failed: number;
     pending: number;
+    sentYesterday: number;
+    failedYesterday: number;
 };
 
 type StatusFilter = 'all' | 'sent' | 'failed' | 'pending';
@@ -68,6 +70,8 @@ const normalizeSummary = (raw: any, logs: MessageLog[]): LogSummary => {
         sent: Number(raw?.sent ?? raw?.sentCount ?? sentFromLogs) || sentFromLogs,
         failed: Number(raw?.failed ?? raw?.failedCount ?? failedFromLogs) || failedFromLogs,
         pending: Number(raw?.pending ?? pendingFromLogs) || pendingFromLogs,
+        sentYesterday: Number(raw?.sentYesterday ?? raw?.sentToday ?? 0) || 0,
+        failedYesterday: Number(raw?.failedYesterday ?? raw?.failedToday ?? 0) || 0,
     };
 };
 
@@ -84,7 +88,7 @@ export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChang
     const [searchTerm, setSearchTerm] = useState<string>('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [logs, setLogs] = useState<MessageLog[]>([]);
-    const [summary, setSummary] = useState<LogSummary>({ total: 0, sent: 0, failed: 0, pending: 0 });
+    const [summary, setSummary] = useState<LogSummary>({ total: 0, sent: 0, failed: 0, pending: 0, sentYesterday: 0, failedYesterday: 0 });
     const [page, setPage] = useState(1);
     const [selectedLog, setSelectedLog] = useState<MessageLog | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
@@ -138,7 +142,7 @@ export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChang
             console.error('Failed to fetch message logs:', error);
             toast.error(t('failedToLoadLogs'));
             setLogs([]);
-            setSummary({ total: 0, sent: 0, failed: 0, pending: 0 });
+            setSummary({ total: 0, sent: 0, failed: 0, pending: 0, sentYesterday: 0, failedYesterday: 0 });
         } finally {
             setIsLoading(false);
         }
@@ -295,9 +299,18 @@ export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChang
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                <h2 className="text-base font-bold text-slate-900">
-                    {t('listOfLogs')}
-                </h2>
+                <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                        {t('listOfLogs')}
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                        <span className="text-[#147677] font-medium">{t('sentYesterdayCount', { count: summary.sentYesterday })}</span>
+                        <span className="mx-1.5 text-slate-300">·</span>
+                        <span className={summary.failedYesterday > 0 ? 'text-[#F5A623] font-medium' : 'font-medium'}>
+                            {t('failedYesterdayCount', { count: summary.failedYesterday })}
+                        </span>
+                    </p>
+                </div>
 
                 <div className="flex w-full sm:w-auto items-center gap-2">
                     <div className="relative flex-1 sm:flex-none">

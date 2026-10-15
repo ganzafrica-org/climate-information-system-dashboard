@@ -47,6 +47,7 @@ import {
 } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { rainfallCategory } from '@/lib/weather';
+import { locationDisplayName, pickDefaultLocation, sortLocationsDistrictFirst } from '@/lib/assignment';
 
 const SoftCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={cn('bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,40,80,0.06)]', className)}>
@@ -86,14 +87,18 @@ type DashboardStats = {
     totalAlertsCount?: number;
     totalLocationsCount?: number;
     farmersToday?: number;
-    messagesToday?: number;
+    sentYesterday?: number;
+    failedYesterday?: number;
     alertsToday?: number;
     locationsToday?: number;
+    messagesScope?: 'sector' | 'district' | 'all' | null;
+    messagesSectorName?: string | null;
 };
+
 
 const Dashboard: NextPage = () => {
     const { t, locale } = useLanguage();
-    const { user } = useAuth();
+    const { user, isLoading: authLoading } = useAuth();
     const router = useRouter();
     const [locations, setLocations] = useState<Location[]>([]);
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
@@ -110,9 +115,12 @@ const Dashboard: NextPage = () => {
         totalMessagesCount: 0,
         totalAlertsCount: 0,
         farmersToday: 0,
-        messagesToday: 0,
+        sentYesterday: 0,
+        failedYesterday: 0,
         alertsToday: 0,
         locationsToday: 0,
+        messagesScope: null,
+        messagesSectorName: null,
     });
     const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
 
@@ -120,6 +128,19 @@ const Dashboard: NextPage = () => {
         fetchLocations();
         fetchDashboardStats();
     }, []);
+
+    useEffect(() => {
+        if (authLoading || !locations.length) return;
+        const picked = pickDefaultLocation(user, locations);
+        if (!picked) return;
+        setSelectedLocation((current) => {
+            if (!current || current.name === "Musanze") return picked;
+            if (user?.assignmentLevel === "sector" && user.sectorName && current.name !== user.sectorName) {
+                return picked;
+            }
+            return current;
+        });
+    }, [authLoading, user, locations]);
 
     useEffect(() => {
         if (selectedLocation) {
@@ -162,25 +183,12 @@ const Dashboard: NextPage = () => {
         return new Date(Math.max(...times));
     };
 
-    const extractMessageLogs = (raw: any): any[] => {
-        const payload = raw?.data ?? raw;
-        if (Array.isArray(payload?.data?.results)) return payload.data.results;
-        if (Array.isArray(payload?.results)) return payload.results;
-        if (Array.isArray(payload?.data?.logs)) return payload.data.logs;
-        if (Array.isArray(payload?.logs)) return payload.logs;
-        if (Array.isArray(payload?.data)) return payload.data;
-        if (Array.isArray(payload)) return payload;
-        return [];
-    };
-
     const fetchDashboardStats = async () => {
         try {
-            const [farmersRes, alertsListRes, messagesLogsRes, locsRes] = await Promise.all([
+            const [farmersRes, alertsListRes, messagesDashRes, locsRes] = await Promise.all([
                 api.get('/api/admin/farmers').catch((e: any) => e),
                 api.get('/api/weather/alerts', { params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc' } }).catch((e: any) => e),
-                api.get('/api/weather/admin/logs/messages', {
-                    params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc', _ts: Date.now() },
-                }).catch(() => null),
+                api.get('/api/weather/dashboard/messages').catch(() => null),
                 api.get('/api/admin/locations').catch((e: any) => e),
             ]);
 
@@ -229,34 +237,50 @@ const Dashboard: NextPage = () => {
 
             const alertsToday = alertsArray.filter((alert: any) => isToday(alert.sentAt) || isToday(alert.createdAt)).length;
 
-            let messagesTotalFromLogs = 0;
-            let totalMessagesCount = 0;
-            if (messagesLogsRes) {
-                const raw = messagesLogsRes;
-                const payloadRoot = raw?.data ?? raw;
+            let messagesSent = 0;
+            let totalMessages = 0;
+            let sentYesterday = 0;
+            let failedYesterday = 0;
+            let messagesScope: DashboardStats['messagesScope'] = null;
+            let messagesSectorName: string | null = null;
 
-                const summaryNode = payloadRoot?.data?.summary || payloadRoot?.summary || null;
-                const paginationNode = payloadRoot?.data?.pagination || payloadRoot?.pagination || null;
+            const dashNode = messagesDashRes?.data ?? messagesDashRes;
+            const hasDashCounts = dashNode && (
+                dashNode.totalSent != null
+                || dashNode.sentYesterday != null
+                || dashNode.failedYesterday != null
+                || dashNode.sentToday != null
+                || dashNode.failedToday != null
+            );
 
-                messagesTotalFromLogs = (
-                    (typeof summaryNode?.total === 'number' ? summaryNode.total : undefined) ??
-                    (typeof paginationNode?.total === 'number' ? paginationNode.total : undefined) ??
-                    0
-                );
+            if (hasDashCounts) {
+                messagesSent = Number(dashNode.totalSent) || 0;
+                totalMessages = messagesSent;
+                sentYesterday = Number(dashNode.sentYesterday ?? dashNode.sentToday) || 0;
+                failedYesterday = Number(dashNode.failedYesterday ?? dashNode.failedToday) || 0;
+                messagesScope = dashNode.scope === 'sector' || dashNode.scope === 'district' || dashNode.scope === 'all'
+                    ? dashNode.scope
+                    : null;
+                messagesSectorName = dashNode.sectorName || null;
+            } else {
+                const messagesLogsRes = await api.get('/api/weather/admin/logs/messages', {
+                    params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc', _ts: Date.now() },
+                }).catch(() => null);
 
-                totalMessagesCount = (
-                    (typeof paginationNode?.total === 'number' ? paginationNode.total : undefined) ??
-                    (typeof summaryNode?.total === 'number' ? summaryNode.total : undefined) ??
-                    0
-                );
+                if (messagesLogsRes) {
+                    const payloadRoot = messagesLogsRes?.data ?? messagesLogsRes;
+                    const summaryNode = payloadRoot?.data?.summary || payloadRoot?.summary || null;
+                    const paginationNode = payloadRoot?.data?.pagination || payloadRoot?.pagination || null;
+                    messagesSent = (
+                        (typeof summaryNode?.total === 'number' ? summaryNode.total : undefined) ??
+                        (typeof paginationNode?.total === 'number' ? paginationNode.total : undefined) ??
+                        0
+                    );
+                    totalMessages = messagesSent;
+                    sentYesterday = Number(summaryNode?.sentYesterday ?? summaryNode?.sentToday) || 0;
+                    failedYesterday = Number(summaryNode?.failedYesterday ?? summaryNode?.failedToday) || 0;
+                }
             }
-
-            const messagesSent = messagesTotalFromLogs;
-            const totalMessages = totalMessagesCount;
-            const messageLogs = extractMessageLogs(messagesLogsRes);
-            const messagesToday = messageLogs.filter((log: any) =>
-                isToday(log.sentAt) || isToday(log.timestamp) || isToday(log.createdAt)
-            ).length;
 
             const locationsData = locsRes?.data?.data?.locations || locsRes?.data?.locations || locsRes?.locations || [];
             const activeLocations = Array.isArray(locationsData)
@@ -277,9 +301,12 @@ const Dashboard: NextPage = () => {
                 totalAlertsCount,
                 totalLocationsCount,
                 farmersToday,
-                messagesToday,
+                sentYesterday,
+                failedYesterday,
                 alertsToday,
                 locationsToday,
+                messagesScope,
+                messagesSectorName,
             });
         } catch (error: any) {
             console.error('Failed to fetch dashboard stats:', error);
@@ -293,9 +320,12 @@ const Dashboard: NextPage = () => {
                 totalAlertsCount: 0,
                 totalLocationsCount: locations.length || 0,
                 farmersToday: 0,
-                messagesToday: 0,
+                sentYesterday: 0,
+                failedYesterday: 0,
                 alertsToday: 0,
                 locationsToday: 0,
+                messagesScope: null,
+                messagesSectorName: null,
             });
         }
     };
@@ -305,11 +335,10 @@ const Dashboard: NextPage = () => {
             const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
                 params: { limit: 100 }
             });
-            setLocations(response.data.locations);
-
-            if (response.data.locations.length > 0) {
-                setSelectedLocation(response.data.locations[0]);
-            }
+            const list = sortLocationsDistrictFirst(response.data.locations || []);
+            setLocations(list);
+            const picked = pickDefaultLocation(user, list);
+            if (picked) setSelectedLocation(picked);
         } catch (error: any) {
             console.error('Byanze kubona ahantu:', error);
             toast.error(t('failedToLoadLocations'));
@@ -505,32 +534,43 @@ const Dashboard: NextPage = () => {
         {
             label: t('totalFarmersReached'),
             value: dashboardStats.totalFarmers,
-            caption: t('allTime'),
-            captionTone: 'teal' as const,
+            captions: [{ text: t('allTime'), tone: 'teal' as const, arrow: true }],
             icon: <Users className="h-5 w-5 text-[#7B8CFF]" strokeWidth={2} />,
             iconBg: 'bg-[#E8EEFF]',
         },
         {
             label: t('totalMessagesSent'),
             value: dashboardStats.messagesSent,
-            caption: t('allTime'),
-            captionTone: 'teal' as const,
+            subtitle: dashboardStats.messagesScope === 'sector' ? dashboardStats.messagesSectorName || undefined : undefined,
+            captions: [
+                {
+                    text: t('sentYesterdayCount', { count: (dashboardStats.sentYesterday || 0).toLocaleString() }),
+                    tone: 'teal' as const,
+                    arrow: true,
+                },
+                {
+                    text: t('failedYesterdayCount', { count: (dashboardStats.failedYesterday || 0).toLocaleString() }),
+                    tone: (dashboardStats.failedYesterday || 0) > 0 ? 'orange' as const : 'teal' as const,
+                },
+            ],
             icon: <MessageSquare className="h-5 w-5 text-[#3DCC8A]" strokeWidth={2} />,
             iconBg: 'bg-[#E5F8EE]',
         },
         {
             label: t('activeAlerts'),
             value: dashboardStats.activeAlerts,
-            caption: t('todayCount', { count: (dashboardStats.alertsToday || 0).toLocaleString() }),
-            captionTone: 'orange' as const,
+            captions: [{
+                text: t('todayCount', { count: (dashboardStats.alertsToday || 0).toLocaleString() }),
+                tone: 'orange' as const,
+                arrow: true,
+            }],
             icon: <AlertTriangle className="h-5 w-5 text-[#F5A623]" strokeWidth={2} />,
             iconBg: 'bg-[#FDECDC]',
         },
         {
             label: t('totalActiveLocations'),
             value: dashboardStats.activeLocations,
-            caption: t('inTheSystem'),
-            captionTone: 'teal' as const,
+            captions: [{ text: t('inTheSystem'), tone: 'teal' as const, arrow: true }],
             icon: <MapPin className="h-5 w-5 text-[#C084FC]" strokeWidth={2} />,
             iconBg: 'bg-[#F3E8FF]',
         },
@@ -541,7 +581,7 @@ const Dashboard: NextPage = () => {
             <DropdownMenuTrigger asChild>
                 <button className="inline-flex items-center gap-1 text-sm font-medium text-white/90 hover:text-white">
                     <MapPin className="h-3.5 w-3.5" />
-                    {selectedLocation?.name || t('selectLocation')}
+                    {selectedLocation ? locationDisplayName(selectedLocation) : t('selectLocation')}
                     <ChevronDown className="h-3.5 w-3.5" />
                 </button>
             </DropdownMenuTrigger>
@@ -551,7 +591,7 @@ const Dashboard: NextPage = () => {
                         key={location.id}
                         onClick={() => setSelectedLocation(location)}
                     >
-                        {location.name}
+                        {locationDisplayName(location)}
                     </DropdownMenuItem>
                 ))}
             </DropdownMenuContent>
@@ -602,28 +642,36 @@ const Dashboard: NextPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
                     {stats.map((stat) => (
                         <SoftCard key={stat.label} className="px-5 py-6">
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="min-w-0">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
                                     <p className="text-slate-400 text-xs">{stat.label}</p>
+                                    {stat.subtitle && (
+                                        <p className="text-[11px] text-slate-400 truncate">{stat.subtitle}</p>
+                                    )}
                                     <p className="text-3xl font-bold text-slate-800 tracking-tight">
                                         {stat.value.toLocaleString()}
                                     </p>
-                                    <div className="mt-1.5 text-xs">
-                                        <span
-                                            className={cn(
-                                                'inline-flex items-center gap-0.5 font-medium',
-                                                stat.captionTone === 'orange' ? 'text-[#F5A623]' : 'text-[#147677]'
-                                            )}
-                                        >
-                                            <ArrowUpRight className="h-3.5 w-3.5" />
-                                            {stat.caption}
-                                        </span>
-                                    </div>
                                 </div>
                                 <div className={cn('h-12 w-12 rounded-full flex items-center justify-center shrink-0', stat.iconBg)}>
                                     {stat.icon}
                                 </div>
                             </div>
+                            <p className="mt-1.5 text-xs font-medium text-[#147677] whitespace-nowrap">
+                                {stat.captions[0]?.arrow && (
+                                    <ArrowUpRight className="inline h-3.5 w-3.5 mr-0.5 align-text-bottom" />
+                                )}
+                                {stat.captions.map((caption, index) => (
+                                    <span
+                                        key={caption.text}
+                                        className={cn(
+                                            caption.tone === 'orange' ? 'text-[#F5A623]' : 'text-[#147677]'
+                                        )}
+                                    >
+                                        {index > 0 ? ' · ' : ''}
+                                        {caption.text}
+                                    </span>
+                                ))}
+                            </p>
                         </SoftCard>
                     ))}
                 </div>
@@ -635,7 +683,7 @@ const Dashboard: NextPage = () => {
                                     <h2 className="text-base font-semibold text-slate-800">
                                         {t('weeklyForecast')}
                                     </h2>
-                                    <p className="text-xs text-slate-400">{selectedLocation?.name}</p>
+                                    <p className="text-xs text-slate-400">{selectedLocation ? locationDisplayName(selectedLocation) : ""}</p>
                                 </div>
                                 <div className="hidden sm:flex items-center gap-4 text-xs text-slate-500">
                                     <span className="flex items-center gap-1.5">

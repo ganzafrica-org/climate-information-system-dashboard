@@ -19,6 +19,13 @@ import {
   SECTORS, NO_DATA_FILL, RAIN_CAT_FILL, asRainCat, conditionOf, rainCatFromApi, rainfallCategory, sectorDays, tempRamp, useLocationWeather, useSectorWeather, warmRamp, type Day, type RainCat,
 } from "@/lib/weather"
 import { dayMonth, downloadCsv, escapeHtml, useWx, weekday } from "@/lib/weatherFormat"
+import { useAuth } from "@/hooks/useAuth"
+import {
+  MUSANZE_DISTRICT_LOCATION,
+  WEATHER_PLACES,
+  defaultLocationName,
+  isDistrictLocationName,
+} from "@/lib/assignment"
 
 const WeatherMap = dynamic(() => import("@/components/WeatherSectorMap"), {
   ssr: false,
@@ -37,7 +44,6 @@ function useGeo(file: string) {
   })
 }
 
-const DEFAULT_SECTOR = "Musanze"
 const LIST_PREVIEW = 6
 const ALERT_CATEGORIES = ["rainfall", "flooding", "temperature"]
 
@@ -51,8 +57,9 @@ type Banner = { key: string; title: string; text: string; cta?: { label: string;
 const Forecasts: NextPage = () => {
   const { w, lang, ago } = useWx()
   const router = useRouter()
+  const { user, isLoading: authLoading } = useAuth()
 
-  const [sector, setSectorState] = useState(DEFAULT_SECTOR)
+  const [sector, setSectorState] = useState(MUSANZE_DISTRICT_LOCATION)
   const [dayState, setDayIdx] = useState(0)
   const [metric, setMetric] = useState<"rain" | "temp">("rain")
   const [detailsOpen, setDetailsOpen] = useState(false)
@@ -64,11 +71,16 @@ const Forecasts: NextPage = () => {
 
   // ?sector= keeps the selection shareable and survives reloads
   useEffect(() => {
-    if (!router.isReady) return
+    if (!router.isReady || authLoading) return
     const q = router.query.sector
-    if (typeof q === "string" && (SECTORS as readonly string[]).includes(q)) setSectorState(q)
+    const places = WEATHER_PLACES as readonly string[]
+    if (typeof q === "string" && places.includes(q)) {
+      setSectorState(q)
+      return
+    }
+    setSectorState(defaultLocationName(user))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady])
+  }, [router.isReady, authLoading, user?.assignmentLevel, user?.sectorName])
   const setSector = (s: string) => {
     setSectorState(s)
     setMenuOpen(false)
@@ -86,7 +98,8 @@ const Forecasts: NextPage = () => {
     return m
   }, [all])
   const sw = all.find((s) => s.sector === sector)
-  const days = daysBySector[sector] ?? []
+    ?? (isDistrictLocationName(sector) ? all.find((s) => isDistrictLocationName(s.sector)) : undefined)
+  const days = sw ? sectorDays(sw) : (daysBySector[sector] ?? [])
   const nDays = days.length
   const dayIdx = Math.min(dayState, Math.max(0, nDays - 1))
   const d: Day | undefined = days[dayIdx]
@@ -266,8 +279,9 @@ const Forecasts: NextPage = () => {
                 onPick={setSector}
                 searchPlaceholder={w("searchSectors")}
                 noMatch={(q) => w("noMatch", { q })}
-                items={SECTORS.map((s) => {
-                  const x = daysBySector[s]?.[0]
+                items={WEATHER_PLACES.map((s) => {
+                  const districtKey = Object.keys(daysBySector).find((k) => isDistrictLocationName(k))
+                  const x = daysBySector[s]?.[0] ?? (isDistrictLocationName(s) && districtKey ? daysBySector[districtKey]?.[0] : undefined)
                   return {
                     name: s,
                     active: s === sector,

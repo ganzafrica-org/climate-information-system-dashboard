@@ -25,6 +25,7 @@ import {
 import { toast } from 'sonner';
 import api from '@/lib/api';
 import { Farmer, Location, CreateFarmerData, UpdateFarmerData, ApiResponse } from '@/types/farmer';
+import { locationDisplayName } from '@/lib/assignment';
 import { Alert, AlertDescription } from '../ui/alert';
 import {Progress} from "@/components/ui/progress";
 
@@ -77,7 +78,7 @@ export function FarmerLocationFilter({ locations, selectedLocationId, onLocation
                     </SelectItem>
                     {locations.map((location) => (
                         <SelectItem key={location.id} value={location.id.toString()}>
-                            {location.name} ({getLocationCount(location.id)})
+                            {locationDisplayName(location)} ({getLocationCount(location.id)})
                         </SelectItem>
                     ))}
                 </SelectContent>
@@ -107,6 +108,16 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
         isActive: true,
     });
     const [isLoading, setIsLoading] = useState(false);
+
+    useEffect(() => {
+        if (!open) {
+            setFormData({ name: '', phone: '', locationIds: [], isActive: true });
+            return;
+        }
+        if (locations.length === 1) {
+            setFormData((prev) => ({ ...prev, locationIds: [locations[0].id] }));
+        }
+    }, [open, locations]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -204,7 +215,7 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                                         }}
                                     />
                                     <Label htmlFor={`location-${location.id}`} className="text-sm cursor-pointer">
-                                        {location.name}
+                                        {locationDisplayName(location)}
                                     </Label>
                                 </div>
                             ))}
@@ -215,7 +226,7 @@ export function CreateFarmerDialog({ open, onOpenChange, locations, onSuccess }:
                                     const location = locations.find(l => l.id === locationId);
                                     return location ? (
                                         <Badge key={locationId} style={{ backgroundColor: '#147677', color: '#ffffff' }} className="text-xs">
-                                            {location.name}
+                                            {locationDisplayName(location)}
                                         </Badge>
                                     ) : null;
                                 })}
@@ -260,6 +271,7 @@ interface ViewFarmerDialogProps {
     onOpenChange: (open: boolean) => void;
     farmerId: number | null;
     onEdit: (farmer: Farmer) => void;
+    canEdit?: boolean;
 }
 
 interface EditFarmerDialogProps {
@@ -297,7 +309,7 @@ interface ImportFarmersDialogProps {
     onSuccess: () => void;
 }
 
-export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewFarmerDialogProps) {
+export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit, canEdit = true }: ViewFarmerDialogProps) {
     const { t } = useLanguage();
     const [farmer, setFarmer] = useState<Farmer | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -379,7 +391,7 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
                             <div className="flex flex-wrap gap-2">
                                 {farmer.locations.map((location) => (
                                     <Badge key={location.id} style={{ backgroundColor: '#147677', color: '#ffffff' }}>
-                                        {location.name}
+                                        {locationDisplayName(location)}
                                     </Badge>
                                 ))}
                             </div>
@@ -391,7 +403,7 @@ export function ViewFarmerDialog({ open, onOpenChange, farmerId, onEdit }: ViewF
                     <Button variant="outline" onClick={() => onOpenChange(false)}>
                         {t('close')}
                     </Button>
-                    {farmer && (
+                    {farmer && canEdit && (
                         <Button 
                             onClick={() => onEdit(farmer)}
                             style={{ backgroundColor: '#147677', borderColor: '#147677' }}
@@ -414,7 +426,11 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
 
     useEffect(() => {
         if (farmer) {
-            const locationIds = farmer.locationIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+            const allowedIds = new Set(locations.map((location) => location.id));
+            const locationIds = farmer.locationIds
+                .split(',')
+                .map(id => parseInt(id.trim()))
+                .filter(id => !isNaN(id) && allowedIds.has(id));
             setFormData({
                 name: farmer.name,
                 phone: farmer.phone,
@@ -422,7 +438,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                 isActive: farmer.isActive,
             });
         }
-    }, [farmer]);
+    }, [farmer, locations]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -524,7 +540,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                                         }}
                                     />
                                     <Label htmlFor={`edit-location-${location.id}`} className="text-sm cursor-pointer">
-                                        {location.name}
+                                        {locationDisplayName(location)}
                                     </Label>
                                 </div>
                             ))}
@@ -535,7 +551,7 @@ export function EditFarmerDialog({ open, onOpenChange, farmer, locations, onSucc
                                     const location = locations.find(l => l.id === locationId);
                                     return location ? (
                                         <Badge key={locationId} style={{ backgroundColor: '#147677', color: '#ffffff' }} className="text-xs">
-                                            {location.name}
+                                            {locationDisplayName(location)}
                                         </Badge>
                                     ) : null;
                                 })}
@@ -809,7 +825,7 @@ export function ImportFarmersDialog({ open, onOpenChange, locations, onSuccess }
                                                 <AlertDescription className="text-sm">
                                                     <div className="flex items-center justify-between">
                                                         <div>
-                                                            <strong>{location.name}</strong>
+                                                            <strong>{locationDisplayName(location)}</strong>
                                                             {location.geocoded && (
                                                                 <Badge variant="outline" className="ml-2 text-xs border-green-300 bg-green-50 text-green-700">
                                                                     {t('geocoded') || 'Auto-geocoded'}

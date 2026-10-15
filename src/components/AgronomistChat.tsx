@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/router"
 import { MessageCircle, Send, X, MapPin } from "lucide-react"
 import { useLanguage, type Locale } from "@/i18n"
-import { SECTORS, useSectorWeather, type SectorWeather } from "@/lib/weather"
+import { useSectorWeather, type SectorWeather } from "@/lib/weather"
 import {
   CHAT_CHIPS,
   nearestSector,
@@ -10,6 +10,8 @@ import {
   snapshotFromSector,
   topicById,
 } from "@/lib/agronomistChat"
+import { useAuth } from "@/hooks/useAuth"
+import { WEATHER_PLACES, defaultLocationName, isDistrictLocationName } from "@/lib/assignment"
 
 type Msg = { id: number; role: "bot" | "user"; text: string }
 
@@ -23,8 +25,9 @@ export function AgronomistChat() {
   const weatherQ = useSectorWeather()
   const sectors = weatherQ.data?.sectors ?? []
 
+  const { user } = useAuth()
   const qSector = typeof router.query.sector === "string" ? router.query.sector : ""
-  const defaultSector = (SECTORS as readonly string[]).includes(qSector) ? qSector : "Musanze"
+  const defaultSector = (WEATHER_PLACES as readonly string[]).includes(qSector) ? qSector : defaultLocationName(user)
 
   const [open, setOpen] = useState(false)
   const [sector, setSector] = useState(defaultSector)
@@ -43,7 +46,10 @@ export function AgronomistChat() {
   }, [msgs, open, busy])
 
   const sw: SectorWeather | undefined = useMemo(
-    () => sectors.find((s) => s.sector === sector) ?? sectors.find((s) => s.sector === "Musanze"),
+    () =>
+      sectors.find((s) => s.sector === sector)
+      ?? (isDistrictLocationName(sector) ? sectors.find((s) => isDistrictLocationName(s.sector)) : undefined)
+      ?? sectors[0],
     [sectors, sector],
   )
 
@@ -150,7 +156,14 @@ export function AgronomistChat() {
             ))}
             {busy && (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-bl-md border border-gray-200 bg-white px-3 py-2 text-[13px] text-slate-500">{t("chat.thinking")}</div>
+                <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-gray-200 bg-white px-3 py-2 text-[13px] text-slate-500">
+                  <span className="inline-flex items-center gap-[3px]" aria-hidden>
+                    <span className="animate-chat-dot h-1.5 w-1.5 rounded-full bg-[#147677]" />
+                    <span className="animate-chat-dot h-1.5 w-1.5 rounded-full bg-[#147677]" style={{ animationDelay: "0.15s" }} />
+                    <span className="animate-chat-dot h-1.5 w-1.5 rounded-full bg-[#147677]" style={{ animationDelay: "0.3s" }} />
+                  </span>
+                  {t("chat.thinking")}
+                </div>
               </div>
             )}
           </div>

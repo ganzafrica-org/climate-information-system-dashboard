@@ -14,6 +14,8 @@ interface RequestOptions {
     skipRetry?: boolean;
 }
 
+type AssignmentLevel = "district" | "sector";
+
 // User types
 interface User {
     id: string;
@@ -27,6 +29,9 @@ interface User {
     updatedAt?: string;
     lastLogin?: string;
     emailVerified?: boolean;
+    assignmentLevel?: AssignmentLevel | null;
+    sectorName?: string | null;
+    districtName?: string | null;
 }
 
 interface CreateUserInput {
@@ -36,6 +41,9 @@ interface CreateUserInput {
     status?: "active" | "pending" | "suspended";
     phone?: string;
     password?: string;
+    assignmentLevel?: AssignmentLevel;
+    sectorName?: string;
+    districtName?: string;
 }
 
 interface UpdateUserInput {
@@ -46,6 +54,9 @@ interface UpdateUserInput {
     phone?: string;
     password?: string;
     isActive?: boolean;
+    assignmentLevel?: AssignmentLevel;
+    sectorName?: string;
+    districtName?: string;
 }
 
 class ApiClient {

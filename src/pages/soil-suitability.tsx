@@ -1,8 +1,10 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import dynamic from "next/dynamic"
 import { useQuery } from "@tanstack/react-query"
 import { Map as MapIcon, Download, ChevronDown, Layers, X } from "lucide-react"
 import { useLanguage } from "@/i18n"
+import { useAuth } from "@/hooks/useAuth"
+import { MUSANZE_DISTRICT_LOCATION, isSectorAgronomist } from "@/lib/assignment"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { SegmentedControl } from "@/components/ui/segmented-control"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -38,6 +40,7 @@ function useGeo(file: string | null) {
 
 export default function SoilSuitabilityPage() {
   const { t } = useLanguage()
+  const { user } = useAuth()
   // Map a raw class string (from the GeoJSON) to its i18n key.
   const CLASS_KEY: Record<string, string> = {
     "Very Suitable": "verySuitable", "Suitable": "suitable", "Moderate Suitable": "moderateSuitable",
@@ -51,6 +54,12 @@ export default function SoilSuitabilityPage() {
   const [crops, setCrops] = useState<Set<string>>(new Set(["beans"]))
   const [hazard, setHazard] = useState<string>("flooding")
   const [sectors, setSectors] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    if (isSectorAgronomist(user) && user?.sectorName) {
+      setSectors(new Set([user.sectorName]))
+    }
+  }, [user?.assignmentLevel, user?.sectorName])
   const [overlays, setOverlays] = useState({ district: true, sectors: true, restricted: false })
   const [popover, setPopover] = useState<SoilPopover | null>(null)
   const [dockTab, setDockTab] = useState(0)
@@ -260,7 +269,7 @@ export default function SoilSuitabilityPage() {
               <div className="relative">
                 <button onClick={() => setSectorMenuOpen((o) => !o)} className="flex w-full items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-left text-sm">
                   <span className="flex flex-wrap gap-1">
-                    {sectors.size === 0 ? <span className="text-muted-foreground">{t("allSectors") || "All sectors"}</span>
+                    {sectors.size === 0 ? <span className="text-muted-foreground">{MUSANZE_DISTRICT_LOCATION}</span>
                       : Array.from(sectors).slice(0, 2).map((s) => <span key={s} className="rounded bg-[#147677]/10 px-1.5 py-0.5 text-[11px] font-medium text-[#147677]">{s}</span>)}
                     {sectors.size > 2 && <span className="rounded bg-[#147677]/10 px-1.5 py-0.5 text-[11px] font-medium text-[#147677]">+{sectors.size - 2}</span>}
                   </span>
@@ -268,6 +277,10 @@ export default function SoilSuitabilityPage() {
                 </button>
                 {sectorMenuOpen && (
                   <div className="absolute z-20 mt-1 max-h-52 w-full overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-lg">
+                    <label className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
+                      <Checkbox checked={sectors.size === 0} onCheckedChange={() => setSectors(new Set())} />
+                      {MUSANZE_DISTRICT_LOCATION}
+                    </label>
                     {SECTORS.map((s) => (
                       <label key={s} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted">
                         <Checkbox checked={sectors.has(s)} onCheckedChange={() => toggleSector(s)} />

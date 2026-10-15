@@ -7,6 +7,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import Head from 'next/head';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
+import { defaultLocationName } from '@/lib/assignment';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Download, RefreshCw } from 'lucide-react';
@@ -88,8 +89,8 @@ export default function Communications() {
           </div>
         </div>
 
-        {activeTab === 'alerts' && <AlertsTable selectedSector="all" searchTerm="" />}
-        {activeTab === 'messages' && <MessagesTable selectedSector="all" searchTerm="" />}
+        {activeTab === 'alerts' && <AlertsTable selectedSector={defaultLocationName(user)} searchTerm="" />}
+        {activeTab === 'messages' && <MessagesTable selectedSector={defaultLocationName(user)} searchTerm="" />}
         {activeTab === 'scheduler' && <WeatherSchedulerTable />}
         {activeTab === 'logs' && user?.role === 'admin' && (
           <MessageLogsTable

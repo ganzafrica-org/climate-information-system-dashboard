@@ -25,6 +25,7 @@ import {
 import {
     Location, LocationsResponse, ApiResponse, LocationFilters
 } from "@/types/farmer";
+import { locationDisplayName, sortLocationsDistrictFirst } from "@/lib/assignment";
 
 const Locations: NextPage = () => {
     const { t } = useLanguage();
@@ -101,7 +102,7 @@ const Locations: NextPage = () => {
                 params: filters
             });
 
-            setLocations(response.data.locations);
+            setLocations(sortLocationsDistrictFirst(response.data.locations || []));
             setTotalCount(response.data.pagination.total);
         } catch (error: any) {
             handleApiError(error);
@@ -327,7 +328,7 @@ const Locations: NextPage = () => {
                         }
                         columns={[
                           { id: "index", header: "#", width: "72px", numeric: true, value: (l: any) => l.id },
-                          { id: "name", header: t("name") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-semibold text-slate-900">{l.name}</span> },
+                          { id: "name", header: t("name") || "Location Name", value: (l: any) => locationDisplayName(l), cell: (l: any) => <span className="font-semibold text-slate-900">{locationDisplayName(l)}</span> },
                           { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
                             <span className="text-sm text-slate-600 font-mono">
                               {l.lat && l.lon ? `${l.lat.toFixed(6)}, ${l.lon.toFixed(6)}` : <span className="text-gray-400">{t("notSpecified") || "Not specified"}</span>}

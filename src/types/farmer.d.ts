@@ -1,6 +1,7 @@
 export interface Location {
     id: number;
     name: string;
+    type?: string;
     lat?: number;
     lon?: number;
     isDefault?: boolean;

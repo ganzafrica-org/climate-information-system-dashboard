@@ -8,6 +8,7 @@ import {
   type Day,
   type SectorWeather,
 } from "@/lib/weather"
+import { MUSANZE_DISTRICT_LOCATION, isDistrictLocationName } from "@/lib/assignment"
 import type { Locale } from "@/i18n"
 
 export type ChatKind = "today" | "week" | "spray" | "heavy" | "seasons" | "static"
@@ -50,7 +51,11 @@ function fold(s: string) {
 
 export function sectorInText(q: string): string | undefined {
   const n = fold(q)
-  return SECTORS.find((s) => n.includes(fold(s)))
+  if (isDistrictLocationName(q) || n.includes("musanze district") || n.includes("akarere ka musanze")) {
+    return MUSANZE_DISTRICT_LOCATION
+  }
+  // Longer names first so "Musanze" does not steal "Musanze District".
+  return [...SECTORS].sort((a, b) => b.length - a.length).find((s) => n.includes(fold(s)))
 }
 
 export function matchTopic(q: string): ChatTopic | undefined {
