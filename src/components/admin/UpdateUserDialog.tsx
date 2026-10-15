@@ -8,13 +8,21 @@ import { Loader2, Edit } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import type { User } from "@/types/user";
+import AssignmentFields from "@/components/admin/AssignmentFields";
+import {
+  assignmentPayload,
+  validateAgronomistAssignment,
+  type AssignmentLevel,
+} from "@/lib/assignment";
 
 // Define the update user input type
-interface UpdateUserInput {
+interface UpdateUserForm {
   username: string;
   email: string;
   phone: string;
   role: 'admin' | 'agronomist';
+  assignmentLevel: AssignmentLevel | "";
+  sectorName: string;
 }
 
 // API functions for user operations
@@ -35,7 +43,7 @@ const getUserById = async (userId: string | number): Promise<User> => {
   }
 };
 
-const updateUser = async (userId: string | number, data: UpdateUserInput): Promise<User> => {
+const updateUser = async (userId: string | number, data: Record<string, string>): Promise<User> => {
   try {
     const response = await api.put<{status: string, data: User}>(`/api/admin/users/${userId}`, data);
     // Extract the user data from the response.data property
@@ -62,11 +70,13 @@ interface UpdateUserDialogProps {
 export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }: UpdateUserDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
-  const [form, setForm] = useState<UpdateUserInput>({
+  const [form, setForm] = useState<UpdateUserForm>({
     username: "",
     email: "",
     phone: "",
-    role: "agronomist"
+    role: "agronomist",
+    assignmentLevel: "",
+    sectorName: "",
   });
 
   // Fetch user details when dialog opens
@@ -84,7 +94,11 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
         username: userData.username || "",
         email: userData.email || "",
         phone: userData.phone || "",
-        role: getValidRole(userData.role)
+        role: getValidRole(userData.role),
+        assignmentLevel: userData.assignmentLevel === "district" || userData.assignmentLevel === "sector"
+          ? userData.assignmentLevel
+          : "",
+        sectorName: userData.sectorName || "",
       });
     } catch (error: any) {
       console.error('Failed to fetch user details:', error);
@@ -94,7 +108,11 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
         username: user.username || "",
         email: user.email || "",
         phone: user.phone || "",
-        role: getValidRole(user.role)
+        role: getValidRole(user.role),
+        assignmentLevel: user.assignmentLevel === "district" || user.assignmentLevel === "sector"
+          ? user.assignmentLevel
+          : "",
+        sectorName: user.sectorName || "",
       });
     } finally {
       setIsFetching(false);
@@ -108,8 +126,25 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
     return 'agronomist';
   };
 
-  const onChange = (field: keyof UpdateUserInput, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+  const onChange = (field: keyof UpdateUserForm, value: string) => {
+    setForm(prev => {
+      if (field === "role") {
+        return {
+          ...prev,
+          role: value as UpdateUserForm["role"],
+          assignmentLevel: value === "agronomist" ? prev.assignmentLevel : "",
+          sectorName: value === "agronomist" ? prev.sectorName : "",
+        };
+      }
+      if (field === "assignmentLevel") {
+        return {
+          ...prev,
+          assignmentLevel: value as AssignmentLevel,
+          sectorName: value === "sector" ? prev.sectorName : "",
+        };
+      }
+      return { ...prev, [field]: value };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,10 +153,27 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
       toast.error("Username and email are required");
       return;
     }
+    const assignmentError = validateAgronomistAssignment(
+      form.role,
+      form.assignmentLevel,
+      form.sectorName
+    );
+    if (assignmentError) {
+      toast.error(assignmentError);
+      return;
+    }
+
+    const payload = {
+      username: form.username.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      role: form.role,
+      ...assignmentPayload(form.role, form.assignmentLevel, form.sectorName),
+    };
     
     setIsLoading(true);
     try {
-      await updateUser(user.id, form);
+      await updateUser(user.id, payload);
       toast.success("User updated successfully");
       onSuccess();
     } catch (error: any) {
@@ -209,6 +261,14 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
                   </SelectContent>
                 </Select>
               </div>
+              <AssignmentFields
+                role={form.role}
+                assignmentLevel={form.assignmentLevel}
+                sectorName={form.sectorName}
+                onAssignmentLevelChange={(value) => onChange("assignmentLevel", value)}
+                onSectorNameChange={(value) => onChange("sectorName", value)}
+                disabled={isLoading}
+              />
             </div>
 
             <DialogFooter>
@@ -223,7 +283,7 @@ export default function UpdateUserDialog({ open, onOpenChange, user, onSuccess }
               <Button 
                 type="submit" 
                 disabled={isLoading} 
-                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                className="bg-[#147677] hover:bg-[#147677]/90 text-white"
               >
                 {isLoading ? (
                   <>

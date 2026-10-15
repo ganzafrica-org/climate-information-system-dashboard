@@ -8,6 +8,12 @@ import { Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import type { User } from "@/types/user";
+import AssignmentFields from "@/components/admin/AssignmentFields";
+import {
+  assignmentPayload,
+  validateAgronomistAssignment,
+  type AssignmentLevel,
+} from "@/lib/assignment";
 
 // Define the user input
 interface InviteUserInput {
@@ -15,6 +21,8 @@ interface InviteUserInput {
   email: string;
   phone: string;
   role: 'admin' | 'agronomist';
+  assignmentLevel: AssignmentLevel | "";
+  sectorName: string;
 }
 
 // Use the existing API client instead of fetch
@@ -25,6 +33,7 @@ const inviteUser = async (data: InviteUserInput): Promise<User> => {
     const sanitized: any = {
       email: data.email?.trim().toLowerCase(),
       role: data.role,
+      ...assignmentPayload(data.role, data.assignmentLevel, data.sectorName),
     };
     
     // Include username if provided (some backends might require it)
@@ -42,8 +51,14 @@ const inviteUser = async (data: InviteUserInput): Promise<User> => {
     // Log the payload for debugging
     console.log('Inviting user with payload:', sanitized);
 
-    const response = await api.post<User>('/api/admin/users/invite', sanitized);
-    return response;
+    try {
+      return await api.post<User>('/api/admin/users/invite', sanitized);
+    } catch (inviteError: any) {
+      if (inviteError?.response?.status !== 404) {
+        throw inviteError;
+      }
+      return await api.post<User>('/api/auth/invite', sanitized);
+    }
   } catch (error: any) {
     // Provide clearer messages based on common API responses
     const status = error?.response?.status;
@@ -100,15 +115,36 @@ interface CreateUserDialogProps {
 
 export default function CreateUserDialog({ open, onOpenChange, onSuccess }: CreateUserDialogProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const [form, setForm] = useState<InviteUserInput>({
+  const emptyForm: InviteUserInput = {
     username: "",
     email: "",
     phone: "",
-    role: "agronomist"
-  });
+    role: "agronomist",
+    assignmentLevel: "",
+    sectorName: "",
+  };
+
+  const [form, setForm] = useState<InviteUserInput>(emptyForm);
 
   const onChange = (field: keyof InviteUserInput, value: string) => {
-    setForm(prev => ({ ...prev, [field]: value }));
+    setForm(prev => {
+      if (field === "role") {
+        return {
+          ...prev,
+          role: value as InviteUserInput["role"],
+          assignmentLevel: value === "agronomist" ? prev.assignmentLevel : "",
+          sectorName: value === "agronomist" ? prev.sectorName : "",
+        };
+      }
+      if (field === "assignmentLevel") {
+        return {
+          ...prev,
+          assignmentLevel: value as AssignmentLevel,
+          sectorName: value === "sector" ? prev.sectorName : "",
+        };
+      }
+      return { ...prev, [field]: value };
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -121,19 +157,22 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
       toast.error("Role is required");
       return;
     }
+    const assignmentError = validateAgronomistAssignment(
+      form.role,
+      form.assignmentLevel,
+      form.sectorName
+    );
+    if (assignmentError) {
+      toast.error(assignmentError);
+      return;
+    }
     setIsLoading(true);
     try {
       const created = await inviteUser(form);
       toast.success("User created successfully");
       onSuccess(created);
       onOpenChange(false);
-      // Reset form
-      setForm({
-        username: "",
-        email: "",
-        phone: "",
-        role: "agronomist"
-      });
+      setForm(emptyForm);
     } catch (e: any) {
       // Show detailed error message
       const errorMessage = e.message || e.response?.data?.message || "Failed to create user";
@@ -198,6 +237,14 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
                 </SelectContent>
               </Select>
             </div>
+            <AssignmentFields
+              role={form.role}
+              assignmentLevel={form.assignmentLevel}
+              sectorName={form.sectorName}
+              onAssignmentLevelChange={(value) => onChange("assignmentLevel", value)}
+              onSectorNameChange={(value) => onChange("sectorName", value)}
+              disabled={isLoading}
+            />
           </div>
 
           <DialogFooter>

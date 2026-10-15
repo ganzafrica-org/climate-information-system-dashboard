@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   AlertCircle,
   CheckCircle,
@@ -14,6 +14,7 @@ import {
   Trash,
   Loader2,
   RefreshCw,
+  Filter,
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { Badge } from '../ui/badge';
@@ -31,6 +32,14 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 import { truncateSms } from '@/lib/alertMessage';
 import { fetchFarmerSmsMap } from '@/lib/farmerSms';
+import { useAuth } from '@/hooks/useAuth';
+import {
+  defaultLocationName,
+  locationDisplayName,
+  pickDefaultLocation,
+  sortLocationsDistrictFirst,
+} from '@/lib/assignment';
+import type { Location } from '@/types/farmer';
 
 // Custom badge components
 const StatusBadge = ({ status }: { status: string }) => {
@@ -181,7 +190,11 @@ interface AlertsTableProps {
 
 export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
     const { t } = useLanguage();
+    const { user, isLoading: authLoading } = useAuth();
     const [alerts, setAlerts] = useState<Alert[]>([]);
+    const [filterLocations, setFilterLocations] = useState<Location[]>([]);
+    const [locationFilter, setLocationFilter] = useState(selectedSector || "");
+    const didApplyDefaultLocation = useRef(false);
     const [search, setSearch] = useState(searchTerm);
     const [currentPage, setCurrentPage] = useState(1);
     const [limit, setLimit] = useState(10);
@@ -215,7 +228,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 limit,
                 sortField,
                 sortOrder,
-                ...(selectedSector !== 'all' && { location: selectedSector }),
+                ...(locationFilter && locationFilter !== 'all' && { location: locationFilter }),
                 ...(search && { search }),
             };
 
@@ -325,19 +338,41 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
         }
     };
 
+    useEffect(() => {
+        const loadLocations = async () => {
+            try {
+                const response = await api.get('/api/users/locations/all', { params: { limit: 100 } });
+                const list = response.data?.locations || response.data?.data?.locations || [];
+                setFilterLocations(sortLocationsDistrictFirst(list));
+            } catch {
+                setFilterLocations([]);
+            }
+        };
+        loadLocations();
+    }, []);
+
+    useEffect(() => {
+        if (authLoading || !filterLocations.length || didApplyDefaultLocation.current) return;
+        const picked = pickDefaultLocation(user, filterLocations);
+        setLocationFilter(picked?.name || defaultLocationName(user));
+        didApplyDefaultLocation.current = true;
+    }, [authLoading, filterLocations, user?.assignmentLevel, user?.sectorName]);
+
     // Initial load
     useEffect(() => {
+        if (!locationFilter) return;
         fetchAlerts(1);
     }, []);
 
     // Refetch when filters change
     useEffect(() => {
+        if (!locationFilter) return;
         if (currentPage === 1) {
             fetchAlerts(1);
         } else {
             setCurrentPage(1);
         }
-    }, [selectedSector, search, sortField, sortOrder, limit]);
+    }, [locationFilter, search, sortField, sortOrder, limit]);
 
     // Refetch when page changes
     useEffect(() => {
@@ -461,6 +496,31 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                                 onChange={(e) => setSearch(e.target.value)}
                             />
                         </div>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button
+                                    variant="primary"
+                                    size="icon"
+                                    className="h-10 w-10 rounded-lg shrink-0"
+                                    title={locationFilter || t("allLocations")}
+                                >
+                                    <Filter className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => setLocationFilter("all")}>
+                                    {t("allLocations")}
+                                </DropdownMenuItem>
+                                {filterLocations.map((location) => (
+                                    <DropdownMenuItem
+                                        key={location.id}
+                                        onClick={() => setLocationFilter(location.name)}
+                                    >
+                                        {locationDisplayName(location)}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
                         {selectedAlerts.size > 0 && (
                             <Button
                                 variant="destructive"

@@ -29,6 +29,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useLanguage } from '@/i18n';
+import { useAuth } from '@/hooks/useAuth';
+import { locationDisplayName, pickDefaultLocation, sortLocationsDistrictFirst } from '@/lib/assignment';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import api from '@/lib/api';
@@ -93,6 +95,7 @@ const kigaliMinutesNow = (currentKigaliTime?: string) => {
 
 export function WeatherSchedulerTable() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null);
   const [scheduleTimes, setScheduleTimes] = useState<string[]>(DEFAULT_TIMES);
   const [isLoading, setIsLoading] = useState(true);
@@ -128,8 +131,11 @@ export function WeatherSchedulerTable() {
     try {
       const response = await api.get('/api/users/locations/all', { params: { limit: 100 } });
       const data = response.data;
-      const list = data?.locations || data?.data?.locations || (Array.isArray(data) ? data : []);
+      const raw = (data?.locations || data?.data?.locations || (Array.isArray(data) ? data : [])) as Location[];
+      const list = sortLocationsDistrictFirst(raw);
       setLocations(list);
+      const picked = pickDefaultLocation(user, list);
+      if (picked) setLocationId(String(picked.id));
     } catch {
       setLocations([]);
     }
@@ -167,6 +173,12 @@ export function WeatherSchedulerTable() {
     const interval = setInterval(fetchSchedulerStatus, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (!locations.length) return;
+    const picked = pickDefaultLocation(user, locations);
+    if (picked) setLocationId(String(picked.id));
+  }, [locations, user?.id, user?.assignmentLevel, user?.sectorName]);
 
   const nextBroadcast = useMemo(() => {
     const sorted = [...scheduleTimes].map(normalizeTime).sort((a, b) => toMinutes(a) - toMinutes(b));
@@ -474,7 +486,7 @@ export function WeatherSchedulerTable() {
                 <SelectContent>
                   {locations.map((location) => (
                     <SelectItem key={location.id} value={String(location.id)}>
-                      {location.name}
+                      {locationDisplayName(location)}
                     </SelectItem>
                   ))}
                 </SelectContent>

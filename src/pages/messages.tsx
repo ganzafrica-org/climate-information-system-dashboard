@@ -10,10 +10,13 @@ import api from "@/lib/api";
 import { Location, LocationsResponse } from "@/types/farmer";
 import { ApiResponse } from "@/types/weather";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+import { defaultLocationName, sortLocationsDistrictFirst } from "@/lib/assignment";
 
 const Messages: NextPage = () => {
   const { t } = useLanguage();
-  const [selectedSector, setSelectedSector] = useState("all");
+  const { user, isLoading: authLoading } = useAuth();
+  const [selectedSector, setSelectedSector] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [locations, setLocations] = useState<Location[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -22,12 +25,17 @@ const Messages: NextPage = () => {
     fetchLocations();
   }, []);
 
+  useEffect(() => {
+    if (authLoading) return;
+    setSelectedSector(defaultLocationName(user));
+  }, [authLoading, user?.assignmentLevel, user?.sectorName]);
+
   const fetchLocations = async () => {
     try {
       const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
         params: { limit: 100 }
       });
-      setLocations(response.data.locations);
+      setLocations(sortLocationsDistrictFirst(response.data.locations || []));
     } catch (error: any) {
       console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));

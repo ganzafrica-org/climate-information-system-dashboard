@@ -10,6 +10,9 @@ interface User {
     createdAt: string;
     updatedAt: string;
     locations?: any[];
+    assignmentLevel?: "district" | "sector" | null;
+    sectorName?: string | null;
+    districtName?: string | null;
 }
 
 interface AuthContextType {

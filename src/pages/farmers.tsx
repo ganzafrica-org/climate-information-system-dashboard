@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { NextPage } from "next";
 import Head from "next/head";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -21,10 +21,20 @@ import { CreateFarmerDialog, ViewFarmerDialog, EditFarmerDialog, ImportFarmersDi
 import {
   Farmer, Location, FarmersResponse, LocationsResponse, ApiResponse, FarmerFilters
 } from "@/types/farmer";
+import {
+  canImportFarmers,
+  canManageFarmers,
+  farmerLocationsForUser,
+  isSectorAgronomist,
+  locationDisplayName,
+  pickDefaultLocation,
+  sortLocationsDistrictFirst,
+} from "@/lib/assignment";
 
 const Farmers: NextPage = () => {
   const { t } = useLanguage();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const didApplyDefaultLocation = useRef(false);
 
   const [farmers, setFarmers] = useState<Farmer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -45,9 +55,31 @@ const Farmers: NextPage = () => {
 
   const [isExporting, setIsExporting] = useState(false);
 
+  const canEditFarmers = canManageFarmers(user);
+  const showImport = canImportFarmers(user);
+  const sectorOnly = isSectorAgronomist(user);
+  const farmerLocations = useMemo(
+    () => farmerLocationsForUser(user, locations),
+    [user, locations]
+  );
+
   useEffect(() => {
     fetchLocations();
   }, []);
+
+  useEffect(() => {
+    if (authLoading || !locations.length || didApplyDefaultLocation.current) return;
+    if (sectorOnly && user?.sectorName) {
+      setSelectedLocation(user.sectorName);
+      didApplyDefaultLocation.current = true;
+      return;
+    }
+    const picked = pickDefaultLocation(user, locations);
+    if (picked) {
+      setSelectedLocation(picked.name);
+      didApplyDefaultLocation.current = true;
+    }
+  }, [authLoading, sectorOnly, user, locations]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -60,7 +92,7 @@ const Farmers: NextPage = () => {
       const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
         params: { limit: 100 }
       });
-      setLocations(response.data.locations);
+      setLocations(sortLocationsDistrictFirst(response.data.locations || []));
     } catch (error: any) {
       console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));
@@ -295,7 +327,7 @@ const Farmers: NextPage = () => {
             <User className="h-4 w-4 mr-2 text-[#147677]" />
             {t("viewDetails")}
           </DropdownMenuItem>
-          {user?.role === 'admin' && (
+          {canEditFarmers && (
             <DropdownMenuItem
               onClick={() => handleEditFarmer(row)}
               className="cursor-pointer"
@@ -304,7 +336,7 @@ const Farmers: NextPage = () => {
               {t("editFarmer")}
             </DropdownMenuItem>
           )}
-          {user?.role === 'admin' && (
+          {canEditFarmers && (
             <>
               <Separator className="my-1" />
               <DropdownMenuItem
@@ -337,14 +369,16 @@ const Farmers: NextPage = () => {
             </h1>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                  variant="outline"
-                  onClick={() => setImportDialogOpen(true)}
-                  className="border-gray-200 text-slate-600 hover:bg-gray-50"
-              >
-                <Upload className="h-4 w-4 mr-2" />
-                {t("importData")}
-              </Button>
+              {showImport && (
+                <Button
+                    variant="outline"
+                    onClick={() => setImportDialogOpen(true)}
+                    className="border-gray-200 text-slate-600 hover:bg-gray-50"
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  {t("importData")}
+                </Button>
+              )}
 
               <Button
                   variant="outline"
@@ -356,7 +390,7 @@ const Farmers: NextPage = () => {
                 {isExporting ? t("exporting") : t("exportData")}
               </Button>
 
-              {user?.role === 'admin' && (
+              {canEditFarmers && (
                 <Button
                   variant="primary"
                   onClick={() => setCreateDialogOpen(true)}
@@ -401,15 +435,17 @@ const Farmers: NextPage = () => {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => { setSelectedLocation("all"); setCurrentPage(1); }}>
-                      {t("allLocations")}
-                    </DropdownMenuItem>
-                    {locations.map((location) => (
+                    {!sectorOnly && (
+                      <DropdownMenuItem onClick={() => { setSelectedLocation("all"); setCurrentPage(1); }}>
+                        {t("allLocations")}
+                      </DropdownMenuItem>
+                    )}
+                    {farmerLocations.map((location) => (
                       <DropdownMenuItem
                         key={location.id}
                         onClick={() => { setSelectedLocation(location.name); setCurrentPage(1); }}
                       >
-                        {location.name}
+                        {locationDisplayName(location)}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -450,17 +486,19 @@ const Farmers: NextPage = () => {
           </div>
         </div>
 
-        <ImportFarmersDialog
-            open={importDialogOpen}
-            onOpenChange={setImportDialogOpen}
-            locations={locations}
-            onSuccess={handleDialogSuccess}
-        />
+        {showImport && (
+          <ImportFarmersDialog
+              open={importDialogOpen}
+              onOpenChange={setImportDialogOpen}
+              locations={farmerLocations}
+              onSuccess={handleDialogSuccess}
+          />
+        )}
 
         <CreateFarmerDialog
             open={createDialogOpen}
             onOpenChange={setCreateDialogOpen}
-            locations={locations}
+            locations={farmerLocations}
             onSuccess={handleDialogSuccess}
         />
 
@@ -469,13 +507,14 @@ const Farmers: NextPage = () => {
             onOpenChange={setViewDialogOpen}
             farmerId={selectedFarmer}
             onEdit={handleEditFarmer}
+            canEdit={canEditFarmers}
         />
 
         <EditFarmerDialog
             open={editDialogOpen}
             onOpenChange={setEditDialogOpen}
             farmer={farmerToEdit}
-            locations={locations}
+            locations={farmerLocations}
             onSuccess={handleDialogSuccess}
         />
       </AppLayout>

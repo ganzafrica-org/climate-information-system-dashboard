@@ -29,6 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import api from '@/lib/api';
 import { toast } from 'sonner';
+import { locationDisplayName, sortLocationsDistrictFirst } from '@/lib/assignment';
 
 // Custom badge components
 const StatusBadge = ({ status }: { status: string }) => {
@@ -72,7 +73,7 @@ const BlueCheckbox = ({ checked, onCheckedChange, ...props }: any) => {
 interface Location {
   id: number;
   name: string;
-  type: string;
+  type?: string;
   latitude?: number;
   longitude?: number;
   coordinates?: string;
@@ -238,7 +239,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
         locationsData = [];
       }
 
-      setAllLocations(locationsData);
+      setAllLocations(sortLocationsDistrictFirst(locationsData));
       
     } catch (error: any) {
       handleApiError(error, t('failedToLoadLocations') || 'Failed to load locations');
@@ -327,7 +328,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
       const transformedLocations = locationsData.map((location: any) => ({
         id: location.id,
         name: location.name,
-        type: location.type || 'sector',
+        type: location.type,
         latitude: location.lat || location.latitude,
         longitude: location.lon || location.longitude,
         coordinates: (location.lat && location.lon) 
@@ -341,7 +342,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
         userId: location.userId
       }));
 
-      setLocations(transformedLocations);
+      setLocations(sortLocationsDistrictFirst(transformedLocations));
       setTotalCount(countData);
     } catch (error: any) {
       handleApiError(error, t('failedToLoadLocations') || 'Failed to load locations');
@@ -737,7 +738,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
             </div>
           }
           columns={[
-            { id: "name", header: t("locationName") || "Location Name", value: (l: any) => l.name || "", cell: (l: any) => <span className="font-semibold text-slate-900">{l.name}</span> },
+            { id: "name", header: t("locationName") || "Location Name", value: (l: any) => locationDisplayName(l), cell: (l: any) => <span className="font-semibold text-slate-900">{locationDisplayName(l)}</span> },
             { id: "status", header: t("status") || "Status", value: (l: any) => (l.isActive ? 1 : 0), cell: (l: any) => <StatusBadge status={l.isActive ? "active" : "inactive"} /> },
             { id: "coordinates", header: t("coordinates") || "Coordinates", sortable: false, cell: (l: any) => (
               <span className="text-sm font-mono text-slate-600">
@@ -913,7 +914,7 @@ export function MessagesTable({ selectedSector, searchTerm: initialSearchTerm }:
             <Button
               onClick={handleSendCustomMessage}
               disabled={isSendingCustomMessage || !customMessageText.trim()}
-              className="bg-primary hover:bg-primary/90"
+              className="bg-[#147677] hover:bg-[#147677]/90 text-white"
             >
               {isSendingCustomMessage ? (
                 <>

@@ -22,6 +22,13 @@ import {
   useSectorHistory, type PeriodStats, type Season,
 } from "@/lib/weather"
 import { dayMonth, downloadCsv, escapeHtml, fmtInt, fromIso, monthName, useWx } from "@/lib/weatherFormat"
+import { useAuth } from "@/hooks/useAuth"
+import {
+  MUSANZE_DISTRICT_LOCATION,
+  WEATHER_PLACES,
+  defaultLocationName,
+  isDistrictLocationName,
+} from "@/lib/assignment"
 
 const WeatherMap = dynamic(() => import("@/components/WeatherSectorMap"), {
   ssr: false,
@@ -40,7 +47,6 @@ function useGeo(file: string) {
   })
 }
 
-const DEFAULT_SECTOR = "Musanze"
 const MAX_SECTORS = 3
 const SERIES = ["#147677", "#b45309", "#6d28d9"]
 const RAIN_BAR = "#3b7dd8"
@@ -59,8 +65,9 @@ type ChartRow = { ym: string; rain: number | null; ly: number | null; temp: numb
 const Historical: NextPage = () => {
   const { w, t, lang } = useWx()
   const router = useRouter()
+  const { user, isLoading: authLoading } = useAuth()
 
-  const [sectors, setSectorsState] = useState<string[]>([DEFAULT_SECTOR])
+  const [sectors, setSectorsState] = useState<string[]>([MUSANZE_DISTRICT_LOCATION])
   const [preset, setPreset] = useState<Preset>("last12")
   const [custom, setCustom] = useState<DateRange>(() => {
     const y = addDays(kigaliToday(), -1)
@@ -74,14 +81,19 @@ const Historical: NextPage = () => {
 
   // ?sectors=A,B keeps the comparison shareable
   useEffect(() => {
-    if (!router.isReady) return
+    if (!router.isReady || authLoading) return
     const q = router.query.sectors
+    const places = WEATHER_PLACES as readonly string[]
     if (typeof q === "string") {
-      const picked = q.split(",").filter((s) => (SECTORS as readonly string[]).includes(s)).slice(0, MAX_SECTORS)
-      if (picked.length) setSectorsState(picked)
+      const picked = q.split(",").filter((s) => places.includes(s)).slice(0, MAX_SECTORS)
+      if (picked.length) {
+        setSectorsState(picked)
+        return
+      }
     }
+    setSectorsState([defaultLocationName(user)])
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router.isReady])
+  }, [router.isReady, authLoading, user?.assignmentLevel, user?.sectorName])
   const setSectors = (next: string[]) => {
     const list = next.slice(0, MAX_SECTORS)
     if (!list.length) return
@@ -121,10 +133,21 @@ const Historical: NextPage = () => {
 
   const allStats = useMemo(() => {
     const m: Record<string, PeriodStats | null> = {}
-    SECTORS.forEach((s) => (m[s] = periodStats(histQ.data?.[s]?.records, start, end)))
+    const names = new Set<string>([...WEATHER_PLACES, ...Object.keys(histQ.data ?? {})])
+    names.forEach((s) => {
+      const rows = histQ.data?.[s]?.records
+        ?? (isDistrictLocationName(s)
+          ? Object.entries(histQ.data ?? {}).find(([name]) => isDistrictLocationName(name))?.[1]?.records
+          : undefined)
+      m[s] = periodStats(rows, start, end)
+    })
     return m
   }, [histQ.data, start, end])
-  const ly = wantLY ? periodStats(lyQ.data?.[primary]?.records, minusYear(start), minusYear(end)) : null
+  const lyRows = lyQ.data?.[primary]?.records
+    ?? (isDistrictLocationName(primary)
+      ? Object.entries(lyQ.data ?? {}).find(([name]) => isDistrictLocationName(name))?.[1]?.records
+      : undefined)
+  const ly = wantLY ? periodStats(lyRows, minusYear(start), minusYear(end)) : null
   const main = allStats[primary]
 
   const isLoading = histQ.isLoading
@@ -370,10 +393,12 @@ const Historical: NextPage = () => {
                       width={280}
                       searchPlaceholder={w("searchSectors")}
                       noMatch={(q) => w("noMatch", { q })}
-                      items={SECTORS.filter((s) => !sectors.includes(s)).map((s) => ({
-                        name: s,
-                        right: <span className="text-[13px] tabular-nums text-slate-500">{allStats[s] ? `${fmtInt(allStats[s]!.total)} mm` : "–"}</span>,
-                      }))}
+                      items={WEATHER_PLACES.filter((s) => !sectors.includes(s)).map((s) => {
+                        return {
+                          name: s,
+                          right: <span className="text-[13px] tabular-nums text-slate-500">{allStats[s] ? `${fmtInt(allStats[s]!.total)} mm` : "–"}</span>,
+                        }
+                      })}
                     />
                   </div>
                 )}

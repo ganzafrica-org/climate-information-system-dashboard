@@ -11,7 +11,7 @@ type Body = {
   history?: { role: "bot" | "user"; text: string }[]
 }
 
-const MODELS = ["gemini-3.5-flash", "gemini-flash-latest", "gemini-3.8-flash", "gemini-3.6-flash"]
+const MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash"]
 
 type GeminiPart = { text?: string; thought?: boolean }
 type GeminiRes = {
@@ -30,23 +30,22 @@ async function geminiReply(apiKey: string, prompt: string): Promise<string | nul
   const key = apiKey.trim()
   for (const model of MODELS) {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`
-    const configs = [
-      { temperature: 0.3, maxOutputTokens: 2048, thinkingConfig: { thinkingBudget: 0 } },
-      { temperature: 0.3, maxOutputTokens: 2048 },
-    ]
-    for (const generationConfig of configs) {
+    try {
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ role: "user", parts: [{ text: prompt }] }],
-          generationConfig,
+          generationConfig: { temperature: 0.3, maxOutputTokens: 512, thinkingConfig: { thinkingBudget: 0 } },
         }),
+        signal: AbortSignal.timeout(12_000),
       })
       if (!res.ok) continue
       const json = (await res.json()) as GeminiRes
       const text = visibleText(json)
       if (text) return text
+    } catch {
+      continue
     }
   }
   return null

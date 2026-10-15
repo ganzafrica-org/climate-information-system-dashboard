@@ -1,3 +1,5 @@
+export type AssignmentLevel = "district" | "sector";
+
 export interface User {
   id: string;
   username: string;
@@ -10,6 +12,9 @@ export interface User {
   updatedAt?: string;
   lastLogin?: string;
   emailVerified?: boolean;
+  assignmentLevel?: AssignmentLevel | null;
+  sectorName?: string | null;
+  districtName?: string | null;
 }
 
 export interface CreateUserInput {
@@ -19,6 +24,9 @@ export interface CreateUserInput {
   status?: "active" | "pending" | "suspended";
   phone?: string;
   password?: string;
+  assignmentLevel?: AssignmentLevel;
+  sectorName?: string;
+  districtName?: string;
 }
 
 export interface UpdateUserInput {
@@ -29,4 +37,7 @@ export interface UpdateUserInput {
   phone?: string;
   password?: string;
   isActive?: boolean;
+  assignmentLevel?: AssignmentLevel;
+  sectorName?: string;
+  districtName?: string;
 }

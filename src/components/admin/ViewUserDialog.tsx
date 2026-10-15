@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Eye, User as UserIcon, Mail, Phone, Shield, Calendar, Activity } from "lucide-react";
+import { Loader2, Eye, User as UserIcon, Mail, Phone, Shield, Calendar, Activity, MapPin } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import type { User } from "@/types/user";
+import { formatCoverage } from "@/lib/assignment";
 
 // API function to get user details
 const getUserById = async (userId: string | number): Promise<User> => {
@@ -154,6 +155,22 @@ export default function ViewUserDialog({ open, onOpenChange, user, onClose }: Vi
                     <p className="text-base">{formatRole(userDetails.role)}</p>
                   </div>
                 </div>
+
+                {userDetails.role === "agronomist" && (
+                  <div className="flex items-center gap-3">
+                    <MapPin className="h-4 w-4 text-gray-500" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-500">Coverage</p>
+                      <p className="text-base">
+                        {userDetails.assignmentLevel === "sector"
+                          ? `Sector · ${formatCoverage(userDetails)}`
+                          : userDetails.assignmentLevel === "district"
+                            ? `District · ${formatCoverage(userDetails)}`
+                            : formatCoverage(userDetails)}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

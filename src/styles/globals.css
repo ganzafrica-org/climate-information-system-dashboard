@@ -178,6 +178,21 @@ body {
   animation: spin-slow 12s linear infinite;
 }
 
+@keyframes chat-dot {
+  0%, 80%, 100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-4px);
+  }
+}
+
+.animate-chat-dot {
+  animation: chat-dot 1s ease-in-out infinite;
+}
+
 .animation-delay-300 {
   animation-delay: 300ms;
 }

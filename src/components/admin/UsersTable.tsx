@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import CreateUserDialog from "@/components/admin/CreateUserDialog";
 import UpdateUserDialog from "@/components/admin/UpdateUserDialog";
 import ViewUserDialog from "@/components/admin/ViewUserDialog";
+import { formatCoverage } from "@/lib/assignment";
 
 // Define allowed roles type
 type AllowedRole = 'admin' | 'agronomist';
@@ -54,9 +55,14 @@ export function UsersTable() {
     }
   };
 
-  const handleRoleChange = async (userId: string | number, role: AllowedRole) => {
+  const handleRoleChange = async (userRow: User, role: AllowedRole) => {
+    if (role === "agronomist" && !userRow.assignmentLevel) {
+      setSelectedUser(userRow);
+      setIsUpdateOpen(true);
+      return;
+    }
     try {
-      await api.updateUserRole(userId, role as any);
+      await api.updateUserRole(userRow.id, role as any);
       toast.success("Role updated");
       fetchUsers(true);
     } catch (e: any) {
@@ -126,6 +132,12 @@ export function UsersTable() {
     { id: "email", header: "Email", value: (u) => u.email ?? "", cell: (u) => u.email || '-' },
     { id: "phone", header: "Phone", value: (u) => (u as any).phone ?? "", cell: (u) => (u as any).phone || '-' },
     {
+      id: "coverage",
+      header: "Coverage",
+      value: (u) => formatCoverage(u),
+      cell: (u) => formatCoverage(u),
+    },
+    {
       id: "status",
       header: "Status",
       sortable: false,
@@ -138,7 +150,7 @@ export function UsersTable() {
       cell: (u) => (
         <Select
           value={getValidRole((u as any).role)}
-          onValueChange={(val: AllowedRole) => handleRoleChange(u.id, val)}
+          onValueChange={(val: AllowedRole) => handleRoleChange(u, val)}
         >
           <SelectTrigger className="w-[140px]">
             <SelectValue>{formatRole((u as any).role)}</SelectValue>
@@ -214,7 +226,7 @@ export function UsersTable() {
           search={{
             query: search,
             matches: (u, q) =>
-              [(u as any).username, u.email, (u as any).role, (u as any).phone, (u as any).status]
+              [(u as any).username, u.email, (u as any).role, (u as any).phone, (u as any).status, u.sectorName, u.districtName, formatCoverage(u)]
                 .filter(Boolean)
                 .some((v) => String(v).toLowerCase().includes(q)),
           }}
