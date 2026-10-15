@@ -131,7 +131,8 @@ export function WeatherSchedulerTable() {
     try {
       const response = await api.get('/api/users/locations/all', { params: { limit: 100 } });
       const data = response.data;
-      const list = sortLocationsDistrictFirst(data?.locations || data?.data?.locations || (Array.isArray(data) ? data : []));
+      const raw = (data?.locations || data?.data?.locations || (Array.isArray(data) ? data : [])) as Location[];
+      const list = sortLocationsDistrictFirst(raw);
       setLocations(list);
       const picked = pickDefaultLocation(user, list);
       if (picked) setLocationId(String(picked.id));
