@@ -8,18 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/table";
 import { Pagination } from "@/components/ui/pagination";
 import {
-  Download, Edit, Filter,
+  Download, Edit, MapPin,
   MoreHorizontal, Search, Trash, Upload, User
 } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
 import { CreateFarmerDialog, ViewFarmerDialog, EditFarmerDialog, ImportFarmersDialog } from "@/components/farmers/dialogs";
 import {
-  Farmer, Location, FarmersResponse, LocationsResponse, ApiResponse, FarmerFilters
+  Farmer, Location, FarmersResponse, LocationsResponse, ApiResponse
 } from "@/types/farmer";
 import {
   canImportFarmers,
@@ -27,25 +28,43 @@ import {
   farmerLocationsForUser,
   isSectorAgronomist,
   locationDisplayName,
-  pickDefaultLocation,
   sortLocationsDistrictFirst,
 } from "@/lib/assignment";
+
+const PAGE_SIZE = 10;
+
+function unwrapRecords<T>(response: unknown, key: string): T[] {
+  const body = response as Record<string, any> | null;
+  const nested = body?.data?.data ?? body?.data ?? body;
+  const list = nested?.[key] ?? (Array.isArray(nested) ? nested : []);
+  return Array.isArray(list) ? list : [];
+}
+
+function farmerInLocation(farmer: Farmer, locationName: string, location?: Location) {
+  if (farmer.locations?.some((item) => item.name === locationName || (location && item.id === location.id))) {
+    return true;
+  }
+  if (!location) return false;
+  return String(farmer.locationIds || "")
+    .split(",")
+    .map((id) => id.trim())
+    .includes(String(location.id));
+}
 
 const Farmers: NextPage = () => {
   const { t } = useLanguage();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const didApplyDefaultLocation = useRef(false);
 
-  const [farmers, setFarmers] = useState<Farmer[]>([]);
+  const [allFarmers, setAllFarmers] = useState<Farmer[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFarmer, setSelectedFarmer] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
 
   const [currentPage, setCurrentPage] = useState(1);
-  const [limit, setLimit] = useState(10);
+  const [listVersion, setListVersion] = useState(0);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
@@ -68,31 +87,55 @@ const Farmers: NextPage = () => {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !locations.length || didApplyDefaultLocation.current) return;
+    if (authLoading || didApplyDefaultLocation.current) return;
     if (sectorOnly && user?.sectorName) {
       setSelectedLocation(user.sectorName);
       didApplyDefaultLocation.current = true;
-      return;
     }
-    const picked = pickDefaultLocation(user, locations);
-    if (picked) {
-      setSelectedLocation(picked.name);
-      didApplyDefaultLocation.current = true;
-    }
-  }, [authLoading, sectorOnly, user, locations]);
+  }, [authLoading, sectorOnly, user?.sectorName]);
+
+  const filteredFarmers = useMemo(() => {
+    const location = locations.find((item) => item.name === selectedLocation);
+    const query = searchTerm.trim().toLowerCase();
+    return allFarmers.filter((farmer) => {
+      if (selectedLocation !== "all" && !farmerInLocation(farmer, selectedLocation, location)) {
+        return false;
+      }
+      if (!query) return true;
+      const haystack = [
+        farmer.name,
+        farmer.phone,
+        ...(farmer.locations || []).map((item) => item.name),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [allFarmers, locations, selectedLocation, searchTerm]);
+
+  const totalCount = filteredFarmers.length;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const page = Math.min(currentPage, totalPages);
+  const farmers = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredFarmers.slice(start, start + PAGE_SIZE);
+  }, [filteredFarmers, page]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchFarmers();
-    }
-  }, [selectedLocation, searchTerm, currentPage, limit, isAuthenticated]);
+    if (!isAuthenticated) return;
+    fetchFarmers();
+  }, [isAuthenticated, listVersion]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedLocation, searchTerm]);
 
   const fetchLocations = async () => {
     try {
       const response = await api.get<ApiResponse<LocationsResponse>>('/api/users/locations/all', {
-        params: { limit: 100 }
+        params: { limit: 500, page: 1 }
       });
-      setLocations(sortLocationsDistrictFirst(response.data.locations || []));
+      setLocations(sortLocationsDistrictFirst(unwrapRecords<Location>(response, "locations")));
     } catch (error: any) {
       console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));
@@ -102,31 +145,36 @@ const Farmers: NextPage = () => {
   const fetchFarmers = async () => {
     setIsLoading(true);
     try {
-      const filters: FarmerFilters = {
-        limit,
-        offset: (currentPage - 1) * limit,
-      };
+      const collected: Farmer[] = [];
+      const pageSize = 100;
+      let pageNumber = 1;
+      let reportedTotal = Infinity;
 
-      if (selectedLocation !== "all") {
-        const location = locations.find(l => l.name === selectedLocation);
-        if (location) {
-          filters.locationId = location.id;
-        }
+      while (pageNumber <= 50 && collected.length < reportedTotal) {
+        const response = await api.get<ApiResponse<FarmersResponse>>('/api/admin/farmers', {
+          params: {
+            limit: pageSize,
+            page: pageNumber,
+            offset: (pageNumber - 1) * pageSize,
+          },
+        });
+        const body = response as Record<string, any>;
+        const nested = body?.data?.data ?? body?.data ?? body;
+        const batch = unwrapRecords<Farmer>(response, "farmers");
+        reportedTotal = Number(nested?.count ?? nested?.total ?? nested?.pagination?.total ?? reportedTotal) || reportedTotal;
+        const before = new Set(collected.map((farmer) => farmer.id)).size;
+        collected.push(...batch);
+        const after = new Set(collected.map((farmer) => farmer.id)).size;
+        if (batch.length < pageSize || after === before) break;
+        pageNumber += 1;
       }
 
-      if (searchTerm.trim()) {
-        filters.search = searchTerm.trim();
-      }
-
-      const response = await api.get<ApiResponse<FarmersResponse>>('/api/admin/farmers', {
-        params: filters
-      });
-
-      setFarmers(response.data.farmers);
-      setTotalCount(response.data.count);
+      const unique = Array.from(new Map(collected.map((farmer) => [farmer.id, farmer])).values());
+      setAllFarmers(unique);
     } catch (error: any) {
       console.error('Failed to fetch farmers:', error);
       toast.error(t('failedToLoadFarmers'));
+      setAllFarmers([]);
     } finally {
       setIsLoading(false);
     }
@@ -148,50 +196,19 @@ const Farmers: NextPage = () => {
     }
   };
 
-  const fetchAllFarmersForExport = async (): Promise<Farmer[]> => {
-    try {
-      const filters: FarmerFilters = {
-        limit: 100,
-        offset: 0,
-      };
-
-      if (selectedLocation !== "all") {
-        const location = locations.find(l => l.name === selectedLocation);
-        if (location) {
-          filters.locationId = location.id;
-        }
-      }
-
-      if (searchTerm.trim()) {
-        filters.search = searchTerm.trim();
-      }
-
-      const response = await api.get<ApiResponse<FarmersResponse>>('/api/admin/farmers', {
-        params: filters
-      });
-
-      return response.data.farmers;
-    } catch (error) {
-      console.error('Failed to fetch all farmers for export:', error);
-      throw error;
-    }
-  };
-
   const handleExportFarmers = async () => {
     setIsExporting(true);
     try {
-      const allFarmers = await fetchAllFarmersForExport();
-
-      if (allFarmers.length === 0) {
+      if (filteredFarmers.length === 0) {
         toast.error(t('noDataToExport'));
         return;
       }
 
-      const exportData = allFarmers.map(farmer => ({
+      const exportData = filteredFarmers.map(farmer => ({
         [t('farmerId')]: farmer.id,
         [t('name')]: farmer.name,
         [t('phoneNumber')]: farmer.phone,
-        [t('locations')]: farmer.locations.map(loc => loc.name).join('; '),
+        [t('locations')]: (farmer.locations || []).map(loc => loc.name).join('; '),
         [t('status')]: farmer.isActive ? t('active') : t('inactive'),
         [t('createdAt')]: new Date(farmer.createdAt).toLocaleDateString(),
         [t('updatedAt')]: new Date(farmer.updatedAt).toLocaleDateString(),
@@ -208,7 +225,7 @@ const Farmers: NextPage = () => {
 
       api.exportAsCSV(exportData, filename);
 
-      toast.success(t('farmersExportedSuccessfully') + ` (${allFarmers.length} ${t('farmers')})`);
+      toast.success(t('farmersExportedSuccessfully') + ` (${filteredFarmers.length} ${t('farmers')})`);
     } catch (error: any) {
       console.error('Export error:', error);
       toast.error(t('failedToExportFarmers'));
@@ -229,15 +246,16 @@ const Farmers: NextPage = () => {
   };
 
   const handleDialogSuccess = () => {
-    fetchFarmers();
     setSelectedFarmer(null);
+    setSearchTerm("");
+    setCurrentPage(1);
+    if (!sectorOnly) setSelectedLocation("all");
+    setListVersion((version) => version + 1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / limit));
-
-  const handlePageChange = (page: number) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
+  const handlePageChange = (nextPage: number) => {
+    if (nextPage >= 1 && nextPage <= totalPages) {
+      setCurrentPage(nextPage);
     }
   };
 
@@ -262,7 +280,15 @@ const Farmers: NextPage = () => {
       header: "#",
       width: "72px",
       numeric: true,
-      value: (row: Farmer) => row.id,
+      sortable: false,
+      value: (row: Farmer) => {
+        const index = farmers.findIndex((farmer) => farmer.id === row.id);
+        return (page - 1) * PAGE_SIZE + index + 1;
+      },
+      cell: (row: Farmer) => {
+        const index = farmers.findIndex((farmer) => farmer.id === row.id);
+        return (page - 1) * PAGE_SIZE + Math.max(0, index) + 1;
+      },
     },
     {
       id: "name",
@@ -286,8 +312,8 @@ const Farmers: NextPage = () => {
     {
       id: "locations",
       header: t("locations"),
-      value: (row: Farmer) => row.locations.map((location) => location.name).join(", "),
-      cell: (row: Farmer) => row.locations.map((location) => location.name).join(", ") || "—",
+      value: (row: Farmer) => (row.locations || []).map((location) => location.name).join(", "),
+      cell: (row: Farmer) => (row.locations || []).map((location) => location.name).join(", ") || "—",
     },
     {
       id: "status",
@@ -423,33 +449,31 @@ const Farmers: NextPage = () => {
                   />
                 </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="primary"
-                      size="icon"
-                      className="h-10 w-10 rounded-lg shrink-0"
-                      title={selectedLocation === "all" ? t("allLocations") : selectedLocation}
-                    >
-                      <Filter className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                <Select
+                  value={selectedLocation}
+                  onValueChange={(value) => {
+                    setSelectedLocation(value);
+                    setCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger
+                    className="h-10 w-full sm:w-[220px] rounded-lg border-gray-200 bg-white gap-2"
+                    aria-label={t("location")}
+                  >
+                    <MapPin className="h-4 w-4 shrink-0 text-[#147677]" />
+                    <SelectValue placeholder={t("selectLocation")} />
+                  </SelectTrigger>
+                  <SelectContent>
                     {!sectorOnly && (
-                      <DropdownMenuItem onClick={() => { setSelectedLocation("all"); setCurrentPage(1); }}>
-                        {t("allLocations")}
-                      </DropdownMenuItem>
+                      <SelectItem value="all">{t("allLocations")}</SelectItem>
                     )}
                     {farmerLocations.map((location) => (
-                      <DropdownMenuItem
-                        key={location.id}
-                        onClick={() => { setSelectedLocation(location.name); setCurrentPage(1); }}
-                      >
+                      <SelectItem key={location.id} value={location.name}>
                         {locationDisplayName(location)}
-                      </DropdownMenuItem>
+                      </SelectItem>
                     ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -460,7 +484,7 @@ const Farmers: NextPage = () => {
               columns={columns}
               getRowId={(row) => String(row.id)}
               loading={isLoading}
-              skeletonRows={limit}
+              skeletonRows={PAGE_SIZE}
               rowHeight={56}
               emptyState={
                 <div className="flex flex-col items-center space-y-2">
@@ -479,7 +503,7 @@ const Farmers: NextPage = () => {
                 variant="boxed"
                 showEdges
                 count={totalPages}
-                page={currentPage}
+                page={page}
                 onPageChange={handlePageChange}
               />
             </div>
