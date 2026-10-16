@@ -85,6 +85,7 @@ export interface FarmerFilters {
     locationId?: number;
     limit?: number;
     offset?: number;
+    page?: number;
     search?: string;
 }
 
