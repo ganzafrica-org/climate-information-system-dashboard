@@ -15,6 +15,7 @@ export interface User {
   assignmentLevel?: AssignmentLevel | null;
   sectorName?: string | null;
   districtName?: string | null;
+  mustChangePassword?: boolean;
 }
 
 export interface CreateUserInput {
