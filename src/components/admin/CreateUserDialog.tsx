@@ -25,85 +25,59 @@ interface InviteUserInput {
   sectorName: string;
 }
 
-// Use the existing API client instead of fetch
-const inviteUser = async (data: InviteUserInput): Promise<User> => {
+function inviteErrorMessage(error: any): string {
+  const status = error?.response?.status;
+  const backendMessage = error?.response?.data?.message;
+  const backendErrors = error?.response?.data?.errors;
+  const backendData = error?.response?.data;
+
+  if (status === 409) {
+    return backendMessage || "A user with this email, phone, or username already exists.";
+  }
+
+  if (status === 400 || status === 422) {
+    if (Array.isArray(backendErrors) && backendErrors.length > 0) {
+      const msg = backendErrors.map((item: any) => {
+        if (typeof item === "string") return item;
+        return item?.message || item?.msg || JSON.stringify(item);
+      }).join("\n");
+      return msg || "Validation error: Please check your input fields.";
+    }
+    if (backendMessage) return backendMessage;
+    return backendData?.error || backendData?.message || `Bad Request (${status}): Please check your input fields.`;
+  }
+
+  return backendMessage || error?.message || "Failed to create user";
+}
+
+type InviteResult = { ok: true; user: User } | { ok: false; message: string };
+
+const inviteUser = async (data: InviteUserInput): Promise<InviteResult> => {
+  const sanitized: Record<string, string> = {
+    email: data.email?.trim().toLowerCase(),
+    role: data.role,
+    ...assignmentPayload(data.role, data.assignmentLevel, data.sectorName),
+  };
+
+  const usernameTrimmed = data.username?.trim();
+  if (usernameTrimmed) sanitized.username = usernameTrimmed;
+
+  const phoneTrimmed = data.phone?.trim();
+  if (phoneTrimmed) sanitized.phone = phoneTrimmed;
+
   try {
-    // Sanitize payload: trim fields, lowercase email
-    // Try including username in case backend requires it
-    const sanitized: any = {
-      email: data.email?.trim().toLowerCase(),
-      role: data.role,
-      ...assignmentPayload(data.role, data.assignmentLevel, data.sectorName),
-    };
-    
-    // Include username if provided (some backends might require it)
-    const usernameTrimmed = data.username?.trim();
-    if (usernameTrimmed) {
-      sanitized.username = usernameTrimmed;
-    }
-    
-    // Include phone if provided
-    const phoneTrimmed = data.phone?.trim();
-    if (phoneTrimmed) {
-      sanitized.phone = phoneTrimmed;
-    }
-
-    // Log the payload for debugging
-    console.log('Inviting user with payload:', sanitized);
-
     try {
-      return await api.post<User>('/api/admin/users/invite', sanitized);
+      const user = await api.post<User>("/api/admin/users/invite", sanitized);
+      return { ok: true, user };
     } catch (inviteError: any) {
       if (inviteError?.response?.status !== 404) {
-        throw inviteError;
+        return { ok: false, message: inviteErrorMessage(inviteError) };
       }
-      return await api.post<User>('/api/auth/invite', sanitized);
+      const user = await api.post<User>("/api/auth/invite", sanitized);
+      return { ok: true, user };
     }
   } catch (error: any) {
-    // Provide clearer messages based on common API responses
-    const status = error?.response?.status;
-    const backendMessage = error?.response?.data?.message;
-    const backendErrors = error?.response?.data?.errors;
-    const backendData = error?.response?.data;
-
-    // Log full error for debugging
-    console.error('Invite user error:', {
-      status,
-      backendMessage,
-      backendErrors,
-      backendData,
-      fullError: error
-    });
-
-    if (status === 409) {
-      throw new Error(backendMessage || 'A user with this email or username already exists.');
-    }
-
-    if (status === 400 || status === 422) {
-      // Aggregate validation errors if present
-      if (Array.isArray(backendErrors) && backendErrors.length > 0) {
-        const msg = backendErrors.map((e: any) => {
-          if (typeof e === 'string') return e;
-          return e?.message || e?.msg || JSON.stringify(e);
-        }).join('\n');
-        throw new Error(msg || 'Validation error: Please check your input fields.');
-      }
-      if (backendMessage) {
-        throw new Error(backendMessage);
-      }
-      // If no specific message, provide a generic one with status
-      throw new Error(backendData?.error || backendData?.message || `Bad Request (${status}): Please check your input fields.`);
-    }
-
-    if (backendMessage) {
-      throw new Error(backendMessage);
-    }
-
-    if (error.message) {
-      throw new Error(error.message);
-    }
-
-    throw new Error('Failed to create user');
+    return { ok: false, message: inviteErrorMessage(error) };
   }
 };
 
@@ -168,16 +142,17 @@ export default function CreateUserDialog({ open, onOpenChange, onSuccess }: Crea
     }
     setIsLoading(true);
     try {
-      const created = await inviteUser(form);
+      const result = await inviteUser(form);
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
       toast.success("User created successfully");
-      onSuccess(created);
+      onSuccess(result.user);
       onOpenChange(false);
       setForm(emptyForm);
     } catch (e: any) {
-      // Show detailed error message
-      const errorMessage = e.message || e.response?.data?.message || "Failed to create user";
-      console.error("Create user error details:", e);
-      toast.error(errorMessage);
+      toast.error(inviteErrorMessage(e));
     } finally {
       setIsLoading(false);
     }
