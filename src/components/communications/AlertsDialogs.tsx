@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
 import { toast } from 'sonner';
+import { devError, devLog } from '@/lib/dev-log';
 import api from '@/lib/api';
 import { isPlaceholderSms } from '@/lib/alertMessage';
 import { fetchFarmerSmsForAlert } from '@/lib/farmerSms';
@@ -370,17 +371,17 @@ export function EditAlertDialog({
         deliveryMethod: formData.deliveryMethod
       };
 
-      console.log('Updating alert with data:', updateData);
+      devLog('Updating alert with data:', updateData);
 
       const response = await api.put(`/api/weather/alerts/${alert.id}/update`, updateData);
 
-      console.log('Update response:', response);
+      devLog('Update response:', response);
 
       toast.success(t('alertUpdatedSuccessfully') || 'Alert updated successfully');
       onSuccess();
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Failed to update alert:', error);
+      devError('Failed to update alert:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to update alert';
       toast.error(errorMessage);
     } finally {

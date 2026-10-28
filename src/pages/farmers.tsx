@@ -137,7 +137,6 @@ const Farmers: NextPage = () => {
       });
       setLocations(sortLocationsDistrictFirst(unwrapRecords<Location>(response, "locations")));
     } catch (error: any) {
-      console.error('Failed to fetch locations:', error);
       toast.error(t('failedToLoadLocations'));
     }
   };
@@ -172,7 +171,6 @@ const Farmers: NextPage = () => {
       const unique = Array.from(new Map(collected.map((farmer) => [farmer.id, farmer])).values());
       setAllFarmers(unique);
     } catch (error: any) {
-      console.error('Failed to fetch farmers:', error);
       toast.error(t('failedToLoadFarmers'));
       setAllFarmers([]);
     } finally {
@@ -227,7 +225,6 @@ const Farmers: NextPage = () => {
 
       toast.success(t('farmersExportedSuccessfully') + ` (${filteredFarmers.length} ${t('farmers')})`);
     } catch (error: any) {
-      console.error('Export error:', error);
       toast.error(t('failedToExportFarmers'));
     } finally {
       setIsExporting(false);

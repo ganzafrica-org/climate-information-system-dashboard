@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
+import { devLog } from '@/lib/dev-log';
 import { Location, ApiResponse, CreateLocationResponse, LocationValidation } from '@/types/farmer';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -297,7 +298,7 @@ export function ViewLocationDialog({ open, onOpenChange, locationId, onEdit }: V
         setError(null);
         try {
             const response = await api.get(`/api/admin/locations/${id}`);
-            console.log('API Response:', response.data); // Debug log
+            devLog('API Response:', response.data); // Debug log
             
             // Handle different possible response structures
             let locationData = null;

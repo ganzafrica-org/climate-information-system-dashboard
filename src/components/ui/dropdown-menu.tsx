@@ -244,7 +244,7 @@ export function DropdownMenuContent({
             // Portals to <body>; must sit above Leaflet panes (max ~700) and the
             // map overlay panels/popover (z-[500]/z-[600]) so the profile menu
             // is never occluded by the map.
-            "z-[1000] min-w-[200px] whitespace-nowrap rounded-[11px] border border-border bg-popover p-[5px] text-popover-foreground shadow-lg",
+            "z-[1000] max-h-[min(20rem,calc(100vh-6rem))] min-w-[200px] overflow-y-auto overscroll-contain whitespace-nowrap rounded-[11px] border border-border bg-popover p-[5px] text-popover-foreground shadow-lg",
             className
           )}
         >

@@ -9,6 +9,7 @@ import {
   type SectorWeather,
 } from "@/lib/weather"
 import { MUSANZE_DISTRICT_LOCATION, isDistrictLocationName } from "@/lib/assignment"
+import { kigaliTodayISO } from "@/lib/weatherFormat"
 import type { Locale } from "@/i18n"
 
 export type ChatKind = "today" | "week" | "spray" | "heavy" | "seasons" | "static"
@@ -157,7 +158,8 @@ export function answerTopic(
 ): string {
   const { sector, sw } = opts
   const days = opts.days?.length ? opts.days : daysOf(sw)
-  const today = days[0]
+  const todayIso = kigaliTodayISO()
+  const today = days.find((day) => day.iso === todayIso)
 
   if (topic.kind === "static") {
     return topic.answer?.[lang] || topic.answer?.en || ""
@@ -190,7 +192,7 @@ export function answerTopic(
 
   if (topic.kind === "week") {
     const lines = days.slice(0, 8).map((x) => {
-      const when = x.index === 0 ? (lang === "rw" ? "Uyu munsi" : "Today") : `${x.date.getDate()} ${x.date.toLocaleString("en", { month: "short" })}`
+      const when = x.iso === todayIso ? (lang === "rw" ? "Uyu munsi" : "Today") : `${x.date.getDate()} ${x.date.toLocaleString("en", { month: "short", timeZone: "Africa/Kigali" })}`
       return `• ${when}: ${rainLine(x, lang)} (${x.rainChance}%)`
     })
     const head = lang === "rw" ? `Imvura iteganyijwe i ${sector}:` : `Rain forecast for ${sector}:`
@@ -201,7 +203,7 @@ export function answerTopic(
     const rows = days.slice(0, 3).map((x) => {
       const mm = x.rainfall ?? 0
       const cat = fieldCat(x.rainChance, mm)
-      const when = x.index === 0 ? (lang === "rw" ? "Uyu munsi" : "Today") : `${x.date.getDate()} ${x.date.toLocaleString("en", { month: "short" })}`
+      const when = x.iso === todayIso ? (lang === "rw" ? "Uyu munsi" : "Today") : `${x.date.getDate()} ${x.date.toLocaleString("en", { month: "short", timeZone: "Africa/Kigali" })}`
       const extra = amountCat(mm) === "heavy" || amountCat(mm) === "moderate"
       const note = extra
         ? lang === "rw" ? "imvura iringaniye cyangwa nyinshi" : "moderate or heavy rain in the forecast"
@@ -232,7 +234,7 @@ export function answerTopic(
           : `No day in the ${sector} forecast here has heavy rain (20 mm+).`
       return body
     }
-    const lines = hits.map((x) => `• ${x.index === 0 ? (lang === "rw" ? "Uyu munsi" : "Today") : `${x.date.getDate()} ${x.date.toLocaleString("en", { month: "short" })}`}: ${rainLine(x, lang)}`)
+    const lines = hits.map((x) => `• ${x.iso === todayIso ? (lang === "rw" ? "Uyu munsi" : "Today") : `${x.date.getDate()} ${x.date.toLocaleString("en", { month: "short", timeZone: "Africa/Kigali" })}`}: ${rainLine(x, lang)}`)
     const head =
       lang === "rw"
         ? `Iminsi ifite imvura nyinshi i ${sector}:`

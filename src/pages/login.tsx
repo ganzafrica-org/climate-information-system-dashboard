@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Eye, EyeOff, Loader2, User, Lock, Globe, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { useRouter } from 'next/router';
+import { consumeSessionExpired } from '@/lib/session';
 
 const useLanguage = () => {
     const [locale, setLocale] = useState('en');
@@ -21,7 +22,9 @@ const useLanguage = () => {
             signUp: 'Sign up',
             allRightsReserved: 'All rights reserved.',
             pleaseEnterUsernameAndPassword: 'Please enter username and password',
-            loginFailed: 'Login failed'
+            loginFailed: 'Login failed',
+            forgotPassword: 'Forgot password?',
+            sessionExpired: 'Your session expired. Sign in again.'
         },
         rw: {
             login: 'Kwinjira',
@@ -37,7 +40,9 @@ const useLanguage = () => {
             signUp: 'Iyandikishe',
             allRightsReserved: 'Uburenganzira bwose burahagarikwa.',
             pleaseEnterUsernameAndPassword: 'Nyamuneka injiza izina ry\'ukoresha n\'ijambo ry\'ibanga',
-            loginFailed: 'Kwinjira byanze'
+            loginFailed: 'Kwinjira byanze',
+            forgotPassword: 'Wibagiwe ijambo ry\'ibanga?',
+            sessionExpired: 'Igihe cyo kwinjira cyarangiye. Ongera winjire.'
         }
     };
     
@@ -247,10 +252,15 @@ const LoginPage = () => {
     const { login, isLoading } = useAuth();
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
+    const [sessionExpired, setSessionExpired] = useState(false);
     const [formData, setFormData] = useState({
         username: '',
         password: '',
     });
+
+    useEffect(() => {
+        if (consumeSessionExpired()) setSessionExpired(true);
+    }, []);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -386,6 +396,13 @@ const LoginPage = () => {
 
                             <div className="space-y-4">
                                 {/* Error Message */}
+                                {sessionExpired && !error && (
+                                    <Alert className="flex items-center">
+                                        <AlertCircle className="h-4 w-4" />
+                                        <AlertDescription className="ml-2">{t('sessionExpired')}</AlertDescription>
+                                    </Alert>
+                                )}
+
                                 {error && (
                                     <Alert variant="destructive" className="flex items-center">
                                         <AlertCircle className="h-4 w-4" />
@@ -437,6 +454,12 @@ const LoginPage = () => {
                                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                         </button>
                                     </div>
+                                </div>
+
+                                <div className="flex justify-end">
+                                    <Link href="/forgot-password" className="text-sm font-semibold text-[#147677] hover:underline">
+                                        {t('forgotPassword')}
+                                    </Link>
                                 </div>
 
                                 {/* Submit Button */}

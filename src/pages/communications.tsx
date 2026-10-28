@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useEffect, useRef, useState } from 'react';
 import { AlertsTable } from '@/components/communications/AlertsTable';
 import { MessagesTable } from '@/components/communications/MessagesTable';
 import { WeatherSchedulerTable } from '@/components/communications/SchedulerTable';
@@ -18,6 +19,7 @@ export default function Communications() {
   const logsRef = useRef<MessageLogsTableHandle>(null);
   const { t } = useLanguage();
   const { user } = useAuth();
+  const router = useRouter();
 
   const tabs = [
     { value: 'alerts', label: t('alerts') },
@@ -25,6 +27,13 @@ export default function Communications() {
     { value: 'scheduler', label: t('weatherScheduler') },
     ...(user?.role === 'admin' ? [{ value: 'logs', label: t('logs') }] : []),
   ];
+
+  useEffect(() => {
+    const tab = router.query.tab;
+    if (typeof tab === 'string' && tabs.some((item) => item.value === tab)) {
+      setActiveTab(tab);
+    }
+  }, [router.query.tab, user?.role]);
 
   return (
     <AppLayout>

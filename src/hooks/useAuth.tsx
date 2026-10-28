@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/router';
+import { markSessionExpired, tokenIsExpired } from '@/lib/session';
 
 interface User {
     id: number;
@@ -57,25 +58,44 @@ export function AuthProvider({ children }: AuthProviderProps) {
     };
 
     useEffect(() => {
+        let cancelled = false;
+
         const initAuth = async () => {
-            const storedToken = localStorage.getItem('token');
-            const storedMustChange = localStorage.getItem('mustChangePassword') === 'true';
-            if (storedMustChange) setMustChangePassword(true);
-            if (storedToken) {
-                setToken(storedToken);
-                await fetchUserProfile(storedToken);
+            try {
+                const storedToken = localStorage.getItem('token');
+                const storedMustChange = localStorage.getItem('mustChangePassword') === 'true';
+                if (storedMustChange) setMustChangePassword(true);
+                if (storedToken && tokenIsExpired(storedToken)) {
+                    localStorage.removeItem('token');
+                    markSessionExpired();
+                } else if (storedToken && !cancelled) {
+                    setToken(storedToken);
+                    await fetchUserProfile(storedToken);
+                }
+            } catch {
+                localStorage.removeItem('token');
+                if (!cancelled) {
+                    setToken(null);
+                    setUser(null);
+                }
+            } finally {
+                if (!cancelled) {
+                    setIsLoading(false);
+                    setIsInitialized(true);
+                }
             }
-            setIsLoading(false);
-            setIsInitialized(true);
         };
 
-        initAuth();
+        void initAuth();
+        return () => {
+            cancelled = true;
+        };
     }, []);
 
     useEffect(() => {
         if (!isInitialized) return;
 
-        const isPublicRoute = router.pathname === '/login' || router.pathname === '/register';
+        const isPublicRoute = router.pathname === '/login' || router.pathname === '/register' || router.pathname === '/forgot-password';
         const isFirstPasswordRoute = router.pathname === '/first-password';
 
         if (!isAuthenticated && !isPublicRoute) {
@@ -94,6 +114,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }, [isAuthenticated, isInitialized, mustChangePassword, router.pathname, router]);
 
     const fetchUserProfile = async (authToken: string) => {
+        const clearSession = () => {
+            localStorage.removeItem('token');
+            setToken(null);
+            setUser(null);
+        };
+
         try {
             const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
                 headers: {
@@ -102,23 +128,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
                 },
             });
 
-            if (response.ok) {
-                const result = await response.json();
-                const profile = result.data ?? result;
-                setUser(profile);
-                if (typeof profile?.mustChangePassword === 'boolean') {
-                    persistMustChangePassword(profile.mustChangePassword);
-                }
-            } else {
-                localStorage.removeItem('token');
-                setToken(null);
-                setUser(null);
+            if (!response.ok) {
+                if (response.status === 401) markSessionExpired();
+                clearSession();
+                return;
             }
-        } catch (error) {
-            console.error('Error fetching user profile:', error);
-            localStorage.removeItem('token');
-            setToken(null);
-            setUser(null);
+
+            const result = await response.json();
+            const profile = result.data ?? result;
+            setUser(profile);
+            if (typeof profile?.mustChangePassword === 'boolean') {
+                persistMustChangePassword(profile.mustChangePassword);
+            }
+        } catch {
+            clearSession();
         }
     };
 
@@ -153,8 +176,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
             } else {
                 throw new Error(result.message || 'Login failed');
             }
-        } catch (error) {
-            throw error;
+        } catch (error: any) {
+            const network =
+                error?.name === 'TypeError' ||
+                error?.message === 'Failed to fetch' ||
+                error?.message === 'Load failed' ||
+                error?.message === 'Network Error';
+            throw new Error(
+                network
+                    ? 'Cannot reach the server. Check your connection and try again.'
+                    : (error?.message || 'Login failed')
+            );
         } finally {
             setIsLoading(false);
         }

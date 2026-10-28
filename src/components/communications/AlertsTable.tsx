@@ -17,6 +17,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { useLanguage } from '@/i18n';
+import { devError, devLog } from '@/lib/dev-log';
 import { Badge } from '../ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DataTable, type SortableColumn } from "@/components/ui/table";
@@ -232,10 +233,10 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
                 ...(search && { search }),
             };
 
-            console.log('Fetching alerts with params:', params);
+            devLog('Fetching alerts with params:', params);
             const response = await api.get('/api/weather/alerts', { params });
             
-            console.log('API Response:', response.data);
+            devLog('API Response:', response.data);
 
             // Handle different response formats
             let alertsData: Alert[] = [];
@@ -313,8 +314,8 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             }
 
         } catch (error: any) {
-            console.error('Failed to fetch alerts:', error);
-            console.error('Error details:', {
+            devError('Failed to fetch alerts:', error);
+            devError('Error details:', {
                 message: error.message,
                 response: error.response?.data,
                 status: error.response?.status
@@ -400,7 +401,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
     };
 
     const handleEditAlert = (alert: Alert) => {
-        console.log('Edit alert:', alert);
+        devLog('Edit alert:', alert);
         setSelectedAlert(alert);
         setIsViewDialogOpen(false);
         setIsEditDialogOpen(true);
@@ -412,7 +413,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             toast.success(t('alertDeleted') || 'Alert deleted');
             fetchAlerts(currentPage, true);
         } catch (error: any) {
-            console.error('Failed to delete alert:', error);
+            devError('Failed to delete alert:', error);
             toast.error(t('failedToDeleteAlert') || 'Failed to delete alert');
         }
     };
@@ -470,7 +471,7 @@ export function AlertsTable({ selectedSector, searchTerm }: AlertsTableProps) {
             setShowDeleteConfirm(false);
             fetchAlerts(currentPage, true);
         } catch (error: any) {
-            console.error('Failed to delete alerts:', error);
+            devError('Failed to delete alerts:', error);
             toast.error(t('failedToDeleteAlerts') || 'Failed to delete some alerts');
         }
     };

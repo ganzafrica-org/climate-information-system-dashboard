@@ -139,7 +139,6 @@ export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChang
             setLogs(allLogs);
             setSummary(normalizeSummary(collectedSummary, allLogs));
         } catch (error: any) {
-            console.error('Failed to fetch message logs:', error);
             toast.error(t('failedToLoadLogs'));
             setLogs([]);
             setSummary({ total: 0, sent: 0, failed: 0, pending: 0, sentYesterday: 0, failedYesterday: 0 });
