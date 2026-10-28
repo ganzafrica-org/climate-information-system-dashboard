@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import api from "@/lib/api"
+import { retryUnlessSignedOut } from "@/lib/session"
 import type { ApiResponse, WeatherData } from "@/types/weather"
 
 // Shared data + helpers for the Forecast and Historical weather pages.
@@ -216,7 +217,7 @@ export function useSectorWeather() {
       }
     },
     staleTime: 30 * 60 * 1000,
-    retry: 1,
+    retry: retryUnlessSignedOut,
   })
 }
 
@@ -266,6 +267,10 @@ export function rainCatFromApi(
 }
 
 function dayDate(d: { dt?: number | string; date?: string }, fallback = new Date()) {
+  if (d?.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date)) {
+    const [year, month, day] = d.date.split("-").map(Number)
+    return new Date(year, month - 1, day, 12, 0, 0)
+  }
   if (d?.date) {
     const parsed = new Date(d.date)
     if (!Number.isNaN(parsed.getTime())) return parsed
@@ -291,6 +296,87 @@ function toDay(index: number, d: SectorDay, sw: SectorWeather): Day {
     humidity: d.humidity ?? sw.humidity ?? null,
     windKmh: msToKmh(d.windSpeed ?? sw.windSpeed),
   }
+}
+
+export type HeavyRainSpot = {
+  place: string
+  iso: string
+  date: Date
+  mm: number
+  kind: "heavy_rain" | "very_heavy"
+}
+
+/** Places whose OpenWeatherMap 24-hour total is heavy (20 mm) or very heavy (over 50 mm). */
+export function heavyRainSpots(sectors: SectorWeather[] | undefined): HeavyRainSpot[] {
+  const spots: HeavyRainSpot[] = []
+  for (const sw of sectors || []) {
+    if (!sw?.sector || sw.error) continue
+    for (const day of sectorDays(sw)) {
+      const cat = asRainCat(day.rainCategory) ?? (day.rainfall != null ? rainfallCategory(day.rainfall) : undefined)
+      if (cat !== "heavy_rain" && cat !== "very_heavy") continue
+      spots.push({
+        place: sw.sector,
+        iso: day.iso,
+        date: day.date,
+        mm: day.rainfall ?? 0,
+        kind: cat,
+      })
+    }
+  }
+  spots.sort((a, b) => a.iso.localeCompare(b.iso) || b.mm - a.mm || a.place.localeCompare(b.place))
+  return spots
+}
+
+export type HeavyRainGroup = {
+  iso: string
+  date: Date
+  kind: "heavy_rain" | "very_heavy"
+  places: { place: string; mm: number }[]
+}
+
+export function heavyRainCoversAllSectors(places: { place: string }[]) {
+  const found = new Set(places.map((place) => place.place))
+  return SECTORS.every((sector) => found.has(sector))
+}
+
+/** Names the places that are heavy that day. One place stays a plain name. */
+export function heavyLocationLabel(
+  places: { place: string; mm: number }[],
+  formatMm: (mm: number) => string,
+  lang: "en" | "rw",
+) {
+  const join = (names: string[]) => {
+    if (names.length <= 1) return names[0] || ""
+    const conj = lang === "rw" ? "na" : "and"
+    if (names.length === 2) return `${names[0]} ${conj} ${names[1]}`
+    return `${names.slice(0, -1).join(", ")} ${conj} ${names[names.length - 1]}`
+  }
+  if (places.length === 1) return places[0]?.place || ""
+  const buckets = new Map<string, string[]>()
+  for (const place of places) {
+    const mm = formatMm(place.mm)
+    const names = buckets.get(mm) || []
+    names.push(place.place)
+    buckets.set(mm, names)
+  }
+  return join([...buckets.entries()].map(([mm, names]) => `${join(names)} (${mm} mm)`))
+}
+
+/** One group per day. A day stays "heavy" unless every place that day is very heavy. */
+export function groupHeavyRain(spots: HeavyRainSpot[]): HeavyRainGroup[] {
+  const groups: HeavyRainGroup[] = []
+  for (const spot of spots) {
+    let group = groups.find((item) => item.iso === spot.iso)
+    if (!group) {
+      group = { iso: spot.iso, date: spot.date, kind: spot.kind, places: [] }
+      groups.push(group)
+    }
+    if (spot.kind !== "very_heavy") group.kind = "heavy_rain"
+    if (!group.places.some((item) => item.place === spot.place)) {
+      group.places.push({ place: spot.place, mm: spot.mm })
+    }
+  }
+  return groups
 }
 
 export function sectorDays(sw: SectorWeather | undefined): Day[] {
@@ -328,7 +414,7 @@ export function useLocationWeather(locationId: number | null | undefined) {
     },
     enabled: locationId != null,
     staleTime: 30 * 60 * 1000,
-    retry: 1,
+    retry: retryUnlessSignedOut,
   })
 }
 
@@ -336,7 +422,23 @@ export function useLocationWeather(locationId: number | null | undefined) {
 // History: all sectors, one row per day
 // ---------------------------------------------------------------------------
 
-export type DailyRecord = { date: string; min: number; max: number; avg: number; rain: number; rainChance: number | null }
+export type DailyRecord = {
+  date: string
+  /** True when this row's saved forecast includes this exact date. */
+  matchedDay?: boolean
+  min: number
+  max: number
+  avg: number
+  rain: number
+  rainChance: number | null
+  rainCategory?: string | null
+  rainLabel?: string | null
+  humidity?: number | null
+  windSpeed?: number | null
+  condition?: string | null
+  conditionMain?: string | null
+  overview?: string | null
+}
 
 export type SectorHistoryRows = {
   sector: string
@@ -362,7 +464,7 @@ export function useSectorHistory(startDate: string, endDate: string, enabled = t
     },
     enabled: enabled && !!startDate && !!endDate,
     staleTime: 15 * 60 * 1000,
-    retry: 1,
+    retry: retryUnlessSignedOut,
   })
 }
 

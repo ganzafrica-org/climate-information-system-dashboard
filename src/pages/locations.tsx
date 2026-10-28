@@ -62,7 +62,6 @@ const Locations: NextPage = () => {
     }, [searchTerm, currentPage, limit, isAuthenticated]);
 
     const handleApiError = (error: any) => {
-        console.error('API Error:', error);
         setHasError(true);
 
         if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
@@ -158,7 +157,6 @@ const Locations: NextPage = () => {
 
             return response.data.locations;
         } catch (error) {
-            console.error('Failed to fetch all locations for export:', error);
             throw error;
         }
     };
@@ -193,7 +191,6 @@ const Locations: NextPage = () => {
 
             toast.success(t('locationsExportedSuccessfully') + ` (${allLocations.length} ${t('locations')})`);
         } catch (error: any) {
-            console.error('Export error:', error);
             toast.error(t('failedToExportLocations'));
         } finally {
             setIsExporting(false);

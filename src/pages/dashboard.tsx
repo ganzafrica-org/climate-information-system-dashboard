@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { NextPage } from 'next';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import Link from 'next/link';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
@@ -26,6 +27,9 @@ import {
     MessageSquare,
     AlertTriangle,
     ArrowUpRight,
+    Bell,
+    Info,
+    X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/lib/api';
@@ -47,7 +51,10 @@ import {
 } from 'recharts';
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { rainfallCategory } from '@/lib/weather';
-import { locationDisplayName, pickDefaultLocation, sortLocationsDistrictFirst } from '@/lib/assignment';
+import { addISODays, kigaliNowParts, kigaliTodayISO, kigaliWeekDates, monthName, weekday, KIGALI_TZ } from '@/lib/weatherFormat';
+import { locationDisplayName, pickDefaultLocation, sortLocationsDistrictFirst, isDistrictLocationName } from '@/lib/assignment';
+import { useSectorHistory } from '@/lib/weather';
+import { isSigningInAgain, isUnauthorized } from '@/lib/session';
 
 const SoftCard = ({ children, className }: { children: React.ReactNode; className?: string }) => (
     <div className={cn('bg-white rounded-2xl shadow-[0_8px_24px_rgba(15,40,80,0.06)]', className)}>
@@ -123,6 +130,20 @@ const Dashboard: NextPage = () => {
         messagesSectorName: null,
     });
     const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+    const [dismissedWatch, setDismissedWatch] = useState<string | null>(null);
+    const weatherRequest = useRef(0);
+    const todayIso = kigaliTodayISO();
+    const weekStart = kigaliWeekDates(todayIso)[0];
+    const yesterdayIso = addISODays(todayIso, -1);
+    const savedWeekQ = useSectorHistory(weekStart, yesterdayIso, yesterdayIso >= weekStart);
+
+    useEffect(() => {
+        try {
+            setDismissedWatch(sessionStorage.getItem('weather-watch-dismissed'));
+        } catch {
+            /* keep the notice visible if storage is blocked */
+        }
+    }, []);
 
     useEffect(() => {
         fetchLocations();
@@ -134,7 +155,7 @@ const Dashboard: NextPage = () => {
         const picked = pickDefaultLocation(user, locations);
         if (!picked) return;
         setSelectedLocation((current) => {
-            if (!current || current.name === "Musanze") return picked;
+            if (!current || !locations.some((location) => location.id === current.id)) return picked;
             if (user?.assignmentLevel === "sector" && user.sectorName && current.name !== user.sectorName) {
                 return picked;
             }
@@ -143,16 +164,18 @@ const Dashboard: NextPage = () => {
     }, [authLoading, user, locations]);
 
     useEffect(() => {
-        if (selectedLocation) {
-            fetchWeatherData(selectedLocation.id);
-        }
-    }, [selectedLocation]);
+        if (!selectedLocation) return;
+        const requestId = ++weatherRequest.current;
+        setWeatherData(null);
+        setTodayWeather(null);
+        fetchWeatherData(selectedLocation.id, requestId);
+    }, [selectedLocation?.id, locale]);
 
     const isToday = (value?: string | null) => {
         if (!value) return false;
         const date = new Date(value);
         if (Number.isNaN(date.getTime())) return false;
-        return date.toDateString() === new Date().toDateString();
+        return kigaliTodayISO(date) === kigaliTodayISO();
     };
 
     const parseTimestamp = (value: unknown): number | null => {
@@ -309,7 +332,7 @@ const Dashboard: NextPage = () => {
                 messagesSectorName,
             });
         } catch (error: any) {
-            console.error('Failed to fetch dashboard stats:', error);
+            if (isUnauthorized(error) || error?.sessionExpired) return;
             setDashboardStats({
                 totalFarmers: 0,
                 messagesSent: 0,
@@ -340,25 +363,25 @@ const Dashboard: NextPage = () => {
             const picked = pickDefaultLocation(user, list);
             if (picked) setSelectedLocation(picked);
         } catch (error: any) {
-            console.error('Byanze kubona ahantu:', error);
+            if (isUnauthorized(error) || error?.sessionExpired) return;
             toast.error(t('failedToLoadLocations'));
         } finally {
             setIsLoading(false);
         }
     };
 
-    const fetchWeatherData = async (locationId: number) => {
+    const fetchWeatherData = async (locationId: number, requestId = ++weatherRequest.current) => {
         try {
-            const params: WeatherRequestParams = { type: 'daily' };
+            const params: WeatherRequestParams = { type: 'daily', createAlert: false };
             const response = await api.get<ApiResponse<WeatherData>>(
                 `/api/weather/location/${locationId}`,
                 { params }
             );
+            if (requestId !== weatherRequest.current) return;
 
             setWeatherData(response.data);
 
-            const todayIndex = response.data.weather.daily.findIndex(day => day.isToday);
-            const today = todayIndex !== -1 ? response.data.weather.daily[todayIndex] : response.data.weather.daily[0];
+            const today = response.data.weather.daily.find((day) => day.date === kigaliTodayISO()) || null;
             setTodayWeather(today);
 
             const payload = response.data as any;
@@ -383,7 +406,8 @@ const Dashboard: NextPage = () => {
             setLastUpdatedAt(updated);
 
         } catch (error: any) {
-            console.error('Byanze kubona amakuru y\'ibihe:', error);
+            if (requestId !== weatherRequest.current) return;
+            if (isUnauthorized(error) || error?.sessionExpired) return;
             toast.error(t('failedToLoadWeather'));
         }
     };
@@ -395,8 +419,10 @@ const Dashboard: NextPage = () => {
         try {
             await fetchWeatherData(selectedLocation.id);
             await fetchDashboardStats();
+            if (isSigningInAgain()) return;
             toast.success(t('weatherDataRefreshed'));
         } catch (error) {
+            if (isUnauthorized(error) || isSigningInAgain()) return;
             toast.error(t('failedToRefreshWeather'));
         } finally {
             setIsRefreshing(false);
@@ -404,20 +430,33 @@ const Dashboard: NextPage = () => {
     };
 
     const getCurrentSeason = () => {
-        const month = new Date().getMonth() + 1;
+        const month = kigaliNowParts().month;
         if (month >= 9 || month <= 2) return 'seasons.seasonA';
         if (month >= 3 && month <= 6) return 'seasons.seasonB';
         return 'seasons.seasonC';
     };
 
     const getGreeting = () => {
-        const hour = new Date().getHours();
+        const hour = kigaliNowParts().hour;
         if (hour < 12) return t('goodMorning');
         if (hour < 17) return t('goodAfternoon');
         return t('goodEvening');
     };
 
     const dateLocale = locale === 'rw' ? 'rw-RW' : undefined;
+    const lang = locale === 'rw' ? 'rw' : 'en';
+
+    const namedDay = (date: Date) => {
+        const week = weekday(date, lang, true);
+        const month = monthName(date.getMonth(), lang, true);
+        const dayNum = date.getDate();
+        if (lang === 'rw') {
+            const bare = week.replace(/^Kuwa\s+/i, '').replace(/^Ku\s+/i, '');
+            const dayName = bare.charAt(0).toUpperCase() + bare.slice(1);
+            return `${dayName}, ${dayNum} ${month}`;
+        }
+        return `${week}, ${month} ${dayNum}`;
+    };
 
     const shortWeekday = (dayOfWeek?: string) => {
         const map: Record<string, string> = {
@@ -431,6 +470,13 @@ const Dashboard: NextPage = () => {
         };
         const key = map[(dayOfWeek || '').toLowerCase()];
         return key ? t(key) : (dayOfWeek || '').slice(0, 3);
+    };
+
+    const shortWeekdayFromDate = (date?: string) => {
+        if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+        const [year, month, day] = date.split('-').map(Number);
+        const keys = ['daySun', 'dayMon', 'dayTue', 'dayWed', 'dayThu', 'dayFri', 'daySat'];
+        return t(keys[new Date(year, month - 1, day, 12).getDay()]);
     };
 
     const translateCondition = (condition?: string) => {
@@ -452,30 +498,68 @@ const Dashboard: NextPage = () => {
     };
 
     const getWeeklyChartData = () => {
-        return getWeeklyDays().map((day) => ({
-            day: day.isToday
-                ? t('today')
-                : shortWeekday(day.dayOfWeek) || day.formattedDate,
-            fullDay: day.dayOfWeek || day.formattedDate,
-            tempMax: day.tempMax,
-            tempMin: day.tempMin,
-            rain: Number(day.rainAmount) || 0,
-            humidity: day.humidity,
-            rainChance: day.rainChance,
-            condition: day.conditionMain,
-            isToday: day.isToday,
-        }));
+        const place = selectedLocation ? locationDisplayName(selectedLocation) : "";
+        const savedRows = (() => {
+            const data = savedWeekQ.data;
+            if (!data || !place) return [];
+            const direct = data[place]?.records;
+            if (direct) return direct;
+            if (isDistrictLocationName(place)) {
+                return Object.entries(data).find(([name]) => isDistrictLocationName(name))?.[1]?.records ?? [];
+            }
+            return [];
+        })();
+        const savedByDate = new Map(
+            savedRows.filter((row) => row.matchedDay && row.date < todayIso).map((row) => [row.date, row])
+        );
+        const byDate = new Map(getWeeklyDays().filter((day) => day.date).map((day) => [day.date, day]));
+        return kigaliWeekDates(todayIso).flatMap((iso) => {
+            const day = byDate.get(iso);
+            const saved = savedByDate.get(iso);
+            const label = iso === todayIso ? t('today') : shortWeekdayFromDate(iso) || iso;
+            if (day) {
+                return [{
+                    day: label,
+                    fullDay: day.dayOfWeek || iso,
+                    tempMax: day.tempMax,
+                    tempMin: day.tempMin,
+                    rain: Number(day.rainAmount) || 0,
+                    rainCategory: day.rainCategory,
+                    peakRainHour: day.peakRainHour,
+                    humidity: day.humidity,
+                    rainChance: day.rainChance,
+                    condition: day.conditionMain,
+                    isToday: iso === todayIso,
+                    missing: false,
+                }];
+            }
+            if (!saved) return [];
+            return [{
+                day: label,
+                fullDay: iso,
+                tempMax: saved.max,
+                tempMin: saved.min,
+                rain: Number(saved.rain) || 0,
+                rainCategory: saved.rainCategory || undefined,
+                peakRainHour: null,
+                humidity: saved.humidity ?? 0,
+                rainChance: saved.rainChance ?? 0,
+                condition: saved.conditionMain || "",
+                isToday: false,
+                missing: false,
+            }];
+        });
     };
 
     const getWeeklyForecastSummary = () => {
         const next7Days = getWeeklyDays();
         if (next7Days.length === 0) return null;
 
-        const avgTemp = Math.round(next7Days.reduce((sum, d) => sum + d.tempMax, 0) / next7Days.length);
+        const avgTemp = Math.round(next7Days.reduce((sum, day) => sum + ((Number(day.tempMin) || 0) + (Number(day.tempMax) || 0)) / 2, 0) / next7Days.length);
         const avgHumidity = Math.round(next7Days.reduce((sum, d) => sum + d.humidity, 0) / next7Days.length);
         const totalRain = next7Days.reduce((sum, d) => sum + d.rainAmount, 0);
         const avgWindSpeed = Math.round(next7Days.reduce((sum, d) => sum + d.windSpeed, 0) / next7Days.length * 3.6);
-        const daysWithRain = next7Days.filter(d => d.hasRain || d.rainChance > 30).length;
+        const daysWithRain = next7Days.filter((day) => (Number(day.rainAmount) || 0) >= 1).length;
 
         return {
             avgTemp,
@@ -485,21 +569,6 @@ const Dashboard: NextPage = () => {
             daysWithRain,
             dryDays: Math.max(next7Days.length - daysWithRain, 0),
         };
-    };
-
-    const getConditionBreakdown = () => {
-        const days = getWeeklyDays();
-        const counts: Record<string, number> = {};
-        days.forEach((day) => {
-            const key = day.conditionMain || 'Clouds';
-            counts[key] = (counts[key] || 0) + 1;
-        });
-        const palette = ['#147677', '#F5A623', '#7AB8B8', '#FDBA74', '#0f5f5f'];
-        return Object.entries(counts).map(([name, value], index) => ({
-            name: translateCondition(name),
-            value,
-            fill: palette[index % palette.length],
-        }));
     };
 
     if (isLoading) {
@@ -517,18 +586,129 @@ const Dashboard: NextPage = () => {
 
     const weeklySummary = getWeeklyForecastSummary();
     const weeklyChartData = getWeeklyChartData();
-    const conditionBreakdown = getConditionBreakdown();
     const currentWeather = weatherData?.weather?.current;
     const displayTemp = currentWeather?.temp ?? todayWeather?.tempMax;
     const displayCondition = currentWeather?.condition || todayWeather?.condition || '';
-    const todayRainLabel = todayWeather
-        ? t(`wx.rainCat.${rainfallCategory(Number(todayWeather.rainAmount) || 0)}`)
-        : '';
 
     const rainyDonut = weeklySummary ? [
         { name: t('rainy'), value: weeklySummary.daysWithRain, fill: '#F5A623' },
         { name: t('dry'), value: weeklySummary.dryDays, fill: '#C5E0E0' },
     ] : [];
+
+    const formatMm = (value: number) => {
+        const mm = Number(value) || 0;
+        if (Number.isInteger(mm)) return String(mm);
+        return String(parseFloat(mm.toPrecision(12)));
+    };
+
+    const rainCatOf = (day: { rainCategory?: string | null; rainAmount?: number; rain?: number }) => {
+        const known = ['no_rain', 'trace', 'light_rain', 'moderate_rain', 'heavy_rain', 'very_heavy'];
+        if (day.rainCategory && known.includes(day.rainCategory)) return day.rainCategory;
+        return rainfallCategory(Number(day.rainAmount ?? day.rain) || 0);
+    };
+
+    const weatherIconKey = (rain: string, condition?: string) => {
+        if (rain === 'light_rain') return 'drizzle';
+        if (rain === 'moderate_rain' || rain === 'heavy_rain' || rain === 'very_heavy') return 'rain';
+        return condition || 'clouds';
+    };
+
+    const todayRainLabel = todayWeather
+        ? `${t(`wx.rainCat.${rainCatOf(todayWeather)}`)} · ${formatMm(Number(todayWeather.rainAmount) || 0)} mm`
+        : '';
+
+    const formatWatchDay = (day: DailyWeather) => {
+        if (day.date && /^\d{4}-\d{2}-\d{2}$/.test(day.date)) {
+            const [year, month, date] = day.date.split('-').map(Number);
+            return namedDay(new Date(year, month - 1, date, 12));
+        }
+        return day.dayOfWeek || day.formattedDate || '';
+    };
+
+    type WatchKind = 'very_heavy' | 'heavy_rain' | 'hot' | 'heavy_hot' | 'very_heavy_hot';
+
+    const watchKind = (day: DailyWeather): WatchKind | null => {
+        const rain = rainCatOf(day);
+        const hot = Number(day.tempMax) >= 26;
+        const veryHeavy = rain === 'very_heavy';
+        const heavy = rain === 'heavy_rain' || veryHeavy;
+        if (!heavy && !hot) return null;
+        if (veryHeavy && hot) return 'very_heavy_hot';
+        if (heavy && hot) return 'heavy_hot';
+        if (veryHeavy) return 'very_heavy';
+        if (rain === 'heavy_rain') return 'heavy_rain';
+        return 'hot';
+    };
+
+    const watchDays = getWeeklyDays()
+        .map((day) => ({ day, kind: watchKind(day) }))
+        .filter((item): item is { day: DailyWeather; kind: WatchKind } => item.kind != null);
+
+    const watchMessageKey: Record<WatchKind, string> = {
+        very_heavy: 'weatherWatchVeryHeavy',
+        heavy_rain: 'weatherWatchHeavy',
+        hot: 'weatherWatchHot',
+        heavy_hot: 'weatherWatchHeavyHot',
+        very_heavy_hot: 'weatherWatchVeryHeavyHot',
+    };
+
+    const watchLine = (day: DailyWeather, kind: WatchKind) => t(watchMessageKey[kind], {
+        location: selectedLocation ? locationDisplayName(selectedLocation) : '',
+        day: formatWatchDay(day),
+        mm: formatMm(Number(day.rainAmount) || 0),
+    });
+
+    const heavyWatch = watchDays.filter((item) => item.kind !== 'hot');
+    const firstWatch = heavyWatch[0];
+    const watchKey = firstWatch
+        ? `${selectedLocation?.id || 'all'}:${firstWatch.day.date}:${firstWatch.kind}:${formatMm(Number(firstWatch.day.rainAmount) || 0)}`
+        : '';
+    const bannerVisible = Boolean(firstWatch) && dismissedWatch !== watchKey;
+
+    const hideWatchBanner = () => {
+        setDismissedWatch(watchKey);
+        try {
+            sessionStorage.setItem('weather-watch-dismissed', watchKey);
+        } catch {
+            /* the banner still closes for this page view */
+        }
+    };
+
+    const highlightDays = (() => {
+        const days = getWeeklyDays();
+        const byRain = [...days].sort((a, b) =>
+            (Number(b.rainAmount) || 0) - (Number(a.rainAmount) || 0) || String(a.date).localeCompare(String(b.date))
+        );
+        const byHeat = [...days].sort((a, b) =>
+            (Number(b.tempMax) || 0) - (Number(a.tempMax) || 0) || String(a.date).localeCompare(String(b.date))
+        );
+        const hot = (day: DailyWeather) => Number(day.tempMax) >= 26;
+        const heavy = (day: DailyWeather) => {
+            const rain = rainCatOf(day);
+            return rain === 'heavy_rain' || rain === 'very_heavy';
+        };
+        const moderate = (day: DailyWeather) => rainCatOf(day) === 'moderate_rain';
+        const picked: { day: DailyWeather; reason: 'rain' | 'temperature' | 'both' }[] = [];
+        const already = (day: DailyWeather) => picked.some((item) => item.day.date === day.date);
+        const add = (day: DailyWeather, why: 'rain' | 'temperature') => {
+            if (picked.length >= 3 || already(day)) return;
+            const rainy = heavy(day) || moderate(day);
+            const reason = hot(day) && rainy ? 'both' : why === 'temperature' ? 'temperature' : hot(day) ? 'both' : 'rain';
+            picked.push({ day, reason });
+        };
+        byRain.forEach((day) => { if (heavy(day)) add(day, 'rain'); });
+        byHeat.forEach((day) => { if (hot(day)) add(day, 'temperature'); });
+        byRain.forEach((day) => { if (moderate(day)) add(day, 'rain'); });
+        byRain.forEach((day) => add(day, 'rain'));
+        return picked;
+    })();
+
+    const highlightLabel = (day: DailyWeather) => {
+        if (!day.date || !/^\d{4}-\d{2}-\d{2}$/.test(day.date)) return day.dayOfWeek || '';
+        const [year, month, date] = day.date.split('-').map(Number);
+        const parsed = new Date(year, month - 1, date, 12);
+        return `${weekday(parsed, lang, true)} ${parsed.getDate()}`;
+    };
 
     const stats = [
         {
@@ -542,17 +722,7 @@ const Dashboard: NextPage = () => {
             label: t('totalMessagesSent'),
             value: dashboardStats.messagesSent,
             subtitle: dashboardStats.messagesScope === 'sector' ? dashboardStats.messagesSectorName || undefined : undefined,
-            captions: [
-                {
-                    text: t('sentYesterdayCount', { count: (dashboardStats.sentYesterday || 0).toLocaleString() }),
-                    tone: 'teal' as const,
-                    arrow: true,
-                },
-                {
-                    text: t('failedYesterdayCount', { count: (dashboardStats.failedYesterday || 0).toLocaleString() }),
-                    tone: (dashboardStats.failedYesterday || 0) > 0 ? 'orange' as const : 'teal' as const,
-                },
-            ],
+            captions: [{ text: t('allTime'), tone: 'teal' as const, arrow: true }],
             icon: <MessageSquare className="h-5 w-5 text-[#3DCC8A]" strokeWidth={2} />,
             iconBg: 'bg-[#E5F8EE]',
         },
@@ -585,7 +755,7 @@ const Dashboard: NextPage = () => {
                     <ChevronDown className="h-3.5 w-3.5" />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
+            <DropdownMenuContent className="max-h-[min(20rem,calc(100vh-6rem))] overflow-y-auto">
                 {locations.map((location) => (
                     <DropdownMenuItem
                         key={location.id}
@@ -605,6 +775,31 @@ const Dashboard: NextPage = () => {
             </Head>
 
             <div className="space-y-3">
+                {bannerVisible && firstWatch && (
+                    <div className="flex items-start gap-3 rounded-lg bg-[#F6D452] px-4 py-2.5 text-[#3F2E04]">
+                        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E8B931]">
+                            <Bell className="h-4 w-4" />
+                        </span>
+                        <p className="flex-1 text-sm font-medium leading-6">
+                            {watchLine(firstWatch.day, firstWatch.kind)}
+                            {heavyWatch.length > 1
+                                ? ` ${t('weatherWatchMore', { count: heavyWatch.length - 1 })}`
+                                : ''}
+                            {' '}
+                            <Link href="/communications?tab=messages" className="font-semibold underline underline-offset-2">
+                                {t('tellFarmers')}
+                            </Link>
+                        </p>
+                        <button
+                            type="button"
+                            onClick={hideWatchBanner}
+                            aria-label={t('weatherWatchDismiss')}
+                            className="mt-0.5 rounded-full p-1 text-[#3F2E04] hover:bg-[#E8B931]"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                )}
                 <div className="bg-white px-4 py-3 rounded-lg">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                         <div>
@@ -613,6 +808,7 @@ const Dashboard: NextPage = () => {
                             </h1>
                             <p className="text-slate-400 text-sm">
                                 {new Date().toLocaleDateString(dateLocale, {
+                                    timeZone: KIGALI_TZ,
                                     weekday: 'long',
                                     day: 'numeric',
                                     month: 'long',
@@ -698,7 +894,7 @@ const Dashboard: NextPage = () => {
                             </div>
                             {weeklyChartData.length > 0 ? (
                                 <>
-                                <div className="grid grid-cols-7 gap-1 mb-2">
+                                <div className="grid gap-1 mb-2" style={{ gridTemplateColumns: `repeat(${Math.max(weeklyChartData.length, 1)}, minmax(0, 1fr))` }}>
                                     {weeklyChartData.map((day) => (
                                         <div
                                             key={day.fullDay + day.day}
@@ -708,11 +904,18 @@ const Dashboard: NextPage = () => {
                                             )}
                                         >
                                             <span className="text-[11px] text-slate-400">{day.day}</span>
-                                            {getWeatherIcon(day.condition, 'h-5 w-5')}
-                                            <span className="text-sm font-semibold text-slate-700">{day.tempMax}°</span>
-                                            <span className="text-[10px] leading-tight text-center text-slate-500">
-                                                {t(`wx.rainCat.${rainfallCategory(day.rain)}`)}
-                                            </span>
+                                            {day.missing ? (
+                                                <span className="py-3 text-[10px] text-slate-400">—</span>
+                                            ) : (
+                                                <>
+                                                    {getWeatherIcon(weatherIconKey(rainCatOf({ rainCategory: day.rainCategory, rain: day.rain ?? 0 }), day.condition), 'h-5 w-5')}
+                                                    <span className="text-sm font-semibold text-slate-700">{day.tempMax}°</span>
+                                                    <span className="text-[10px] leading-tight text-center text-slate-500">
+                                                        {t(`wx.rainCat.${rainCatOf({ rainCategory: day.rainCategory, rain: day.rain ?? 0 })}`)}
+                                                    </span>
+                                                    <span className="text-[10px] leading-tight text-slate-400">{formatMm(day.rain || 0)} mm</span>
+                                                </>
+                                            )}
                                         </div>
                                     ))}
                                 </div>
@@ -732,8 +935,8 @@ const Dashboard: NextPage = () => {
                                         <XAxis dataKey="day" tick={{ fill: '#94A3B8', fontSize: 12 }} axisLine={false} tickLine={false} />
                                         <YAxis tick={{ fill: '#94A3B8', fontSize: 12 }} axisLine={false} tickLine={false} />
                                         <Tooltip content={<ChartTooltipContent />} />
-                                        <Area type="monotone" dataKey="tempMax" stroke="#147677" strokeWidth={3} fill="url(#tempMaxFill)" name={t('maxTempShort')} />
-                                        <Area type="monotone" dataKey="tempMin" stroke="#F5A623" strokeWidth={3} fill="url(#tempMinFill)" name={t('minTempShort')} />
+                                        <Area type="monotone" dataKey="tempMax" stroke="#147677" strokeWidth={3} fill="url(#tempMaxFill)" name={t('maxTempShort')} connectNulls={false} />
+                                        <Area type="monotone" dataKey="tempMin" stroke="#F5A623" strokeWidth={3} fill="url(#tempMinFill)" name={t('minTempShort')} connectNulls={false} />
                                     </AreaChart>
                                 </ChartContainer>
                                 {weeklySummary && (
@@ -764,19 +967,20 @@ const Dashboard: NextPage = () => {
                             )}
                     </SoftCard>
 
-                    <div className="xl:col-span-4 rounded-2xl bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] p-4 text-white shadow-[0_12px_28px_rgba(20,118,119,0.3)] flex flex-col h-full">
+                    <div className="xl:col-span-4 rounded-2xl bg-gradient-to-br from-[#147677] via-[#0f5f5f] to-[#0c4d4d] p-4 text-white flex flex-col h-full">
                         <div className="flex items-center" onClick={(e) => e.stopPropagation()}>
                             {locationMenu}
                         </div>
 
-                        {todayWeather ? (
+                        {(currentWeather || todayWeather) ? (
                             <div
                                 className="flex-1 flex flex-col items-center justify-center text-center py-3 cursor-pointer"
                                 onClick={() => router.push('/forecasts')}
                             >
-                                {getWeatherIcon(todayWeather.conditionMain || currentWeather?.conditionMain, 'h-16 w-16')}
+                                {getWeatherIcon(todayWeather?.conditionMain || currentWeather?.conditionMain, 'h-16 w-16')}
                                 <p className="text-xs text-white/80 mt-2">
                                     {t('today')}, {new Date().toLocaleDateString(dateLocale, {
+                                        timeZone: KIGALI_TZ,
                                         day: 'numeric',
                                         month: 'long',
                                         year: 'numeric',
@@ -785,17 +989,19 @@ const Dashboard: NextPage = () => {
                                 <p className="text-5xl font-bold tracking-tight leading-none mt-1">{Math.round(displayTemp)}°</p>
                                 <p className="text-white/90 capitalize text-sm mt-1">{translateCondition(displayCondition) || t('todayForecast')}</p>
                                 <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-xs text-white/85 mt-3">
-                                    <span className="flex items-center gap-1.5">
-                                        <Droplets className="h-3.5 w-3.5" />
-                                        {todayRainLabel}
-                                        {todayWeather.rainChance != null ? ` · ${todayWeather.rainChance}%` : ''}
-                                    </span>
-                                    <span className="text-white/40">|</span>
-                                    <span>{t('humidity')} {todayWeather.humidity}%</span>
+                                    {todayWeather && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Droplets className="h-3.5 w-3.5" />
+                                            {todayRainLabel}
+                                            {todayWeather.rainChance != null ? ` · ${todayWeather.rainChance}%` : ''}
+                                        </span>
+                                    )}
+                                    {todayWeather && <span className="text-white/40">|</span>}
+                                    <span>{t('humidity')} {todayWeather?.humidity ?? currentWeather?.humidity ?? '—'}%</span>
                                     <span className="text-white/40">|</span>
                                     <span className="flex items-center gap-1.5">
                                         <Wind className="h-3.5 w-3.5" />
-                                        {Math.round(todayWeather.windSpeed * 3.6)} km/h
+                                        {Math.round(((todayWeather?.windSpeed ?? currentWeather?.windSpeed) || 0) * 3.6)} km/h
                                     </span>
                                 </div>
                             </div>
@@ -830,32 +1036,6 @@ const Dashboard: NextPage = () => {
                     </SoftCard>
 
                     <SoftCard className="p-3 xl:col-span-4">
-                        <h2 className="text-sm font-semibold text-slate-800">{t('weatherConditions')}</h2>
-                        {conditionBreakdown.length > 0 ? (
-                            <div className="relative">
-                                <ChartContainer config={weeklyChartConfig} className="h-[120px] w-full aspect-auto">
-                                    <PieChart>
-                                        <Pie data={conditionBreakdown} dataKey="value" nameKey="name" innerRadius={32} outerRadius={46} paddingAngle={3} stroke="none">
-                                            {conditionBreakdown.map((entry) => (
-                                                <Cell key={entry.name} fill={entry.fill} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip content={<ChartTooltipContent hideLabel />} />
-                                    </PieChart>
-                                </ChartContainer>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span className="text-lg font-bold text-slate-800">{conditionBreakdown[0]?.value || 0}</span>
-                                    <span className="text-[10px] text-slate-400 capitalize">{conditionBreakdown[0]?.name}</span>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="flex justify-center py-6">
-                                <Loader2 className="animate-spin h-5 w-5 text-[#147677]" />
-                            </div>
-                        )}
-                    </SoftCard>
-
-                    <SoftCard className="p-3 xl:col-span-4">
                         <h2 className="text-sm font-semibold text-slate-800">{t('daysWithRain')}</h2>
                         {weeklySummary ? (
                             <div className="relative">
@@ -879,6 +1059,50 @@ const Dashboard: NextPage = () => {
                                 <Loader2 className="animate-spin h-5 w-5 text-[#147677]" />
                             </div>
                         )}
+                    </SoftCard>
+
+                    <SoftCard className="p-3 xl:col-span-4">
+                        <h2 className="text-sm font-semibold text-[#147677]">{t('weatherWatchTitle')}</h2>
+                        {highlightDays.length > 0 ? (
+                            <ul className="mt-2 space-y-1.5">
+                                {highlightDays.map(({ day }) => {
+                                    const rain = rainCatOf(day);
+                                    return (
+                                    <li key={day.date || highlightLabel(day)} className="flex items-start gap-2 text-xs">
+                                        <span className="mt-0.5 shrink-0">
+                                            {getWeatherIcon(weatherIconKey(rain, day.conditionMain || day.condition), 'h-5 w-5')}
+                                        </span>
+                                        <div className="min-w-0 flex-1 leading-4">
+                                            <p className="font-medium text-slate-800">{highlightLabel(day)}</p>
+                                            <p className="text-slate-500">
+                                                <span className="font-semibold text-[#F5A623]">{formatMm(Number(day.rainAmount) || 0)} mm</span>
+                                                {' · '}{t(`wx.rainCat.${rain}`)}{' · '}{day.tempMin}–{day.tempMax}°C
+                                            </p>
+                                        </div>
+                                        <div className="relative shrink-0">
+                                            <button
+                                                type="button"
+                                                aria-label={t('keyHighlightAdvice')}
+                                                className="peer rounded-full p-1 text-[#147677] hover:bg-[#147677]/10"
+                                            >
+                                                <Info className="h-3.5 w-3.5" />
+                                            </button>
+                                            <div className="pointer-events-none invisible absolute right-0 bottom-full z-30 mb-1 w-64 peer-hover:visible">
+                                                <div className="rounded-lg bg-white p-2 text-left shadow-lg">
+                                                    <p className="text-[11px] leading-4 text-slate-600">{day.farmingRecommendation}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                    );
+                                })}
+                            </ul>
+                        ) : (
+                            <p className="py-6 text-center text-xs text-slate-500">{t('weatherWatchClear')}</p>
+                        )}
+                        <Link href="/forecasts" className="mt-2 inline-block text-xs font-semibold text-[#147677]">
+                            {t('viewMore')}
+                        </Link>
                     </SoftCard>
                 </div>
 

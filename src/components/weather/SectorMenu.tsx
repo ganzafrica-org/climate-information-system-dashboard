@@ -56,7 +56,11 @@ export function SectorMenu({ open, onClose, items, onPick, searchPlaceholder, no
           className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 outline-none"
         />
       </label>
-      <div role="listbox" className="mt-1.5 flex max-h-80 flex-col overflow-auto">
+      <div
+        role="listbox"
+        onWheel={(e) => e.stopPropagation()}
+        className="mt-1.5 flex max-h-80 flex-col overflow-y-auto overscroll-contain"
+      >
         {shown.map((i) => (
           <button
             key={i.name}

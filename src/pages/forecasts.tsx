@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import type { NextPage } from "next"
 import Head from "next/head"
+import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/router"
 import { useQuery } from "@tanstack/react-query"
 import {
   Check, ChevronDown, ChevronUp, CloudAlert, CloudOff, Copy, Download, Droplet, Droplets, MapPin,
-  MessageSquareText, Sprout, TriangleAlert, Umbrella, Wind, X, type LucideIcon,
+  Bell, MessageSquareText, Sprout, TriangleAlert, Umbrella, Wind, X, type LucideIcon,
 } from "lucide-react"
 import { AppLayout } from "@/components/layout/AppLayout"
 import { ConditionIcon } from "@/components/weather/ConditionIcon"
@@ -18,7 +19,7 @@ import type { DailyWeather, HourlyForecast, WeatherAlert } from "@/types/weather
 import {
   SECTORS, NO_DATA_FILL, RAIN_CAT_FILL, asRainCat, conditionOf, rainCatFromApi, rainfallCategory, sectorDays, tempRamp, useLocationWeather, useSectorWeather, warmRamp, type Day, type RainCat,
 } from "@/lib/weather"
-import { dayMonth, downloadCsv, escapeHtml, useWx, weekday } from "@/lib/weatherFormat"
+import { addISODays, dayMonth, downloadCsv, escapeHtml, kigaliTodayISO, monthName, useWx, weekday } from "@/lib/weatherFormat"
 import { useAuth } from "@/hooks/useAuth"
 import {
   MUSANZE_DISTRICT_LOCATION,
@@ -55,7 +56,7 @@ const kigaliTime = (d: Date) =>
 type Banner = { key: string; title: string; text: string; cta?: { label: string; onClick: () => void } }
 
 const Forecasts: NextPage = () => {
-  const { w, lang, ago } = useWx()
+  const { w, t, lang, ago } = useWx()
   const router = useRouter()
   const { user, isLoading: authLoading } = useAuth()
 
@@ -68,6 +69,15 @@ const Forecasts: NextPage = () => {
   const [shareOpen, setShareOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const [dismissed, setDismissed] = useState<string[]>([])
+  const [heavyDismissed, setHeavyDismissed] = useState<string | null>(null)
+
+  useEffect(() => {
+    try {
+      setHeavyDismissed(sessionStorage.getItem("forecast-heavy-rain"))
+    } catch {
+      /* keep the notice visible if storage is blocked */
+    }
+  }, [])
 
   // ?sector= keeps the selection shareable and survives reloads
   useEffect(() => {
@@ -103,18 +113,21 @@ const Forecasts: NextPage = () => {
   const nDays = days.length
   const dayIdx = Math.min(dayState, Math.max(0, nDays - 1))
   const d: Day | undefined = days[dayIdx]
-  const isToday = dayIdx === 0
+  const todayIso = kigaliTodayISO()
+  const tomorrowIso = addISODays(todayIso, 1)
+  const todayIdx = days.findIndex((x) => x.iso === todayIso)
+  const isToday = d?.iso === todayIso
 
   // Overview, farming advice, soil, confidence, 3-hourly and alerts for the selected sector
   const locQ = useLocationWeather(sw?.locationId)
   const loc = locQ.data
   const utcIso = (dt: Date) => dt.toISOString().slice(0, 10)
   const locDay: DailyWeather | undefined = d
-    ? loc?.weather?.daily?.find((x) => x.date === utcIso(d.date) || x.date === d.iso) ?? (isToday ? loc?.weather?.daily?.[0] : undefined)
+    ? loc?.weather?.daily?.find((x) => x.date === d.iso || x.date === utcIso(d.date))
     : undefined
   const sectorDay = sw?.days?.[dayIdx]
   const overview = locDay?.overview || (isToday ? sw?.overview : sectorDay?.overview) || ""
-  const advice = locDay?.farmingRecommendation || (isToday ? sw?.farmingAdvice || sw?.farmingRecommendation : sectorDay?.farmingAdvice || sectorDay?.farmingRecommendation) || ""
+  const advice = sectorDay?.farmingAdvice || sectorDay?.farmingRecommendation || locDay?.farmingRecommendation || (isToday ? sw?.farmingAdvice || sw?.farmingRecommendation : "") || ""
   const hourly = useMemo<HourlyForecast[]>(() => loc?.weather?.daily?.find((x) => x.hourly?.length)?.hourly ?? (sw as { hourly?: HourlyForecast[] } | undefined)?.hourly ?? [], [loc, sw])
 
   const isLoading = weatherQ.isLoading
@@ -122,7 +135,7 @@ const Forecasts: NextPage = () => {
   const noData = !isLoading && !isDown && nDays === 0
 
   // ---- text helpers ----
-  const dayName = (x: Day) => (x.index === 0 ? w("today") : x.index === 1 ? w("tomorrow") : weekday(x.date, lang))
+  const dayName = (x: Day) => (x.iso === todayIso ? w("today") : x.iso === tomorrowIso ? w("tomorrow") : weekday(x.date, lang))
   const longDate = (x: Day) => `${weekday(x.date, lang, true)}, ${dayMonth(x.date, lang, { long: true })}`
   const formatBackendMm = (mm: number) => {
     if (Number.isInteger(mm)) return String(mm)
@@ -237,10 +250,66 @@ const Forecasts: NextPage = () => {
   const generatedAt = weatherQ.data?.generatedAt
   const subtitle = [w("district"), generatedAt ? `${w("updated", { ago: ago(generatedAt) })} (${kigaliTime(new Date(generatedAt))})` : ""].filter(Boolean).join(" · ")
 
+  const heavyLabel = (date: Date) => {
+    const week = weekday(date, lang, true)
+    const month = monthName(date.getMonth(), lang, true)
+    const dayNum = date.getDate()
+    if (lang === "rw") {
+      const bare = week.replace(/^Kuwa\s+/i, "").replace(/^Ku\s+/i, "")
+      const dayName = bare.charAt(0).toUpperCase() + bare.slice(1)
+      return `${dayName}, ${dayNum} ${month}`
+    }
+    return `${week}, ${month} ${dayNum}`
+  }
+  const heavyDays = days.filter((x) => {
+    const cat = asRainCat(x.rainCategory) ?? (x.rainfall != null ? rainfallCategory(x.rainfall) : undefined)
+    return cat === "heavy_rain" || cat === "very_heavy"
+  })
+  const firstHeavy = heavyDays[0]
+  const heavyKind = firstHeavy && ((asRainCat(firstHeavy.rainCategory) ?? rainfallCategory(firstHeavy.rainfall || 0)) === "very_heavy")
+    ? "weatherWatchVeryHeavy"
+    : "weatherWatchHeavy"
+  const heavyText = firstHeavy
+    ? t(heavyKind, { location: sector, day: heavyLabel(firstHeavy.date), mm: formatBackendMm(firstHeavy.rainfall ?? 0) })
+    : ""
+  const heavyKey = firstHeavy ? `${sector}:${firstHeavy.iso}:${heavyKind}:${firstHeavy.rainfall ?? ""}` : ""
+  const heavyVisible = Boolean(firstHeavy) && heavyDismissed !== heavyKey
+  const hideHeavy = () => {
+    setHeavyDismissed(heavyKey)
+    try {
+      sessionStorage.setItem("forecast-heavy-rain", heavyKey)
+    } catch {
+      /* the notice still closes for this page view */
+    }
+  }
+
   return (
     <AppLayout>
       <Head><title>{`${w("fcTitle")} | Teganyamuhinzi`}</title></Head>
       <div className="w-full max-w-[1600px] space-y-4 p-3 text-sm text-[#171717] md:p-6">
+        {heavyVisible && (
+          <div className="flex items-start gap-3 rounded-lg bg-[#F6D452] px-4 py-2.5 text-[#3F2E04]">
+            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#E8B931]">
+              <Bell className="h-4 w-4" />
+            </span>
+            <p className="flex-1 text-sm font-medium leading-6">
+              {heavyText}
+              {heavyDays.length > 1 ? ` ${t("weatherWatchMore", { count: heavyDays.length - 1 })}` : ""}
+              {" "}
+              <Link href="/communications?tab=messages" className="font-semibold underline underline-offset-2">
+                {t("tellFarmers")}
+              </Link>
+            </p>
+            <button
+              type="button"
+              onClick={hideHeavy}
+              aria-label={t("weatherWatchDismiss")}
+              className="mt-0.5 rounded-full p-1 text-[#3F2E04] hover:bg-[#E8B931]"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
         {banners.map((b) => (
           <div key={b.key} role="alert" className="flex flex-wrap items-start gap-x-3.5 gap-y-3 rounded-xl border border-[#fbc98e] bg-[#fff7ed] px-4 py-3.5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#fde3c3] text-[#b45309]"><TriangleAlert className="h-5 w-5" /></div>
@@ -342,7 +411,7 @@ const Forecasts: NextPage = () => {
                     <div className="text-base font-semibold text-slate-900">
                       {sector} <span className="font-medium text-slate-500">· {isToday ? `${w("today")}, ${dayMonth(d.date, lang, { long: true })}` : longDate(d)}</span>
                     </div>
-                    {!isToday && <button onClick={() => setDayIdx(0)} className="text-sm font-semibold text-[#147677] hover:underline">{w("backToday")}</button>}
+                    {todayIdx >= 0 && !isToday && <button onClick={() => setDayIdx(todayIdx)} className="text-sm font-semibold text-[#147677] hover:underline">{w("backToday")}</button>}
                   </div>
                   <div className="flex flex-wrap items-center gap-x-7 gap-y-4">
                     <div className="flex shrink-0 items-center gap-4 whitespace-nowrap">
@@ -562,19 +631,22 @@ function HourSlot({ h, w }: { h: HourlyForecast; w: W }) {
 
 function LoadingGrid({ label }: { label: string }) {
   return (
-    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(640px,7.5fr)_minmax(0,6fr)] xl:items-stretch" aria-busy>
-      <div className="order-1 flex h-full flex-col gap-3 rounded-2xl border border-gray-200 bg-white p-5">
-        <Skeleton className="h-4 w-1/3" />
-        {Array.from({ length: 10 }).map((_, i) => <Skeleton key={i} className="h-9 w-full" />)}
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(640px,7.5fr)_minmax(0,6fr)]" aria-busy aria-label={label}>
+      <div className="order-1 flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-4">
+        <Skeleton className="mb-1 h-5 w-36" />
+        {Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12 w-full rounded-[10px]" />)}
       </div>
-      <div className="order-2 flex h-full flex-col gap-3.5 rounded-2xl border border-gray-200 bg-white p-6">
-        <Skeleton className="h-4 w-2/5" />
-        <div className="flex items-center gap-4"><Skeleton className="h-[76px] w-[76px] rounded-full" /><Skeleton className="h-[52px] w-36" /></div>
-        <Skeleton className="h-[22px] w-[85%]" />
-        <Skeleton className="h-24 w-full" />
+      <div className="order-2 flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white px-6 py-5">
+        <Skeleton className="h-5 w-48" />
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-16 w-16 rounded-full" />
+          <Skeleton className="h-12 w-32" />
+        </div>
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-4/5" />
+        <Skeleton className="h-20 w-full rounded-xl" />
       </div>
-      <Skeleton className="h-[170px] rounded-2xl xl:col-span-2" />
-      <div className="flex h-[420px] items-center justify-center rounded-2xl border border-gray-200 bg-white text-sm text-slate-500 xl:col-span-2">{label}</div>
+      <Skeleton className="h-[280px] rounded-2xl xl:col-span-2" />
     </div>
   )
 }

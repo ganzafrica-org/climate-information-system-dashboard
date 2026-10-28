@@ -5,7 +5,7 @@ import { useLanguage, type Locale } from "@/i18n"
 
 const WD: Record<Locale, string[]> = {
   en: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],
-  rw: ["Ku cyumweru", "Kuwa mbere", "Kuwa kabiri", "Kuwa gatatu", "Kuwa kane", "Kuwa gatanu", "Kuwa gatandatu"],
+  rw: ["Ku Cyumweru", "Kuwa Mbere", "Kuwa Kabiri", "Kuwa Gatatu", "Kuwa Kane", "Kuwa Gatanu", "Kuwa Gatandatu"],
 }
 const WDL: Record<Locale, string[]> = {
   en: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
@@ -18,6 +18,45 @@ const MON: Record<Locale, string[]> = {
 const MONL: Record<Locale, string[]> = {
   en: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
   rw: ["Mutarama", "Gashyantare", "Werurwe", "Mata", "Gicurasi", "Kamena", "Nyakanga", "Kanama", "Nzeri", "Ukwakira", "Ugushyingo", "Ukuboza"],
+}
+
+export const KIGALI_TZ = "Africa/Kigali"
+
+/** Calendar date in Kigali, as YYYY-MM-DD. */
+export function kigaliTodayISO(date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: KIGALI_TZ }).format(date)
+}
+
+/** Hour and month in Kigali, so greetings and seasons do not follow the laptop clock. */
+export function kigaliNowParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: KIGALI_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date)
+  const pick = (type: string) => parts.find((part) => part.type === type)?.value || ""
+  return {
+    iso: `${pick("year")}-${pick("month")}-${pick("day")}`,
+    month: Number(pick("month")),
+    hour: Number(pick("hour")),
+  }
+}
+
+/** Monday through Sunday of the Kigali week that contains this date. */
+export function kigaliWeekDates(todayIso = kigaliTodayISO()) {
+  const [year, month, day] = todayIso.split("-").map(Number)
+  const weekday = new Date(Date.UTC(year, month - 1, day)).getUTCDay()
+  const mondayOffset = weekday === 0 ? -6 : 1 - weekday
+  return Array.from({ length: 7 }, (_, index) => addISODays(todayIso, mondayOffset + index))
+}
+
+export function addISODays(iso: string, days: number) {
+  const [year, month, day] = iso.split("-").map(Number)
+  const next = new Date(Date.UTC(year, month - 1, day + days))
+  return next.toISOString().slice(0, 10)
 }
 
 export const weekday = (d: Date, lang: Locale, long = false) => (long ? WDL : WD)[lang][d.getDay()]

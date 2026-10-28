@@ -6,14 +6,16 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { DataTable, rowActionsColumn, type SortableColumn } from "@/components/ui/table";
 import { toast } from "sonner";
-import { Eye, Edit, MoreHorizontal, Plus, RefreshCw, Search, Shield, Trash } from "lucide-react";
+import { Eye, Edit, KeyRound, MoreHorizontal, Plus, RefreshCw, Search, Shield, Trash } from "lucide-react";
 import api from "@/lib/api";
 import type { User } from "@/lib/api";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import CreateUserDialog from "@/components/admin/CreateUserDialog";
 import UpdateUserDialog from "@/components/admin/UpdateUserDialog";
 import ViewUserDialog from "@/components/admin/ViewUserDialog";
+import ResetPasswordDialog from "@/components/admin/ResetPasswordDialog";
 import { formatCoverage } from "@/lib/assignment";
+import { useAuth } from "@/hooks/useAuth";
 
 // Define allowed roles type
 type AllowedRole = 'admin' | 'agronomist';
@@ -27,6 +29,8 @@ export function UsersTable() {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isUpdateOpen, setIsUpdateOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isResetOpen, setIsResetOpen] = useState(false);
+  const { user: currentUser } = useAuth();
 
   const fetchUsers = async (refresh = false) => {
     try {
@@ -34,7 +38,6 @@ export function UsersTable() {
       const data = await api.listUsers();
       setUsers(Array.isArray(data) ? data : []);
     } catch (e: any) {
-      console.error(e);
       toast.error("Failed to load users");
     } finally {
       setIsLoading(false);
@@ -50,7 +53,6 @@ export function UsersTable() {
       toast.success("User deleted");
       fetchUsers(true);
     } catch (e: any) {
-      console.error(e);
       toast.error("Failed to delete user");
     }
   };
@@ -66,7 +68,6 @@ export function UsersTable() {
       toast.success("Role updated");
       fetchUsers(true);
     } catch (e: any) {
-      console.error(e);
       toast.error("Failed to update role");
     }
   };
@@ -178,6 +179,12 @@ export function UsersTable() {
             <Edit className="h-4 w-4 mr-2" />
             Update
           </DropdownMenuItem>
+          {String(u.id) !== String(currentUser?.id) && (
+            <DropdownMenuItem onClick={() => { setSelectedUser(u); setIsResetOpen(true); }}>
+              <KeyRound className="h-4 w-4 mr-2" />
+              Reset password
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem destructive onClick={() => handleDelete(u.id)}>
             <Trash className="h-4 w-4 mr-2" />
             Delete
@@ -185,8 +192,7 @@ export function UsersTable() {
         </DropdownMenuContent>
       </DropdownMenu>
     )),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], []);
+  ], [currentUser?.id]);
 
   return (
     <Card>
@@ -252,6 +258,11 @@ export function UsersTable() {
             onOpenChange={setIsViewOpen}
             user={selectedUser}
             onClose={handleViewClose}
+          />
+          <ResetPasswordDialog
+            open={isResetOpen}
+            onOpenChange={setIsResetOpen}
+            user={selectedUser}
           />
         </>
       )}

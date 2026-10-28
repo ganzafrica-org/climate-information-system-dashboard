@@ -1,11 +1,12 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { retryUnlessSignedOut } from '@/lib/session';
 
 export const queryClient = new QueryClient({
     defaultOptions: {
         queries: {
             refetchOnWindowFocus: false,
-            retry: 1,
+            retry: retryUnlessSignedOut,
             staleTime: 5 * 60 * 1000,
         },
     },

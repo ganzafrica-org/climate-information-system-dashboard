@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { NextPage } from "next"
 import Head from "next/head"
+import Link from "next/link"
 import dynamic from "next/dynamic"
 import { useRouter } from "next/router"
 import { useQuery } from "@tanstack/react-query"
@@ -13,7 +14,7 @@ import {
 import { AppLayout } from "@/components/layout/AppLayout"
 import { SectorMenu } from "@/components/weather/SectorMenu"
 import { StateCard } from "@/components/weather/StateCard"
-import { DateRangePicker, type DateRange } from "@/components/ui/calendar"
+import { CalendarRange, type DateRange } from "@/components/ui/calendar"
 import { Pagination } from "@/components/ui/pagination"
 import { Skeleton } from "@/components/ui/skeleton"
 import type { FeatureCollection } from "@/lib/soil"
@@ -55,7 +56,7 @@ const TEMP_LINE = "#e0702f"
 const BAND: Record<Season, [string, string]> = { A: ["#e8f3f3", "#0f5f60"], B: ["#eef5e7", "#3d6b1f"], C: ["#f8f2e4", "#8a5a00"] }
 const LOW_COVERAGE = 0.8
 const TABLE_PAGE_SIZE = 10
-const PRESETS = ["thisSeason", "lastSeason", "last12", "year", "custom"] as const
+const PRESETS = ["past7", "thisSeason", "lastSeason", "last12", "custom"] as const
 type Preset = (typeof PRESETS)[number]
 
 const kigaliToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Kigali" }).format(new Date())
@@ -73,7 +74,8 @@ const Historical: NextPage = () => {
     const y = addDays(kigaliToday(), -1)
     return { start: `${y.slice(0, 4)}-01-01`, end: y }
   })
-  const [cmpLastYear, setCmpLastYear] = useState(true)
+  const [dateOpen, setDateOpen] = useState(false)
+  const dateRef = useRef<HTMLDivElement>(null)
   const [metric, setMetric] = useState<"rain" | "temp">("rain")
   const [menuOpen, setMenuOpen] = useState(false)
   const [tableOpen, setTableOpen] = useState(false)
@@ -100,6 +102,14 @@ const Historical: NextPage = () => {
     setSectorsState(list)
     router.replace({ pathname: router.pathname, query: { ...router.query, sectors: list.join(",") } }, undefined, { shallow: true })
   }
+  useEffect(() => {
+    if (!dateOpen) return
+    const onDown = (event: MouseEvent) => {
+      if (!dateRef.current?.contains(event.target as Node)) setDateOpen(false)
+    }
+    document.addEventListener("mousedown", onDown)
+    return () => document.removeEventListener("mousedown", onDown)
+  }, [dateOpen])
   const addSector = (s: string) => { if (!sectors.includes(s)) setSectors([...sectors, s]); setMenuOpen(false) }
   const removeSector = (s: string) => setSectors(sectors.filter((x) => x !== s))
 
@@ -109,9 +119,9 @@ const Historical: NextPage = () => {
   const [start, end] = useMemo((): [string, string] => {
     const clampEnd = (s: string, e: string): [string, string] => [s, e < s ? s : e]
     switch (preset) {
+      case "past7": return clampEnd(addDays(yesterday, -6), yesterday)
       case "thisSeason": { const r = seasonRange(today); return clampEnd(r.start, r.end < yesterday ? r.end : yesterday) }
       case "lastSeason": { const r = previousSeason(today); return clampEnd(r.start, r.end) }
-      case "year": return clampEnd(`${today.slice(0, 4)}-01-01`, yesterday)
       case "custom": return clampEnd(custom.start, custom.end)
       default: {
         const y = +yesterday.slice(0, 4)
@@ -124,8 +134,7 @@ const Historical: NextPage = () => {
 
   const primary = sectors[0]
   const single = sectors.length === 1
-  const wantLY = single && cmpLastYear
-
+  const wantLY = false
   const histQ = useSectorHistory(start, end)
   const lyQ = useSectorHistory(minusYear(start), minusYear(end), wantLY)
   const sectorsGeo = useGeo("Sectors.geojson")
@@ -357,20 +366,21 @@ const Historical: NextPage = () => {
   return (
     <AppLayout>
       <Head><title>{`${w("histTitle")} | Teganyamuhinzi`}</title></Head>
-      <div className="max-w-[1280px] space-y-4 p-3 text-sm text-[#171717] md:p-6">
+      <div className="w-full max-w-[1600px] space-y-4 p-3 text-sm text-[#171717] md:p-6">
         {/* Header + filters */}
-        <div className="flex flex-col gap-3.5 rounded-lg bg-white px-4 py-3.5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="min-w-0">
-              <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{w("histTitle")}</h1>
-              <p className="mt-0.5 text-sm text-slate-500">{w("district")}</p>
-            </div>
-            <button onClick={exportCsv} disabled={!isLive} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb] disabled:opacity-50">
-              <Download className="h-4 w-4 text-[#147677]" />{w("exportCsv")}
-            </button>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-white px-4 py-3 shadow-sm">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight text-[#147677]">{w("histTitle")}</h1>
+            <p className="mt-0.5 text-sm text-slate-500">{w("district")}</p>
           </div>
-          <div className="flex flex-wrap items-end gap-x-5 gap-y-3">
-            <div className="flex min-w-0 flex-col gap-1.5">
+          <button onClick={exportCsv} disabled={!isLive} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 hover:bg-[#f9fafb] disabled:opacity-50">
+            <Download className="h-4 w-4 text-[#147677]" />{w("exportCsv")}
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3.5 rounded-lg bg-white px-4 py-3.5 shadow-sm">
+          <div className="flex flex-nowrap items-end gap-x-5">
+            <div className="flex shrink-0 flex-col gap-1.5">
               <span className="text-sm font-semibold text-slate-700">{w("sectorsLabel")}</span>
               <div className="relative flex flex-wrap items-center gap-1.5">
                 {sectors.map((s) => (
@@ -404,28 +414,36 @@ const Historical: NextPage = () => {
                 )}
               </div>
             </div>
-            <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex shrink-0 flex-col gap-1.5">
               <span className="text-sm font-semibold text-slate-700">{w("period")}</span>
-              <div role="radiogroup" className="flex flex-wrap gap-1 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
-                {PRESETS.map((p) => (
-                  <button key={p} role="radio" aria-checked={preset === p} onClick={() => setPreset(p)} className={segBtn(preset === p)}>{w(`preset.${p}`)}</button>
+              <div role="radiogroup" className="flex flex-nowrap gap-1 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
+                {PRESETS.filter((p) => p !== "custom").map((p) => (
+                  <button key={p} role="radio" aria-checked={preset === p} onClick={() => { setPreset(p); setDateOpen(false) }} className={`${segBtn(preset === p)} whitespace-nowrap`}>{w(`preset.${p}`)}</button>
                 ))}
-              </div>
-            </div>
-            {preset === "custom" && (
-              <div className="w-[260px]">
-                <DateRangePicker value={custom} onChange={setCustom} locale={lang === "rw" ? "rw-RW" : "en-GB"} label={w("period")} max={fromIso(yesterday)} />
-              </div>
-            )}
-            {single && (
-              <div className="flex min-w-0 flex-col gap-1.5">
-                <span className="text-sm font-semibold text-slate-700">{w("compareWith")}</span>
-                <div role="radiogroup" className="flex flex-wrap gap-1 rounded-[9px] border border-gray-200 bg-gray-100 p-[3px]">
-                  <button role="radio" aria-checked={!cmpLastYear} onClick={() => setCmpLastYear(false)} className={segBtn(!cmpLastYear)}>{w("cNone")}</button>
-                  <button role="radio" aria-checked={cmpLastYear} onClick={() => setCmpLastYear(true)} className={segBtn(cmpLastYear)}>{w("cLastYear")}</button>
+                <div ref={dateRef} className="relative">
+                  <button
+                    role="radio"
+                    aria-checked={preset === "custom"}
+                    aria-expanded={dateOpen}
+                    onClick={() => { setPreset("custom"); setDateOpen((open) => preset === "custom" ? !open : true) }}
+                    className={`${segBtn(preset === "custom")} whitespace-nowrap`}
+                  >
+                    {w("preset.custom")}
+                  </button>
+                  {dateOpen && (
+                    <div className="absolute right-0 top-[calc(100%+8px)] z-50 rounded-xl border border-gray-200 bg-white p-3 shadow-[0_12px_32px_rgba(15,23,42,0.14)]">
+                      <CalendarRange value={custom} onChange={setCustom} locale={lang === "rw" ? "rw-RW" : "en-GB"} max={fromIso(yesterday)} />
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
+            <Link
+              href={{ pathname: "/past-days", query: { place: primary } }}
+              className="inline-flex shrink-0 items-center whitespace-nowrap rounded-lg bg-[#147677] px-3.5 py-2 text-sm font-semibold text-white hover:bg-[#0f5f60]"
+            >
+              {w("pastAsk")}
+            </Link>
           </div>
           <p className="text-sm text-slate-600">{periodText}</p>
         </div>

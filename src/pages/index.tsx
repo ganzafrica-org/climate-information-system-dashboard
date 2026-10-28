@@ -16,7 +16,7 @@ useEffect(() => {
   return (
       <>
         <Head>
-          <title>GanzAfrica | Teganyamuhinzi</title>
+          <title>Musanze District | Teganyamuhinzi</title>
         </Head>
         <div className="flex min-h-screen items-center justify-center bg-background">
           <div className="flex flex-col items-center space-y-4">
@@ -68,7 +68,7 @@ useEffect(() => {
               </div>
             </div>
 
-            <h1 className="text-2xl font-bold text-ganz-primary">GanzAfrica</h1>
+            <h1 className="text-2xl font-bold text-ganz-primary">Musanze District</h1>
             <p className="text-muted-foreground">Teganyamuhinzi</p>
           </div>
         </div>

@@ -56,6 +56,7 @@ export interface DailyWeather {
     uvIndex: number;
     rainChance: number;
     rainAmount: number;
+    peakRainHour?: { time: string; rainAmount: number; hours?: number } | null;
     rainCategory?: string;
     cloudCategory?: string;
     clouds?: number;
@@ -71,6 +72,7 @@ export interface DailyWeather {
     soilCondition: string;
     extremeWeatherConditions: string[];
     farmingRecommendation: string;
+    weeklyAdvice?: string;
     rainPrediction: {
         willRain: boolean;
         timing: string;
@@ -263,4 +265,5 @@ export interface HistoricalWeatherFilters {
 
 export interface WeatherRequestParams {
     type?: 'daily' | 'warning' | 'forecast';
+    createAlert?: boolean;
 }
