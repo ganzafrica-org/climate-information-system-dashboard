@@ -16,6 +16,10 @@ export type UserAssignment = {
   districtName?: string | null;
 };
 
+export function isAdmin(user?: { role?: string } | null): boolean {
+  return user?.role?.trim().toLowerCase() === "admin";
+}
+
 export function isSectorAgronomist(user?: UserAssignment | null): boolean {
   return (
     user?.role === "agronomist" &&
