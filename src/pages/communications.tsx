@@ -8,7 +8,7 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import Head from 'next/head';
 import { useLanguage } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
-import { defaultLocationName } from '@/lib/assignment';
+import { defaultLocationName, isAdmin } from '@/lib/assignment';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Download, RefreshCw } from 'lucide-react';
@@ -20,20 +20,25 @@ export default function Communications() {
   const { t } = useLanguage();
   const { user } = useAuth();
   const router = useRouter();
+  const adminUser = isAdmin(user);
 
   const tabs = [
     { value: 'alerts', label: t('alerts') },
     { value: 'messages', label: t('customMessages') },
     { value: 'scheduler', label: t('weatherScheduler') },
-    ...(user?.role === 'admin' ? [{ value: 'logs', label: t('logs') }] : []),
+    ...(adminUser ? [{ value: 'logs', label: t('logs') }] : []),
   ];
 
   useEffect(() => {
     const tab = router.query.tab;
     if (typeof tab === 'string' && tabs.some((item) => item.value === tab)) {
       setActiveTab(tab);
+      return;
     }
-  }, [router.query.tab, user?.role]);
+    if (activeTab === 'logs' && !adminUser) {
+      setActiveTab('alerts');
+    }
+  }, [router.query.tab, adminUser, activeTab]);
 
   return (
     <AppLayout>
@@ -49,7 +54,7 @@ export default function Communications() {
             {t('Agricultural Alerts & Messages')}
           </h1>
 
-          {activeTab === 'logs' && user?.role === 'admin' && (
+          {activeTab === 'logs' && adminUser && (
             <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="outline"
@@ -101,7 +106,7 @@ export default function Communications() {
         {activeTab === 'alerts' && <AlertsTable selectedSector={defaultLocationName(user)} searchTerm="" />}
         {activeTab === 'messages' && <MessagesTable selectedSector={defaultLocationName(user)} searchTerm="" />}
         {activeTab === 'scheduler' && <WeatherSchedulerTable />}
-        {activeTab === 'logs' && user?.role === 'admin' && (
+        {activeTab === 'logs' && adminUser && (
           <MessageLogsTable
             ref={logsRef}
             onBusyChange={setLogsBusy}

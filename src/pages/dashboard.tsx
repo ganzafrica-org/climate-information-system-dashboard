@@ -52,7 +52,7 @@ import {
 import { ChartContainer, ChartTooltipContent } from '@/components/ui/chart';
 import { rainfallCategory } from '@/lib/weather';
 import { addISODays, kigaliNowParts, kigaliTodayISO, kigaliWeekDates, monthName, weekday, KIGALI_TZ } from '@/lib/weatherFormat';
-import { locationDisplayName, pickDefaultLocation, sortLocationsDistrictFirst, isDistrictLocationName } from '@/lib/assignment';
+import { locationDisplayName, pickDefaultLocation, sortLocationsDistrictFirst, isDistrictLocationName, isAdmin } from '@/lib/assignment';
 import { useSectorHistory } from '@/lib/weather';
 import { isSigningInAgain, isUnauthorized } from '@/lib/session';
 
@@ -84,6 +84,52 @@ const getWeatherIcon = (condition: string, className?: string): React.ReactEleme
     return iconMap[conditionKey] || <SunCloudIcon className={cn('h-10 w-10', className)} />;
 };
 
+const ALERTS_PAGE_SIZE = 100;
+const ALERTS_MAX_PAGES = 25;
+
+function asRecord(value: unknown): Record<string, any> | null {
+    return value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, any>)
+        : null;
+}
+
+function extractAlertsPayload(res: any) {
+    const layers = [res, res?.data, res?.data?.data, res?.data?.data?.data];
+    let summary: Record<string, any> | null = null;
+    let pagination: Record<string, any> | null = null;
+    let alerts: any[] = [];
+
+    for (const layer of layers) {
+        if (Array.isArray(layer) && !alerts.length) {
+            alerts = layer;
+            continue;
+        }
+        const rec = asRecord(layer);
+        if (!rec) continue;
+        if (!summary && asRecord(rec.summary)) summary = rec.summary;
+        if (!pagination && (asRecord(rec.pagination) || asRecord(rec.meta))) {
+            pagination = rec.pagination || rec.meta;
+        }
+        if (!alerts.length) {
+            if (Array.isArray(rec.alerts)) alerts = rec.alerts;
+            else if (Array.isArray(rec.results)) alerts = rec.results;
+            else if (Array.isArray(rec.data)) alerts = rec.data;
+        }
+    }
+
+    return { summary, pagination, alerts };
+}
+
+function alertIsActive(alert: any) {
+    if (alert?.isActive === true || alert?.isActive === 1 || String(alert?.isActive).toLowerCase() === 'true') {
+        return true;
+    }
+    const validTo = alert?.validTo || alert?.validUntil;
+    const until = validTo ? Date.parse(validTo) : NaN;
+    const sent = Boolean(alert?.isSent || alert?.status === 'sent' || alert?.sentAt);
+    return sent && Number.isFinite(until) && until > Date.now();
+}
+
 type DashboardStats = {
     totalFarmers: number;
     messagesSent: number;
@@ -96,7 +142,6 @@ type DashboardStats = {
     farmersToday?: number;
     sentYesterday?: number;
     failedYesterday?: number;
-    alertsToday?: number;
     locationsToday?: number;
     messagesScope?: 'sector' | 'district' | 'all' | null;
     messagesSectorName?: string | null;
@@ -124,7 +169,6 @@ const Dashboard: NextPage = () => {
         farmersToday: 0,
         sentYesterday: 0,
         failedYesterday: 0,
-        alertsToday: 0,
         locationsToday: 0,
         messagesScope: null,
         messagesSectorName: null,
@@ -147,8 +191,12 @@ const Dashboard: NextPage = () => {
 
     useEffect(() => {
         fetchLocations();
-        fetchDashboardStats();
     }, []);
+
+    useEffect(() => {
+        if (authLoading) return;
+        fetchDashboardStats();
+    }, [authLoading, user?.role]);
 
     useEffect(() => {
         if (authLoading || !locations.length) return;
@@ -210,7 +258,7 @@ const Dashboard: NextPage = () => {
         try {
             const [farmersRes, alertsListRes, messagesDashRes, locsRes] = await Promise.all([
                 api.get('/api/admin/farmers').catch((e: any) => e),
-                api.get('/api/weather/alerts', { params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc' } }).catch((e: any) => e),
+                api.get('/api/weather/alerts', { params: { limit: ALERTS_PAGE_SIZE, page: 1 } }).catch((e: any) => e),
                 api.get('/api/weather/dashboard/messages').catch(() => null),
                 api.get('/api/admin/locations').catch((e: any) => e),
             ]);
@@ -225,40 +273,38 @@ const Dashboard: NextPage = () => {
                 ? farmersData.filter((farmer: any) => isToday(farmer.createdAt)).length
                 : 0;
 
+            const firstAlerts = extractAlertsPayload(alertsListRes);
+            const page1Active = firstAlerts.alerts.filter(alertIsActive).length;
+            const summaryActive = Number(firstAlerts.summary?.activeAlerts);
+            const totalPages = Math.min(
+                Math.max(1, Number(firstAlerts.pagination?.totalPages) || 1),
+                ALERTS_MAX_PAGES,
+            );
+
             let activeAlerts = 0;
-            let totalAlertsCount = 0;
+            let collectedAlerts = firstAlerts.alerts;
 
-            const alertsPayload = alertsListRes?.data || alertsListRes;
-            let alertsArray: any[] = [];
-            if (Array.isArray(alertsPayload)) {
-                alertsArray = alertsPayload;
-            } else if (Array.isArray(alertsPayload?.data?.alerts)) {
-                alertsArray = alertsPayload.data.alerts;
-            } else if (Array.isArray(alertsPayload?.alerts)) {
-                alertsArray = alertsPayload.alerts;
-            } else if (Array.isArray(alertsPayload?.data)) {
-                alertsArray = alertsPayload.data;
+            if (Number.isFinite(summaryActive) && summaryActive > page1Active) {
+                activeAlerts = summaryActive;
+            } else if (totalPages <= 1) {
+                activeAlerts = page1Active;
+            } else {
+                const rest = await Promise.all(
+                    Array.from({ length: totalPages - 1 }, (_, index) =>
+                        api.get('/api/weather/alerts', {
+                            params: { limit: ALERTS_PAGE_SIZE, page: index + 2 },
+                        }).catch(() => null)
+                    )
+                );
+                collectedAlerts = firstAlerts.alerts.concat(
+                    ...rest.map((payload) => extractAlertsPayload(payload).alerts)
+                );
+                activeAlerts = collectedAlerts.filter(alertIsActive).length;
             }
 
-            totalAlertsCount = alertsPayload?.data?.total || alertsPayload?.total || alertsPayload?.pagination?.total || alertsArray.length;
-
-            if (alertsArray.length > 0) {
-                const now = Date.now();
-                const parsed = alertsArray.map((a: any) => ({
-                    status: a.status || (a.isSent ? 'sent' : 'draft'),
-                    isSent: Boolean(a.isSent || a.status === 'sent' || a.sentAt),
-                    isActive: a.isActive,
-                    validUntil: a.validUntil ? Date.parse(a.validUntil) : null,
-                }));
-
-                activeAlerts = parsed.filter(p => {
-                    if (p.isActive === true) return true;
-                    if (p.isSent && p.validUntil && p.validUntil > now) return true;
-                    return false;
-                }).length;
-            }
-
-            const alertsToday = alertsArray.filter((alert: any) => isToday(alert.sentAt) || isToday(alert.createdAt)).length;
+            const totalAlertsCount = Number(
+                firstAlerts.summary?.totalAlerts ?? firstAlerts.pagination?.total ?? collectedAlerts.length
+            ) || 0;
 
             let messagesSent = 0;
             let totalMessages = 0;
@@ -285,7 +331,7 @@ const Dashboard: NextPage = () => {
                     ? dashNode.scope
                     : null;
                 messagesSectorName = dashNode.sectorName || null;
-            } else {
+            } else if (isAdmin(user)) {
                 const messagesLogsRes = await api.get('/api/weather/admin/logs/messages', {
                     params: { limit: 1000, sortField: 'createdAt', sortOrder: 'desc', _ts: Date.now() },
                 }).catch(() => null);
@@ -326,7 +372,6 @@ const Dashboard: NextPage = () => {
                 farmersToday,
                 sentYesterday,
                 failedYesterday,
-                alertsToday,
                 locationsToday,
                 messagesScope,
                 messagesSectorName,
@@ -345,7 +390,6 @@ const Dashboard: NextPage = () => {
                 farmersToday: 0,
                 sentYesterday: 0,
                 failedYesterday: 0,
-                alertsToday: 0,
                 locationsToday: 0,
                 messagesScope: null,
                 messagesSectorName: null,
@@ -729,11 +773,7 @@ const Dashboard: NextPage = () => {
         {
             label: t('activeAlerts'),
             value: dashboardStats.activeAlerts,
-            captions: [{
-                text: t('todayCount', { count: (dashboardStats.alertsToday || 0).toLocaleString() }),
-                tone: 'orange' as const,
-                arrow: true,
-            }],
+            captions: [{ text: t('allTime'), tone: 'teal' as const, arrow: true }],
             icon: <AlertTriangle className="h-5 w-5 text-[#F5A623]" strokeWidth={2} />,
             iconBg: 'bg-[#FDECDC]',
         },

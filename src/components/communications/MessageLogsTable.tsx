@@ -26,6 +26,8 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLanguage } from '@/i18n';
+import { useAuth } from '@/hooks/useAuth';
+import { isAdmin } from '@/lib/assignment';
 
 interface MessageLog {
     id?: number;
@@ -83,6 +85,8 @@ export type MessageLogsTableHandle = {
 
 export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChange?: (busy: boolean) => void }>(function MessageLogsTable({ onBusyChange }, ref) {
     const { t } = useLanguage();
+    const { user, isLoading: authLoading } = useAuth();
+    const adminUser = isAdmin(user);
     const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
     const [searchTerm, setSearchTerm] = useState<string>('');
@@ -109,6 +113,12 @@ export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChang
     };
 
     const fetchLogs = async () => {
+        if (!isAdmin(user)) {
+            setLogs([]);
+            setSummary({ total: 0, sent: 0, failed: 0, pending: 0, sentYesterday: 0, failedYesterday: 0 });
+            setIsLoading(false);
+            return;
+        }
         setIsLoading(true);
         try {
             const allLogs: MessageLog[] = [];
@@ -148,9 +158,10 @@ export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChang
     };
 
     useEffect(() => {
+        if (authLoading) return;
         fetchLogs();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [authLoading, adminUser]);
 
     useEffect(() => {
         onBusyChange?.(isRefreshing || isLoading);
@@ -294,6 +305,8 @@ export const MessageLogsTable = forwardRef<MessageLogsTableHandle, { onBusyChang
         { id: 'failed' as const, label: t('failedCountLabel'), count: summary.failed },
         { id: 'pending' as const, label: t('pendingCountLabel'), count: summary.pending },
     ];
+
+    if (!adminUser) return null;
 
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_8px_24px_rgba(15,40,80,0.06)] px-5 pt-5 pb-4">
