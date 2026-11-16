@@ -897,12 +897,7 @@ const Dashboard: NextPage = () => {
                                     <ArrowUpRight className="inline h-3.5 w-3.5 mr-0.5 align-text-bottom" />
                                 )}
                                 {stat.captions.map((caption, index) => (
-                                    <span
-                                        key={caption.text}
-                                        className={cn(
-                                            caption.tone === 'orange' ? 'text-[#F5A623]' : 'text-[#147677]'
-                                        )}
-                                    >
+                                    <span key={caption.text}>
                                         {index > 0 ? ' · ' : ''}
                                         {caption.text}
                                     </span>
